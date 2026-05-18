@@ -1,23 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-
-import StepMenu from "./components/StepMenu";
 import StepDataDiri from "./components/StepDataDiri";
 import StepRiwayatKeluarga from "./components/StepRiwayatKeluarga";
 import StepRiwayatKesehatan from "./components/StepRiwayatKesehatan";
 import StepRiwayatPekerjaan from "./components/StepRiwayatPekerjaan";
 import StepKesiapanBekerja from "./components/StepKesiapanBekerja";
+import CekTahapanPelamar from "./components/CekTahapanPelamar";
 
 function PendaftaranPage() {
-    const emptySaudara = {
-        nama: "",
-        jenis_kelamin: "",
-        hubungan: "",
-        pekerjaan: "",
-        no_hp: "",
-        alamat: "",
-    };
-
     const emptySosialMedia = {
         platform: "",
         nama_akun: "",
@@ -29,9 +19,21 @@ function PendaftaranPage() {
         nomor: "",
     };
 
+    const emptySaudara = {
+        nama: "",
+        jenis_kelamin: "",
+        hubungan: "",
+        pekerjaan: "",
+        no_hp: "",
+        alamat: "",
+    };
+
     const [activePage, setActivePage] = useState("pendaftaran");
     const [step, setStep] = useState(1);
     const [errors, setErrors] = useState({});
+    const [loadingToken, setLoadingToken] = useState(false);
+    const [loadingSubmit, setLoadingSubmit] = useState(false);
+    const [pelamarAktif, setPelamarAktif] = useState(null);
 
     const [cekTahapanForm, setCekTahapanForm] = useState({
         token: "",
@@ -41,6 +43,8 @@ function PendaftaranPage() {
     const [hasilCekTahapan, setHasilCekTahapan] = useState(null);
 
     const [form, setForm] = useState({
+        token: "",
+
         nama: "",
         nama_panggilan: "",
         email: "",
@@ -49,8 +53,11 @@ function PendaftaranPage() {
 
         posisi_dilamar: "",
         perusahaan_dilamar: "",
+        sumber_informasi: "",
 
         pendidikan: "",
+        jurusan: "",
+        nama_institusi: "",
         str_aktif: "",
 
         sosial_media: [{ ...emptySosialMedia }],
@@ -61,7 +68,10 @@ function PendaftaranPage() {
         agama: "",
         status_perkawinan: "",
         kewarganegaraan: "",
+
         alamat: "",
+        alamat_ktp: "",
+        alamat_domisili: "",
         provinsi: "",
         kabupaten: "",
         kecamatan: "",
@@ -100,7 +110,6 @@ function PendaftaranPage() {
         pekerjaan_ibu_mertua: "",
 
         kontak_darurat: [{ ...emptyKontakDarurat }],
-
         saudara_kandung: [{ ...emptySaudara }],
         saudara_ipar: [{ ...emptySaudara }],
 
@@ -171,45 +180,29 @@ function PendaftaranPage() {
         {
             id: 1,
             title: "Data Diri",
-            description: "Identitas utama pelamar.",
+            description: "Identitas utama dan informasi lamaran.",
         },
         {
             id: 2,
             title: "Riwayat Keluarga",
-            description: "Data keluarga pelamar.",
+            description: "Data keluarga dan kontak darurat.",
         },
         {
             id: 3,
             title: "Riwayat Kesehatan",
-            description: "Kondisi kesehatan pelamar.",
+            description: "Informasi kesehatan pelamar.",
         },
         {
             id: 4,
             title: "Riwayat Pekerjaan",
-            description: "Pengalaman kerja pelamar.",
+            description: "Pengalaman kerja dan keahlian.",
         },
         {
             id: 5,
             title: "Kesiapan Bekerja",
-            description: "Kesiapan mulai bekerja.",
+            description: "Kesiapan penempatan dan mulai kerja.",
         },
     ];
-
-    const stepTitle = {
-        1: "Data Diri",
-        2: "Riwayat Keluarga",
-        3: "Riwayat Kesehatan",
-        4: "Riwayat Pekerjaan",
-        5: "Data Kesiapan Bekerja",
-    };
-
-    const stepDescription = {
-        1: "Isi informasi identitas pribadi dan data lamaran dengan lengkap.",
-        2: "Lengkapi informasi keluarga serta kontak darurat yang dapat dihubungi.",
-        3: "Lengkapi informasi kondisi kesehatan dan riwayat medis Anda.",
-        4: "Isi pengalaman kerja, keahlian, dan riwayat pekerjaan Anda.",
-        5: "Lengkapi informasi kesiapan kerja sebelum mengirim pendaftaran.",
-    };
 
     const requiredFieldsByStep = {
         1: [
@@ -217,14 +210,10 @@ function PendaftaranPage() {
             "nama_panggilan",
             "email",
             "no_hp",
-            "nik",
             "posisi_dilamar",
             "perusahaan_dilamar",
             "pendidikan",
-            "str_aktif",
-            "tempat_lahir",
             "tanggal_lahir",
-            "jenis_kelamin",
             "agama",
             "alamat",
         ],
@@ -240,22 +229,16 @@ function PendaftaranPage() {
             "tinggi_badan",
             "berat_badan",
             "buta_warna",
-            "kacamata_digunakan",
             "alat_bantu_pendengaran",
             "tangan_dominan",
-            "tangan_gemetar",
-            "tangan_berkeringat",
             "memiliki_riwayat_penyakit",
             "punya_penyakit_genetik",
-            "riwayat_kronis",
-            "riwayat_penyakit_menular",
             "memiliki_alergi",
             "pengobatan_psikolog",
             "pernah_kecelakaan",
             "pernah_operasi",
-            "program_kehamilan",
         ],
-        4: ["status_pekerjaan", "posisi_pekerjaan", "keahlian"],
+        4: ["status_pekerjaan", "keahlian"],
         5: ["bersedia_ditempatkan", "bersedia_shift", "tanggal_siap_kerja"],
     };
 
@@ -267,55 +250,74 @@ function PendaftaranPage() {
         nik: "NIK",
         posisi_dilamar: "Posisi yang Dilamar",
         perusahaan_dilamar: "Perusahaan yang Dilamar",
+        sumber_informasi: "Sumber Informasi",
         pendidikan: "Pendidikan Terakhir",
+        jurusan: "Jurusan",
+        nama_institusi: "Nama Institusi",
         str_aktif: "STR Aktif",
         tempat_lahir: "Tempat Lahir",
         tanggal_lahir: "Tanggal Lahir",
         jenis_kelamin: "Jenis Kelamin",
         agama: "Agama",
+        status_perkawinan: "Status Perkawinan",
+        kewarganegaraan: "Kewarganegaraan",
         alamat: "Alamat Lengkap",
-
         nama_ayah_kandung: "Nama Ayah Kandung",
         pekerjaan_ayah_kandung: "Pekerjaan Ayah Kandung",
         nama_ibu_kandung: "Nama Ibu Kandung",
         pekerjaan_ibu_kandung: "Pekerjaan Ibu Kandung",
-
         kontak_darurat: "Kontak Darurat",
-
         golongan_darah: "Golongan Darah",
         tinggi_badan: "Tinggi Badan",
         berat_badan: "Berat Badan",
-
         buta_warna: "Buta Warna",
-        kacamata_digunakan: "Penggunaan Kaca Mata",
         alat_bantu_pendengaran: "Alat Bantu Pendengaran",
-        tangan_dominan: "Tangan yang Digunakan Saat Menulis",
-        tangan_gemetar: "Tangan Sering Gemetar",
-        tangan_berkeringat: "Tangan Sering Berkeringat",
-
-        memiliki_riwayat_penyakit: "Riwayat Penyakit",
+        tangan_dominan: "Tangan Dominan",
+        memiliki_riwayat_penyakit: "Memiliki Riwayat Penyakit",
         punya_penyakit_genetik: "Punya Penyakit Genetik",
-        nama_penyakit: "Nama Penyakit",
-        riwayat_kronis: "Riwayat Kronis",
-        riwayat_penyakit_menular: "Riwayat Penyakit Menular",
-
-        memiliki_alergi: "Alergi",
+        memiliki_alergi: "Memiliki Alergi",
         pengobatan_psikolog: "Pengobatan Psikolog",
-        kapan_dilakukan: "Kapan Dilakukan",
         pernah_kecelakaan: "Pernah Kecelakaan",
-        bagian_tubuh_kecelakaan: "Bagian Tubuh yang Kecelakaan",
         pernah_operasi: "Pernah Operasi",
-        diagnosa_dokter: "Diagnosa Dokter",
-        program_kehamilan: "Program Kehamilan",
-
         status_pekerjaan: "Status Pekerjaan",
         posisi_pekerjaan: "Posisi / Jabatan",
-        keahlian: "Keahlian / Skill",
-
+        keahlian: "Keahlian",
         bersedia_ditempatkan: "Bersedia Ditempatkan",
         bersedia_shift: "Bersedia Shift",
         tanggal_siap_kerja: "Tanggal Siap Kerja",
     };
+
+    const progressPercent = useMemo(() => {
+        return Math.round((step / steps.length) * 100);
+    }, [step, steps.length]);
+
+    useEffect(() => {
+        const initialToken = getInitialTokenFromPage();
+        const initialPelamar = getInitialPelamarFromPage();
+
+        if (initialToken) {
+            setCekTahapanForm({
+                token: initialToken,
+            });
+
+            setForm((prevForm) => ({
+                ...prevForm,
+                token: initialToken,
+            }));
+        }
+
+        if (initialPelamar) {
+            applyPelamarToPage(initialPelamar);
+            return;
+        }
+
+        if (initialToken) {
+            loadPelamarByToken(initialToken, {
+                silent: true,
+                showResult: false,
+            });
+        }
+    }, []);
 
     const isEmpty = (value) => {
         if (Array.isArray(value)) {
@@ -325,33 +327,366 @@ function PendaftaranPage() {
         return value === undefined || value === null || String(value).trim() === "";
     };
 
-    const resetCekTahapan = () => {
+    function getInitialTokenFromPage() {
+        const root = document.getElementById("pendaftaran-root");
+
+        if (root?.dataset?.token) {
+            return root.dataset.token;
+        }
+
+        const pathParts = window.location.pathname.split("/").filter(Boolean);
+        const pendaftaranIndex = pathParts.indexOf("pendaftaran");
+
+        if (pendaftaranIndex !== -1 && pathParts[pendaftaranIndex + 1]) {
+            return decodeURIComponent(pathParts[pendaftaranIndex + 1]);
+        }
+
+        return "";
+    }
+
+    function getInitialPelamarFromPage() {
+        const root = document.getElementById("pendaftaran-root");
+        const rawPelamar = root?.dataset?.pelamar;
+
+        if (!rawPelamar || rawPelamar === "null") {
+            return null;
+        }
+
+        try {
+            return JSON.parse(rawPelamar);
+        } catch (error) {
+            console.error("Gagal membaca data pelamar dari Blade:", error);
+            return null;
+        }
+    }
+
+    const getRelationName = (pelamar, relationName, fieldName, fallbackField = null) => {
+        return (
+            pelamar?.[relationName]?.[fieldName] ||
+            pelamar?.[fallbackField || relationName]?.[fieldName] ||
+            ""
+        );
+    };
+
+    const mapPelamarToForm = (pelamar) => {
+        return {
+            token: pelamar?.token || "",
+
+            nama: pelamar?.nama_lengkap || "",
+            nama_panggilan: pelamar?.nama_panggil || "",
+            email: pelamar?.email || "",
+            no_hp: pelamar?.no_wa || "",
+            nik: pelamar?.nik || "",
+
+            posisi_dilamar:
+                getRelationName(pelamar, "posisi", "nama_posisi") ||
+                pelamar?.posisi_yang_dilamar ||
+                "",
+
+            perusahaan_dilamar:
+                getRelationName(pelamar, "perusahaan", "nama_perusahaan") ||
+                pelamar?.perusahaan_dilamar ||
+                "",
+
+            sumber_informasi:
+                getRelationName(pelamar, "sumberInformasi", "informasi", "sumber_informasi") ||
+                pelamar?.sumber_informasi_id ||
+                "",
+
+            pendidikan:
+                getRelationName(pelamar, "pendidikan", "pendidikan") ||
+                pelamar?.pendidikan_id ||
+                "",
+
+            jurusan: pelamar?.jurusan || "",
+            nama_institusi: pelamar?.nama_institusi || "",
+            str_aktif: pelamar?.str_aktif || "",
+
+            tempat_lahir: pelamar?.tempat_lahir || "",
+            tanggal_lahir: pelamar?.tanggal_lahir || "",
+            jenis_kelamin: pelamar?.jenis_kelamin || "",
+
+            agama:
+                getRelationName(pelamar, "agama", "agama") ||
+                pelamar?.agama_id ||
+                "",
+
+            status_perkawinan:
+                getRelationName(pelamar, "statusPernikahan", "status_pernikahan", "status_pernikahan") ||
+                pelamar?.status_pernikahan_id ||
+                "",
+
+            kewarganegaraan:
+                getRelationName(pelamar, "kewarganegaraan", "kewarganegaraan") ||
+                pelamar?.kewarganegaraan_id ||
+                "",
+
+            alamat:
+                pelamar?.alamat_domisili ||
+                pelamar?.alamat_ktp ||
+                pelamar?.alamat ||
+                "",
+
+            alamat_ktp: pelamar?.alamat_ktp || "",
+            alamat_domisili: pelamar?.alamat_domisili || "",
+            provinsi: pelamar?.provinsi || "",
+            kabupaten: pelamar?.kabupaten || "",
+            kecamatan: pelamar?.kecamatan || "",
+            kelurahan: pelamar?.kelurahan || "",
+            rt: pelamar?.rt || "",
+            rw: pelamar?.rw || "",
+
+            golongan_darah: pelamar?.gol_darah || "",
+            tinggi_badan: pelamar?.tinggi_badan || "",
+            berat_badan: pelamar?.berat_badan || "",
+        };
+    };
+
+    const applyPelamarToPage = (pelamar) => {
+        const mappedData = mapPelamarToForm(pelamar);
+
+        setPelamarAktif(pelamar);
+
+        setForm((prevForm) => ({
+            ...prevForm,
+            ...mappedData,
+        }));
+
         setCekTahapanForm({
-            token: "",
+            token: pelamar?.token || "",
         });
 
-        setCekTahapanErrors({});
-        setHasilCekTahapan(null);
+        setHasilCekTahapan(makeHasilCekTahapan(pelamar));
     };
 
-    const openCekTahapan = () => {
-        resetCekTahapan();
-        setActivePage("cek-tahapan");
+    const loadPelamarByToken = async (
+        token,
+        options = {
+            silent: false,
+            showResult: true,
+        }
+    ) => {
+        const cleanToken = String(token || "").trim();
 
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
+        if (!cleanToken) {
+            throw new Error("Token pelamar wajib diisi.");
+        }
+
+        setLoadingToken(true);
+
+        try {
+            const response = await fetch(
+                `/pendaftaran/api/token/${encodeURIComponent(cleanToken)}`,
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || "Token pelamar tidak ditemukan.");
+            }
+
+            applyPelamarToPage(result.data);
+
+            if (options.showResult) {
+                setActivePage("cek-tahapan");
+            }
+
+            setCekTahapanErrors({});
+
+            return result.data;
+        } catch (error) {
+            if (!options.silent) {
+                setCekTahapanErrors({
+                    token: error.message || "Token pelamar tidak ditemukan.",
+                });
+            }
+
+            throw error;
+        } finally {
+            setLoadingToken(false);
+        }
+    };
+
+    const makeHasilCekTahapan = (pelamar) => {
+        const status = pelamar?.status_seleksi || "Administrasi";
+        const tahapanTerakhir = pelamar?.tahapan_terakhir || status;
+
+        return {
+            token: pelamar?.token || "-",
+            nama_pelamar: pelamar?.nama_lengkap || "-",
+            posisi_dilamar:
+                getRelationName(pelamar, "posisi", "nama_posisi") ||
+                pelamar?.posisi_yang_dilamar ||
+                "-",
+            perusahaan_dilamar:
+                getRelationName(pelamar, "perusahaan", "nama_perusahaan") ||
+                pelamar?.perusahaan_dilamar ||
+                "-",
+            status,
+            tahapan_terakhir: tahapanTerakhir,
+            keterangan:
+                pelamar?.keterangan_seleksi ||
+                `Status seleksi kandidat saat ini berada pada tahap ${tahapanTerakhir}.`,
+            saran:
+                pelamar?.saran_seleksi ||
+                "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.",
+            tahapan:
+                Array.isArray(pelamar?.tahapan_seleksi) &&
+                pelamar.tahapan_seleksi.length > 0
+                    ? pelamar.tahapan_seleksi
+                    : makeDefaultTahapanSeleksi(status),
+        };
+    };
+
+    const makeDefaultTahapanSeleksi = (statusSeleksi) => {
+        const tahapan = [
+            "Administrasi",
+            "Test Psikolog",
+            "Test MMPI",
+            "Interview",
+            "Offering",
+            "Diterima",
+        ];
+
+        let currentIndex = tahapan.findIndex(
+            (item) => item.toLowerCase() === String(statusSeleksi || "").toLowerCase()
+        );
+
+        if (currentIndex === -1) {
+            currentIndex = 0;
+        }
+
+        return tahapan.map((nama, index) => {
+            let status = "Menunggu";
+
+            if (index < currentIndex) {
+                status = "Lolos";
+            }
+
+            if (index === currentIndex) {
+                status = "Proses";
+            }
+
+            return {
+                nama,
+                status,
+                keterangan:
+                    status === "Lolos"
+                        ? `Tahap ${nama} sudah selesai dan kandidat dinyatakan lolos.`
+                        : status === "Proses"
+                        ? `Kandidat sedang berada pada tahap ${nama}.`
+                        : `Tahap ${nama} belum dimulai.`,
+            };
         });
     };
 
-    const backToPendaftaran = () => {
-        resetCekTahapan();
-        setActivePage("pendaftaran");
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
 
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
+        setForm((prevForm) => {
+            let nextValue = value;
+
+            if (type === "checkbox") {
+                const currentValues = Array.isArray(prevForm[name])
+                    ? prevForm[name]
+                    : [];
+
+                nextValue = checked
+                    ? [...currentValues, value]
+                    : currentValues.filter((item) => item !== value);
+            }
+
+            const updatedForm = {
+                ...prevForm,
+                [name]: nextValue,
+            };
+
+            if (name === "status_pekerjaan" && value === "Belum Bekerja") {
+                updatedForm.posisi_pekerjaan = "";
+            }
+
+            return updatedForm;
         });
+
+        setErrors((prevErrors) => {
+            const updatedErrors = { ...prevErrors };
+
+            if (!isEmpty(value)) {
+                delete updatedErrors[name];
+            }
+
+            if (name === "status_pekerjaan" && value === "Belum Bekerja") {
+                delete updatedErrors.posisi_pekerjaan;
+            }
+
+            return updatedErrors;
+        });
+    };
+
+    const handleArrayChange = (field, index, name, value) => {
+        setForm((prevForm) => {
+            const list = Array.isArray(prevForm[field]) ? [...prevForm[field]] : [];
+
+            list[index] = {
+                ...list[index],
+                [name]: value,
+            };
+
+            return {
+                ...prevForm,
+                [field]: list,
+            };
+        });
+
+        setErrors((prevErrors) => {
+            const updatedErrors = { ...prevErrors };
+
+            if (!isEmpty(value)) {
+                delete updatedErrors[`${field}_${index}_${name}`];
+
+                if (field === "kontak_darurat" && index === 0) {
+                    delete updatedErrors[`kontak_darurat_${name}`];
+                }
+            }
+
+            return updatedErrors;
+        });
+    };
+
+    const addArrayItem = (field, template) => {
+        setForm((prevForm) => ({
+            ...prevForm,
+            [field]: [...prevForm[field], { ...template }],
+        }));
+    };
+
+    const removeArrayItem = (field, index, template) => {
+        setForm((prevForm) => {
+            const nextItems = prevForm[field].filter((_, itemIndex) => itemIndex !== index);
+
+            return {
+                ...prevForm,
+                [field]: nextItems.length > 0 ? nextItems : [{ ...template }],
+            };
+        });
+    };
+
+
+    const handleSosialMediaChange = (index, name, value) => {
+        handleArrayChange("sosial_media", index, name, value);
+    };
+
+    const addSosialMedia = () => {
+        addArrayItem("sosial_media", emptySosialMedia);
+    };
+
+    const removeSosialMedia = (index) => {
+        removeArrayItem("sosial_media", index, emptySosialMedia);
     };
 
     const handleCekTahapanChange = (e) => {
@@ -375,59 +710,69 @@ function PendaftaranPage() {
         setHasilCekTahapan(null);
     };
 
-    const handleCekTahapanSubmit = (e) => {
+    const handleCekTahapanSubmit = async (e) => {
         e.preventDefault();
 
-        const newErrors = {};
-
         if (isEmpty(cekTahapanForm.token)) {
-            newErrors.token = "Token pelamar wajib diisi.";
-        }
-
-        setCekTahapanErrors(newErrors);
-
-        if (Object.keys(newErrors).length > 0) {
+            setCekTahapanErrors({
+                token: "Token pelamar wajib diisi.",
+            });
             return;
         }
 
-        setHasilCekTahapan({
-            token: cekTahapanForm.token,
-            nama_pelamar: "Andi Saputra",
-            posisi_dilamar: "Staff Administrasi",
-            status: "Gagal Interview",
-            tahapan_terakhir: "Interview",
-            keterangan:
-                "Terima kasih telah mengikuti proses seleksi. Berdasarkan hasil evaluasi, Anda telah lolos tahap Administrasi, Test Psikolog, dan Test MMPI. Namun, untuk saat ini Anda belum dapat melanjutkan ke tahap berikutnya karena hasil interview belum memenuhi kualifikasi yang dibutuhkan.",
-            saran:
-                "Anda dapat mencoba kembali di lain waktu apabila terdapat lowongan yang sesuai. Tetap tingkatkan kemampuan komunikasi, kesiapan kerja, dan pemahaman terhadap posisi yang dilamar.",
-            tahapan: [
-                {
-                    nama: "Administrasi",
-                    status: "Lolos",
-                    keterangan:
-                        "Data pendaftaran dan kelengkapan berkas telah diverifikasi serta dinyatakan sesuai dengan persyaratan administrasi.",
-                },
-                {
-                    nama: "Test Psikolog",
-                    status: "Lolos",
-                    keterangan:
-                        "Pelamar telah mengikuti test psikolog dan hasilnya memenuhi standar penilaian awal perusahaan.",
-                },
-                {
-                    nama: "Test MMPI",
-                    status: "Lolos",
-                    keterangan:
-                        "Pelamar telah mengikuti test MMPI dan hasilnya memenuhi ketentuan proses seleksi.",
-                },
-                {
-                    nama: "Interview",
-                    status: "Gagal",
-                    keterangan:
-                        "Pelamar belum memenuhi kriteria penilaian pada tahap interview untuk posisi yang dilamar saat ini.",
-                    saran:
-                        "Silakan mencoba kembali di lain waktu apabila tersedia kesempatan rekrutmen berikutnya.",
-                },
-            ],
+        try {
+            await loadPelamarByToken(cekTahapanForm.token, {
+                silent: false,
+                showResult: true,
+            });
+        } catch (error) {
+            setHasilCekTahapan(null);
+        }
+    };
+
+    const openCekTahapan = async () => {
+        setActivePage("cek-tahapan");
+        setErrors({});
+        setCekTahapanErrors({});
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+
+        const token = cekTahapanForm.token || form.token || getInitialTokenFromPage();
+
+        if (!token) {
+            setHasilCekTahapan(null);
+            setCekTahapanErrors({
+                token: "Token pelamar tidak tersedia. Silakan buka halaman melalui link pendaftaran yang diberikan HR.",
+            });
+            return;
+        }
+
+        setCekTahapanForm({
+            token,
+        });
+
+        try {
+            await loadPelamarByToken(token, {
+                silent: false,
+                showResult: true,
+            });
+        } catch (error) {
+            setHasilCekTahapan(null);
+            setCekTahapanErrors({
+                token: error.message || "Token pelamar tidak ditemukan.",
+            });
+        }
+    };
+
+    const backToPendaftaran = () => {
+        setActivePage("pendaftaran");
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
         });
     };
 
@@ -442,18 +787,17 @@ function PendaftaranPage() {
                     : null;
 
                 if (!firstKontak || isEmpty(firstKontak.nama)) {
-                    newErrors.kontak_darurat_nama =
-                        "Nama kontak darurat wajib diisi.";
+                    newErrors.kontak_darurat_nama = "Nama kontak darurat wajib diisi.";
                 }
 
                 if (!firstKontak || isEmpty(firstKontak.status)) {
                     newErrors.kontak_darurat_status =
-                        "Status hubungan kontak darurat wajib dipilih.";
+                        "Status hubungan kontak darurat wajib diisi.";
                 }
 
                 if (!firstKontak || isEmpty(firstKontak.nomor)) {
                     newErrors.kontak_darurat_nomor =
-                        "Nomor telepon kontak darurat wajib diisi.";
+                        "Nomor kontak darurat wajib diisi.";
                 }
 
                 return;
@@ -467,41 +811,35 @@ function PendaftaranPage() {
             }
 
             if (isEmpty(form[fieldName])) {
-                newErrors[fieldName] = `${
-                    fieldLabels[fieldName] || fieldName
-                } wajib diisi.`;
+                newErrors[fieldName] = `${fieldLabels[fieldName] || fieldName} wajib diisi.`;
             }
         });
 
         if (step === 3) {
-            if (
-                form.punya_penyakit_genetik === "Ya" &&
-                isEmpty(form.nama_penyakit)
-            ) {
-                newErrors.nama_penyakit =
-                    "Nama penyakit wajib diisi jika memilih Ya.";
+            if (form.punya_penyakit_genetik === "Ya" && isEmpty(form.nama_penyakit)) {
+                newErrors.nama_penyakit = "Nama penyakit wajib diisi jika memilih Ya.";
             }
 
-            if (
-                form.pengobatan_psikolog === "Ya" &&
-                isEmpty(form.kapan_dilakukan)
-            ) {
+            if (form.memiliki_riwayat_penyakit === "Ya" && isEmpty(form.riwayat_penyakit)) {
+                newErrors.riwayat_penyakit =
+                    "Riwayat penyakit wajib diisi jika memilih Ya.";
+            }
+
+            if (form.memiliki_alergi === "Ya" && isEmpty(form.alergi)) {
+                newErrors.alergi = "Alergi wajib diisi jika memilih Ya.";
+            }
+
+            if (form.pengobatan_psikolog === "Ya" && isEmpty(form.kapan_dilakukan)) {
                 newErrors.kapan_dilakukan =
                     "Kapan dilakukan wajib diisi jika memilih Ya.";
             }
 
-            if (
-                form.pernah_kecelakaan === "Ya" &&
-                isEmpty(form.bagian_tubuh_kecelakaan)
-            ) {
+            if (form.pernah_kecelakaan === "Ya" && isEmpty(form.bagian_tubuh_kecelakaan)) {
                 newErrors.bagian_tubuh_kecelakaan =
                     "Bagian tubuh yang kecelakaan wajib diisi jika memilih Ya.";
             }
 
-            if (
-                form.pernah_operasi === "Ya" &&
-                isEmpty(form.diagnosa_dokter)
-            ) {
+            if (form.pernah_operasi === "Ya" && isEmpty(form.diagnosa_dokter)) {
                 newErrors.diagnosa_dokter =
                     "Diagnosa dokter wajib diisi jika memilih Ya.";
             }
@@ -537,221 +875,6 @@ function PendaftaranPage() {
         return true;
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-
-        setForm((prevForm) => {
-            const updatedForm = {
-                ...prevForm,
-                [name]: value,
-            };
-
-            if (name === "status_pekerjaan" && value === "Belum Bekerja") {
-                updatedForm.posisi_pekerjaan = "";
-            }
-
-            return updatedForm;
-        });
-
-        setErrors((prevErrors) => {
-            const updatedErrors = { ...prevErrors };
-
-            if (!isEmpty(value)) {
-                delete updatedErrors[name];
-            }
-
-            if (name === "status_pekerjaan" && value === "Belum Bekerja") {
-                delete updatedErrors.posisi_pekerjaan;
-            }
-
-            return updatedErrors;
-        });
-    };
-
-    const handleSosialMediaChange = (index, name, value) => {
-        setForm((prevForm) => {
-            const updatedSosialMedia = [...prevForm.sosial_media];
-
-            updatedSosialMedia[index] = {
-                ...updatedSosialMedia[index],
-                [name]: value,
-            };
-
-            return {
-                ...prevForm,
-                sosial_media: updatedSosialMedia,
-            };
-        });
-    };
-
-    const addSosialMedia = () => {
-        setForm((prevForm) => ({
-            ...prevForm,
-            sosial_media: [
-                ...prevForm.sosial_media,
-                { ...emptySosialMedia },
-            ],
-        }));
-    };
-
-    const removeSosialMedia = (index) => {
-        setForm((prevForm) => {
-            const updatedSosialMedia = prevForm.sosial_media.filter(
-                (_, itemIndex) => itemIndex !== index
-            );
-
-            return {
-                ...prevForm,
-                sosial_media: updatedSosialMedia.length
-                    ? updatedSosialMedia
-                    : [{ ...emptySosialMedia }],
-            };
-        });
-    };
-
-    const handleKontakDaruratChange = (index, name, value) => {
-        setForm((prevForm) => {
-            const updatedKontakDarurat = [...prevForm.kontak_darurat];
-
-            updatedKontakDarurat[index] = {
-                ...updatedKontakDarurat[index],
-                [name]: value,
-            };
-
-            return {
-                ...prevForm,
-                kontak_darurat: updatedKontakDarurat,
-            };
-        });
-
-        setErrors((prevErrors) => {
-            const updatedErrors = { ...prevErrors };
-
-            if (!isEmpty(value)) {
-                if (name === "nama") {
-                    delete updatedErrors.kontak_darurat_nama;
-                }
-
-                if (name === "status") {
-                    delete updatedErrors.kontak_darurat_status;
-                }
-
-                if (name === "nomor") {
-                    delete updatedErrors.kontak_darurat_nomor;
-                }
-            }
-
-            return updatedErrors;
-        });
-    };
-
-    const addKontakDarurat = () => {
-        setForm((prevForm) => ({
-            ...prevForm,
-            kontak_darurat: [
-                ...prevForm.kontak_darurat,
-                { ...emptyKontakDarurat },
-            ],
-        }));
-    };
-
-    const removeKontakDarurat = (index) => {
-        setForm((prevForm) => {
-            const updatedKontakDarurat = prevForm.kontak_darurat.filter(
-                (_, itemIndex) => itemIndex !== index
-            );
-
-            return {
-                ...prevForm,
-                kontak_darurat: updatedKontakDarurat.length
-                    ? updatedKontakDarurat
-                    : [{ ...emptyKontakDarurat }],
-            };
-        });
-    };
-
-    const handleSaudaraKandungChange = (index, name, value) => {
-        setForm((prevForm) => {
-            const updatedSaudara = [...prevForm.saudara_kandung];
-
-            updatedSaudara[index] = {
-                ...updatedSaudara[index],
-                [name]: value,
-            };
-
-            return {
-                ...prevForm,
-                saudara_kandung: updatedSaudara,
-            };
-        });
-    };
-
-    const addSaudaraKandung = () => {
-        setForm((prevForm) => ({
-            ...prevForm,
-            saudara_kandung: [
-                ...prevForm.saudara_kandung,
-                { ...emptySaudara },
-            ],
-        }));
-    };
-
-    const removeSaudaraKandung = (index) => {
-        setForm((prevForm) => {
-            const updatedSaudara = prevForm.saudara_kandung.filter(
-                (_, itemIndex) => itemIndex !== index
-            );
-
-            return {
-                ...prevForm,
-                saudara_kandung: updatedSaudara.length
-                    ? updatedSaudara
-                    : [{ ...emptySaudara }],
-            };
-        });
-    };
-
-    const handleSaudaraIparChange = (index, name, value) => {
-        setForm((prevForm) => {
-            const updatedSaudara = [...prevForm.saudara_ipar];
-
-            updatedSaudara[index] = {
-                ...updatedSaudara[index],
-                [name]: value,
-            };
-
-            return {
-                ...prevForm,
-                saudara_ipar: updatedSaudara,
-            };
-        });
-    };
-
-    const addSaudaraIpar = () => {
-        setForm((prevForm) => ({
-            ...prevForm,
-            saudara_ipar: [
-                ...prevForm.saudara_ipar,
-                { ...emptySaudara },
-            ],
-        }));
-    };
-
-    const removeSaudaraIpar = (index) => {
-        setForm((prevForm) => {
-            const updatedSaudara = prevForm.saudara_ipar.filter(
-                (_, itemIndex) => itemIndex !== index
-            );
-
-            return {
-                ...prevForm,
-                saudara_ipar: updatedSaudara.length
-                    ? updatedSaudara
-                    : [{ ...emptySaudara }],
-            };
-        });
-    };
-
     const nextStep = () => {
         if (!validateStep()) {
             return;
@@ -777,15 +900,24 @@ function PendaftaranPage() {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!validateStep()) {
             return;
         }
 
-        console.log("Data pendaftaran:", form);
-        alert("Pendaftaran berhasil dikirim!");
+        setLoadingSubmit(true);
+
+        try {
+            console.log("Data pendaftaran:", form);
+            alert("Pendaftaran berhasil dikirim.");
+        } catch (error) {
+            console.error("Gagal mengirim pendaftaran:", error);
+            alert("Terjadi kesalahan saat mengirim pendaftaran.");
+        } finally {
+            setLoadingSubmit(false);
+        }
     };
 
     const renderStep = () => {
@@ -793,12 +925,13 @@ function PendaftaranPage() {
             return (
                 <StepDataDiri
                     form={form}
-                    errors={errors}
                     handleChange={handleChange}
+                    errors={errors}
                     requiredFields={requiredFieldsByStep[1]}
                     handleSosialMediaChange={handleSosialMediaChange}
                     addSosialMedia={addSosialMedia}
                     removeSosialMedia={removeSosialMedia}
+                    pelamarAktif={pelamarAktif}
                 />
             );
         }
@@ -808,17 +941,35 @@ function PendaftaranPage() {
                 <StepRiwayatKeluarga
                     form={form}
                     errors={errors}
-                    handleChange={handleChange}
                     requiredFields={requiredFieldsByStep[2]}
-                    handleKontakDaruratChange={handleKontakDaruratChange}
-                    addKontakDarurat={addKontakDarurat}
-                    removeKontakDarurat={removeKontakDarurat}
-                    handleSaudaraKandungChange={handleSaudaraKandungChange}
-                    addSaudaraKandung={addSaudaraKandung}
-                    removeSaudaraKandung={removeSaudaraKandung}
-                    handleSaudaraIparChange={handleSaudaraIparChange}
-                    addSaudaraIpar={addSaudaraIpar}
-                    removeSaudaraIpar={removeSaudaraIpar}
+                    handleChange={handleChange}
+                    handleKontakDaruratChange={(index, name, value) =>
+                        handleArrayChange("kontak_darurat", index, name, value)
+                    }
+                    addKontakDarurat={() =>
+                        addArrayItem("kontak_darurat", emptyKontakDarurat)
+                    }
+                    removeKontakDarurat={(index) =>
+                        removeArrayItem("kontak_darurat", index, emptyKontakDarurat)
+                    }
+                    handleSaudaraKandungChange={(index, name, value) =>
+                        handleArrayChange("saudara_kandung", index, name, value)
+                    }
+                    addSaudaraKandung={() =>
+                        addArrayItem("saudara_kandung", emptySaudara)
+                    }
+                    removeSaudaraKandung={(index) =>
+                        removeArrayItem("saudara_kandung", index, emptySaudara)
+                    }
+                    handleSaudaraIparChange={(index, name, value) =>
+                        handleArrayChange("saudara_ipar", index, name, value)
+                    }
+                    addSaudaraIpar={() =>
+                        addArrayItem("saudara_ipar", emptySaudara)
+                    }
+                    removeSaudaraIpar={(index) =>
+                        removeArrayItem("saudara_ipar", index, emptySaudara)
+                    }
                 />
             );
         }
@@ -828,8 +979,8 @@ function PendaftaranPage() {
                 <StepRiwayatKesehatan
                     form={form}
                     errors={errors}
-                    handleChange={handleChange}
                     requiredFields={requiredFieldsByStep[3]}
+                    handleChange={handleChange}
                 />
             );
         }
@@ -839,8 +990,8 @@ function PendaftaranPage() {
                 <StepRiwayatPekerjaan
                     form={form}
                     errors={errors}
-                    handleChange={handleChange}
                     requiredFields={requiredFieldsByStep[4]}
+                    handleChange={handleChange}
                 />
             );
         }
@@ -850,8 +1001,8 @@ function PendaftaranPage() {
                 <StepKesiapanBekerja
                     form={form}
                     errors={errors}
-                    handleChange={handleChange}
                     requiredFields={requiredFieldsByStep[5]}
+                    handleChange={handleChange}
                 />
             );
         }
@@ -862,11 +1013,9 @@ function PendaftaranPage() {
     if (activePage === "cek-tahapan") {
         return (
             <CekTahapanPelamar
-                form={cekTahapanForm}
                 errors={cekTahapanErrors}
                 hasil={hasilCekTahapan}
-                handleChange={handleCekTahapanChange}
-                handleSubmit={handleCekTahapanSubmit}
+                loading={loadingToken}
                 onBack={backToPendaftaran}
             />
         );
@@ -880,80 +1029,91 @@ function PendaftaranPage() {
                         <aside className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-teal-900 p-6 text-white sm:p-8 lg:col-span-2">
                             <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
                             <div className="absolute -bottom-28 -left-28 h-64 w-64 rounded-full bg-teal-400/10 blur-3xl" />
-                            <div className="absolute right-8 top-1/2 h-32 w-32 rounded-full bg-white/5 blur-2xl" />
 
                             <div className="relative">
-                                <div className="mb-8">
-                                    <div className="mb-7 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur">
-                                        <div className="flex items-center gap-4">
-                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-sm font-black text-slate-950 shadow-lg">
-                                                HR
-                                            </div>
+                                <div className="mb-7 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-sm font-black text-slate-950 shadow-lg">
+                                            HR
+                                        </div>
 
-                                            <div className="min-w-0">
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100">
-                                                    Sistem Rekrutmen
-                                                </p>
-                                                <h2 className="mt-1 text-base font-black leading-5 text-white sm:text-lg">
-                                                    Portal Kandidat
-                                                </h2>
-                                            </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100">
+                                                Sistem Rekrutmen
+                                            </p>
+                                            <h2 className="mt-1 text-base font-black leading-5 text-white sm:text-lg">
+                                                Portal Kandidat
+                                            </h2>
                                         </div>
                                     </div>
+                                </div>
 
-                                    <div className="mb-6">
-                                        <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-cyan-100">
-                                            Pendaftaran Online
-                                        </span>
+                                <div className="mb-6">
+                                    <span className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-cyan-100">
+                                        Pendaftaran Online
+                                    </span>
 
-                                        <h1 className="mt-5 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
-                                            Pusat Pendaftaran Kandidat
-                                        </h1>
+                                    <h1 className="mt-5 text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl">
+                                        Pusat Pendaftaran Kandidat
+                                    </h1>
 
-                                        <p className="mt-4 max-w-md text-sm leading-7 text-slate-200">
-                                            Lengkapi data pribadi, riwayat keluarga,
-                                            kesehatan, pengalaman kerja, dan kesiapan
-                                            bekerja secara bertahap.
+                                    <p className="mt-4 max-w-md text-sm leading-7 text-slate-200">
+                                        Lengkapi data pribadi, keluarga, kesehatan,
+                                        pengalaman kerja, dan kesiapan bekerja secara
+                                        bertahap.
+                                    </p>
+                                </div>
+
+                                {pelamarAktif && (
+                                    <div className="mb-5 rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-4 shadow-lg backdrop-blur">
+                                        <p className="text-xs font-bold uppercase tracking-wide text-emerald-100">
+                                            Data Token Ditemukan
+                                        </p>
+                                        <p className="mt-2 text-lg font-black text-white">
+                                            {pelamarAktif.nama_lengkap || "-"}
+                                        </p>
+                                        <p className="mt-1 break-all text-xs font-semibold text-emerald-100">
+                                            Token: {pelamarAktif.token || "-"}
                                         </p>
                                     </div>
+                                )}
 
-                                    <div className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-lg backdrop-blur">
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                            <div>
-                                                <p className="text-xs font-semibold text-cyan-100">
-                                                    Progress Pengisian
-                                                </p>
-                                                <p className="mt-1 text-sm font-black text-white">
-                                                    Langkah {step} dari {steps.length}
-                                                </p>
-                                            </div>
-
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-sm font-black text-slate-950">
-                                                {Math.round((step / steps.length) * 100)}%
-                                            </div>
+                                <div className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-lg backdrop-blur">
+                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold text-cyan-100">
+                                                Progress Pengisian
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-white">
+                                                Langkah {step} dari {steps.length}
+                                            </p>
                                         </div>
 
-                                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                                            <div
-                                                className="h-full rounded-full bg-cyan-300 transition-all duration-500"
-                                                style={{
-                                                    width: `${(step / steps.length) * 100}%`,
-                                                }}
-                                            />
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-sm font-black text-slate-950">
+                                            {progressPercent}%
                                         </div>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={openCekTahapan}
-                                        className="group inline-flex w-full items-center justify-between rounded-2xl bg-cyan-50 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-cyan-950/20 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-2xl"
-                                    >
-                                        <span>Cek Tahapan Seleksi</span>
-                                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-950 text-cyan-100 transition group-hover:bg-teal-700">
-                                            →
-                                        </span>
-                                    </button>
+                                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                                        <div
+                                            className="h-full rounded-full bg-cyan-300 transition-all duration-500"
+                                            style={{
+                                                width: `${progressPercent}%`,
+                                            }}
+                                        />
+                                    </div>
                                 </div>
+
+                                <button
+                                    type="button"
+                                    onClick={openCekTahapan}
+                                    className="group mb-7 inline-flex w-full items-center justify-between rounded-2xl bg-cyan-50 px-5 py-4 text-sm font-black text-slate-950 shadow-xl shadow-cyan-950/20 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-2xl"
+                                >
+                                    <span>Cek Tahapan Seleksi</span>
+                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-950 text-cyan-100 transition group-hover:bg-teal-700">
+                                        →
+                                    </span>
+                                </button>
 
                                 <StepMenu
                                     steps={steps}
@@ -983,9 +1143,11 @@ function PendaftaranPage() {
                                             </h3>
                                             <p className="mt-1 text-sm leading-6 text-slate-200">
                                                 Kolom bertanda{" "}
-                                                <span className="font-bold text-amber-300">*</span>{" "}
-                                                wajib diisi. Pastikan data yang Anda
-                                                masukkan sesuai dengan identitas resmi.
+                                                <span className="font-bold text-amber-300">
+                                                    *
+                                                </span>{" "}
+                                                wajib diisi. Jika membuka link token,
+                                                data awal akan terisi otomatis.
                                             </p>
                                         </div>
                                     </div>
@@ -999,14 +1161,20 @@ function PendaftaranPage() {
                                     <span className="inline-flex w-fit rounded-full bg-cyan-50 px-4 py-1 text-xs font-bold uppercase tracking-wide text-teal-700 ring-1 ring-cyan-100">
                                         Pendaftaran Online
                                     </span>
+
+                                    {form.token && (
+                                        <span className="inline-flex w-fit rounded-full bg-slate-100 px-4 py-1 text-xs font-bold text-slate-600">
+                                            Token: {form.token}
+                                        </span>
+                                    )}
                                 </div>
 
                                 <h2 className="mt-4 text-3xl font-black text-slate-950">
-                                    {stepTitle[step]}
+                                    {steps.find((item) => item.id === step)?.title}
                                 </h2>
 
                                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                                    {stepDescription[step]}
+                                    {steps.find((item) => item.id === step)?.description}
                                 </p>
 
                                 {Object.keys(errors).length > 0 && (
@@ -1045,9 +1213,12 @@ function PendaftaranPage() {
                                     ) : (
                                         <button
                                             type="submit"
-                                            className="rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+                                            disabled={loadingSubmit}
+                                            className="rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            Kirim Pendaftaran
+                                            {loadingSubmit
+                                                ? "Mengirim..."
+                                                : "Kirim Pendaftaran"}
                                         </button>
                                     )}
                                 </div>
@@ -1060,260 +1231,48 @@ function PendaftaranPage() {
     );
 }
 
-function CekTahapanPelamar({
-    form,
-    errors,
-    hasil,
-    handleChange,
-    handleSubmit,
-    onBack,
-}) {
+function StepMenu({ steps, activeStep, setActiveStep }) {
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50 px-4 py-10">
-            <div className="mx-auto max-w-5xl">
-                <div className="mb-8 text-center">
-                    <span className="inline-flex rounded-full bg-cyan-50 px-4 py-1 text-xs font-bold uppercase tracking-wide text-teal-700 ring-1 ring-cyan-100">
-                        Cek Tahapan Seleksi
-                    </span>
+        <div className="space-y-3">
+            {steps.map((item) => {
+                const active = item.id === activeStep;
+                const complete = item.id < activeStep;
 
-                    <h1 className="mt-4 text-3xl font-black text-slate-950">
-                        Cek Status Pendaftaran Kandidat
-                    </h1>
+                return (
+                    <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setActiveStep(item.id)}
+                        className={`flex w-full items-start gap-4 rounded-3xl border p-4 text-left transition ${
+                            active
+                                ? "border-cyan-300/40 bg-cyan-300/15"
+                                : complete
+                                ? "border-emerald-300/20 bg-emerald-300/10 hover:bg-emerald-300/15"
+                                : "border-white/10 bg-white/5 hover:bg-white/10"
+                        }`}
+                    >
+                        <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${
+                                active
+                                    ? "bg-cyan-50 text-slate-950"
+                                    : complete
+                                    ? "bg-emerald-300 text-slate-950"
+                                    : "bg-white/10 text-white"
+                            }`}
+                        >
+                            {complete ? "✓" : item.id}
+                        </div>
 
-                    <p className="mt-3 text-sm leading-6 text-slate-500">
-                        Masukkan token pelamar untuk melihat status dan tahapan
-                        seleksi pendaftaran Anda.
-                    </p>
-                </div>
-
-                <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
-                    <div className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-teal-900 px-6 py-6 text-white sm:px-8">
-                        <h2 className="text-xl font-black">
-                            Form Pengecekan Tahapan Seleksi
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-200">
-                            Gunakan token pelamar untuk memantau perkembangan
-                            proses seleksi Anda.
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="p-6 sm:p-8">
                         <div>
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">
-                                Token Pelamar <span className="text-red-500">*</span>
-                            </label>
-
-                            <input
-                                type="text"
-                                name="token"
-                                value={form.token}
-                                onChange={handleChange}
-                                placeholder="Masukkan token pelamar"
-                                className={`w-full rounded-2xl border px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 ${
-                                    errors.token
-                                        ? "border-red-300 bg-red-50 focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-100"
-                                        : "border-slate-200 bg-slate-50 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100"
-                                }`}
-                            />
-
-                            {errors.token && (
-                                <p className="mt-2 text-xs font-semibold text-red-500">
-                                    {errors.token}
-                                </p>
-                            )}
+                            <h4 className="font-black text-white">{item.title}</h4>
+                            <p className="mt-1 text-xs leading-5 text-slate-200">
+                                {item.description}
+                            </p>
                         </div>
-
-                        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                className="rounded-2xl bg-slate-100 px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
-                            >
-                                Kembali ke Pendaftaran
-                            </button>
-
-                            <button
-                                type="submit"
-                                className="rounded-2xl bg-teal-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-teal-100 transition hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-teal-100"
-                            >
-                                Cek Tahapan
-                            </button>
-                        </div>
-                    </form>
-
-                    {hasil && (
-                        <div className="border-t border-slate-100 bg-slate-50 p-6 sm:p-8">
-                            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                    <div>
-                                        <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
-                                            Hasil Pengecekan
-                                        </p>
-
-                                        <h3
-                                            className={`mt-2 text-2xl font-black ${
-                                                hasil.status.includes("Gagal")
-                                                    ? "text-red-600"
-                                                    : "text-emerald-600"
-                                            }`}
-                                        >
-                                            {hasil.status}
-                                        </h3>
-
-                                        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                                            {hasil.keterangan}
-                                        </p>
-                                    </div>
-
-                                    <span
-                                        className={`w-fit rounded-full px-4 py-2 text-xs font-bold ${
-                                            hasil.status.includes("Gagal")
-                                                ? "bg-red-100 text-red-700"
-                                                : "bg-emerald-100 text-emerald-700"
-                                        }`}
-                                    >
-                                        Tahap Terakhir: {hasil.tahapan_terakhir}
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs font-bold uppercase text-slate-400">
-                                            Nama Pelamar
-                                        </p>
-                                        <p className="mt-1 font-semibold text-slate-800">
-                                            {hasil.nama_pelamar}
-                                        </p>
-                                    </div>
-
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs font-bold uppercase text-slate-400">
-                                            Posisi Dilamar
-                                        </p>
-                                        <p className="mt-1 font-semibold text-slate-800">
-                                            {hasil.posisi_dilamar}
-                                        </p>
-                                    </div>
-
-                                    <div className="rounded-2xl bg-slate-50 p-4">
-                                        <p className="text-xs font-bold uppercase text-slate-400">
-                                            Token Pelamar
-                                        </p>
-                                        <p className="mt-1 break-all font-semibold text-slate-800">
-                                            {hasil.token}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {hasil.status.includes("Gagal") && (
-                                    <div className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-5">
-                                        <div className="flex items-start gap-4">
-                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-500 text-lg font-black text-white">
-                                                !
-                                            </div>
-
-                                            <div>
-                                                <h4 className="font-black text-red-800">
-                                                    Belum Dapat Melanjutkan Proses Seleksi
-                                                </h4>
-
-                                                <p className="mt-2 text-sm leading-6 text-red-700">
-                                                    {hasil.saran}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="mt-8">
-                                    <h4 className="mb-5 text-lg font-black text-slate-950">
-                                        Tahapan Seleksi Pelamar
-                                    </h4>
-
-                                    <div className="relative">
-                                        <div className="absolute left-5 top-8 hidden h-[calc(100%-4rem)] w-1 rounded-full bg-slate-200 md:block" />
-
-                                        <div className="space-y-5">
-                                            {hasil.tahapan.map((item, index) => {
-                                                const isLolos = item.status === "Lolos";
-                                                const isGagal = item.status === "Gagal";
-
-                                                return (
-                                                    <div
-                                                        key={index}
-                                                        className={`relative flex gap-4 rounded-3xl border p-4 shadow-sm ${
-                                                            isGagal
-                                                                ? "border-red-200 bg-red-50"
-                                                                : "border-slate-200 bg-white"
-                                                        }`}
-                                                    >
-                                                        <div
-                                                            className={`z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white shadow-lg ${
-                                                                isLolos
-                                                                    ? "bg-emerald-500 shadow-emerald-100"
-                                                                    : isGagal
-                                                                    ? "bg-red-500 shadow-red-100"
-                                                                    : "bg-slate-400 shadow-slate-100"
-                                                            }`}
-                                                        >
-                                                            {isLolos ? "✓" : isGagal ? "!" : index + 1}
-                                                        </div>
-
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                                <h5
-                                                                    className={`font-black ${
-                                                                        isGagal
-                                                                            ? "text-red-800"
-                                                                            : "text-slate-950"
-                                                                    }`}
-                                                                >
-                                                                    {item.nama}
-                                                                </h5>
-
-                                                                <span
-                                                                    className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${
-                                                                        isLolos
-                                                                            ? "bg-emerald-100 text-emerald-700"
-                                                                            : isGagal
-                                                                            ? "bg-red-100 text-red-700"
-                                                                            : "bg-slate-100 text-slate-700"
-                                                                    }`}
-                                                                >
-                                                                    {item.status}
-                                                                </span>
-                                                            </div>
-
-                                                            <p
-                                                                className={`mt-2 text-sm leading-6 ${
-                                                                    isGagal
-                                                                        ? "text-red-700"
-                                                                        : "text-slate-500"
-                                                                }`}
-                                                            >
-                                                                {item.keterangan}
-                                                            </p>
-
-                                                            {item.saran && (
-                                                                <div className="mt-3 rounded-2xl border border-red-200 bg-white p-4">
-                                                                    <p className="text-sm font-semibold leading-6 text-red-700">
-                                                                        {item.saran}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </main>
+                    </button>
+                );
+            })}
+        </div>
     );
 }
 
