@@ -30,4 +30,9 @@ class OpsiKacamata extends Model
             }
         });
     }
+
+    public function riwayatKesehatan()
+    {
+        return $this->hasMany(DataRiwayatKesehatan::class, 'opsi_kacamata_id', 'id');
+    }
 }

@@ -19,7 +19,6 @@ export default function StepKesiapanBekerja({ form, handleChange }) {
                     value={form.bersedia_ditempatkan}
                     onChange={handleChange}
                     options={["Ya", "Tidak"]}
-                    required
                 />
 
                 <Select
@@ -28,7 +27,6 @@ export default function StepKesiapanBekerja({ form, handleChange }) {
                     value={form.bersedia_shift}
                     onChange={handleChange}
                     options={["Ya", "Tidak"]}
-                    required
                 />
             </div>
 
@@ -57,7 +55,6 @@ export default function StepKesiapanBekerja({ form, handleChange }) {
                     name="tanggal_siap_kerja"
                     value={form.tanggal_siap_kerja}
                     onChange={handleChange}
-                    required
                 />
 
                 <Input
@@ -76,7 +73,6 @@ export default function StepKesiapanBekerja({ form, handleChange }) {
                     value={form.posisi_dilamar}
                     onChange={handleChange}
                     placeholder="Contoh: Staff Administrasi"
-                    required
                 />
 
                 <Input
@@ -167,21 +163,20 @@ function Input({
     value,
     onChange,
     placeholder,
-    required = false,
 }) {
     return (
         <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
                 {label}
             </label>
+
             <input
                 type={type}
                 name={name}
-                value={value}
+                value={value ?? ""}
                 onChange={onChange}
                 placeholder={placeholder || `Masukkan ${label.toLowerCase()}`}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                required={required}
             />
         </div>
     );
@@ -192,20 +187,19 @@ function Select({
     name,
     value,
     onChange,
-    options,
-    required = false,
+    options = [],
 }) {
     return (
         <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
                 {label}
             </label>
+
             <select
                 name={name}
-                value={value}
+                value={value ?? ""}
                 onChange={onChange}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                required={required}
             >
                 <option value="">Pilih {label.toLowerCase()}</option>
                 {options.map((item) => (

@@ -1,29 +1,23 @@
 import React from "react";
+import Select2 from "react-select";
 
 export default function StepRiwayatKesehatan({
     form,
     handleChange,
     errors = {},
-    requiredFields = [],
+    masterOptions = {},
 }) {
-    const isRequired = (name) => requiredFields.includes(name);
-
-    const showRiwayatPenyakit =
-        form.memiliki_riwayat_penyakit === "Ada" ||
-        form.memiliki_riwayat_penyakit === "Ya";
-
-    const showAlergi =
-        form.memiliki_alergi === "Ada" ||
-        form.memiliki_alergi === "Ya";
-
-    const showTahunDirawat =
-        form.pernah_dirawat === "Pernah" ||
-        form.pernah_dirawat === "Ya";
-
-    const showPenyakitGenetik = form.punya_penyakit_genetik === "Ya";
+    const showNamaAlergi = form.punya_alergi === "Ya";
+    const showNamaPenyakitGenetik = form.punya_penyakit_genetik === "Ya";
     const showPengobatanPsikolog = form.pengobatan_psikolog === "Ya";
     const showKecelakaan = form.pernah_kecelakaan === "Ya";
     const showOperasi = form.pernah_operasi === "Ya";
+
+    const opsiKacamataOptions =
+        Array.isArray(masterOptions.opsi_kacamata) &&
+        masterOptions.opsi_kacamata.length > 0
+            ? masterOptions.opsi_kacamata
+            : [];
 
     return (
         <div className="space-y-6">
@@ -31,10 +25,9 @@ export default function StepRiwayatKesehatan({
                 <h3 className="text-base font-bold text-emerald-800">
                     Riwayat Kesehatan
                 </h3>
+
                 <p className="mt-1 text-sm text-emerald-600">
-                    Lengkapi data kesehatan sesuai kondisi sebenarnya. Field
-                    bertanda <span className="font-bold text-red-500">*</span>{" "}
-                    wajib diisi.
+                    Lengkapi data kesehatan sesuai kondisi sebenarnya.
                 </p>
             </div>
 
@@ -44,14 +37,19 @@ export default function StepRiwayatKesehatan({
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                    <Select
+                    <SelectField
                         label="Golongan Darah"
                         name="golongan_darah"
-                        value={form.golongan_darah}
+                        value={form.golongan_darah || form.gol_darah || ""}
                         onChange={handleChange}
-                        required={isRequired("golongan_darah")}
-                        error={errors.golongan_darah}
-                        options={["A", "B", "AB", "O", "Tidak Tahu"]}
+                        error={errors.golongan_darah || errors.gol_darah}
+                        options={[
+                            { value: "A", label: "A" },
+                            { value: "B", label: "B" },
+                            { value: "AB", label: "AB" },
+                            { value: "O", label: "O" },
+                            { value: "Tidak Tahu", label: "Tidak Tahu" },
+                        ]}
                     />
 
                     <Input
@@ -61,7 +59,6 @@ export default function StepRiwayatKesehatan({
                         value={form.tinggi_badan}
                         onChange={handleChange}
                         placeholder="Contoh: 170"
-                        required={isRequired("tinggi_badan")}
                         error={errors.tinggi_badan}
                         suffix="cm"
                     />
@@ -73,7 +70,6 @@ export default function StepRiwayatKesehatan({
                         value={form.berat_badan}
                         onChange={handleChange}
                         placeholder="Contoh: 60"
-                        required={isRequired("berat_badan")}
                         error={errors.berat_badan}
                         suffix="kg"
                     />
@@ -91,7 +87,6 @@ export default function StepRiwayatKesehatan({
                         name="buta_warna"
                         value={form.buta_warna}
                         onChange={handleChange}
-                        required={isRequired("buta_warna")}
                         error={errors.buta_warna}
                         options={[
                             "Ya, Buta Warna Total",
@@ -100,29 +95,29 @@ export default function StepRiwayatKesehatan({
                         ]}
                     />
 
-                    <CheckboxGroup
+                    <SelectField
                         label="Apakah Anda Menggunakan Kaca Mata?"
-                        description="Dapat memilih lebih dari 1 opsi."
-                        name="kacamata_digunakan"
-                        value={form.kacamata_digunakan}
+                        name="opsi_kacamata_id"
+                        value={form.opsi_kacamata_id || ""}
                         onChange={handleChange}
-                        required={isRequired("kacamata_digunakan")}
-                        error={errors.kacamata_digunakan}
-                        options={[
-                            "Plus",
-                            "Minus",
-                            "Silinder",
-                            "Tidak Menggunakan Kaca Mata",
-                        ]}
+                        error={errors.opsi_kacamata_id}
+                        placeholder="Pilih opsi kacamata"
+                        options={opsiKacamataOptions}
                     />
 
                     <RadioGroup
                         label="Apakah Anda Menggunakan Alat Bantu Pendengaran?"
-                        name="alat_bantu_pendengaran"
-                        value={form.alat_bantu_pendengaran}
+                        name="alat_bantu_dengar"
+                        value={
+                            form.alat_bantu_dengar ||
+                            form.alat_bantu_pendengaran ||
+                            ""
+                        }
                         onChange={handleChange}
-                        required={isRequired("alat_bantu_pendengaran")}
-                        error={errors.alat_bantu_pendengaran}
+                        error={
+                            errors.alat_bantu_dengar ||
+                            errors.alat_bantu_pendengaran
+                        }
                         options={["Ya", "Tidak"]}
                     />
                 </div>
@@ -136,31 +131,42 @@ export default function StepRiwayatKesehatan({
                 <div className="space-y-5">
                     <RadioGroup
                         label="Ketika Menulis Anda Menggunakan Tangan?"
-                        name="tangan_dominan"
-                        value={form.tangan_dominan}
+                        name="menulis_dengan_tangan"
+                        value={
+                            form.menulis_dengan_tangan ||
+                            form.tangan_dominan ||
+                            ""
+                        }
                         onChange={handleChange}
-                        required={isRequired("tangan_dominan")}
-                        error={errors.tangan_dominan}
+                        error={
+                            errors.menulis_dengan_tangan ||
+                            errors.tangan_dominan
+                        }
                         options={["Kanan", "Kiri"]}
                     />
 
                     <RadioGroup
                         label="Apakah Tangan Anda Sering Gemetar?"
-                        name="tangan_gemetar"
-                        value={form.tangan_gemetar}
+                        name="sering_gemetar"
+                        value={form.sering_gemetar || form.tangan_gemetar || ""}
                         onChange={handleChange}
-                        required={isRequired("tangan_gemetar")}
-                        error={errors.tangan_gemetar}
+                        error={errors.sering_gemetar || errors.tangan_gemetar}
                         options={["Ya", "Tidak"]}
                     />
 
                     <RadioGroup
                         label="Apakah Tangan Anda Sering Berkeringat?"
-                        name="tangan_berkeringat"
-                        value={form.tangan_berkeringat}
+                        name="tangan_sering_berkeringat"
+                        value={
+                            form.tangan_sering_berkeringat ||
+                            form.tangan_berkeringat ||
+                            ""
+                        }
                         onChange={handleChange}
-                        required={isRequired("tangan_berkeringat")}
-                        error={errors.tangan_berkeringat}
+                        error={
+                            errors.tangan_sering_berkeringat ||
+                            errors.tangan_berkeringat
+                        }
                         options={["Ya", "Tidak"]}
                     />
                 </div>
@@ -171,36 +177,28 @@ export default function StepRiwayatKesehatan({
                     Riwayat Penyakit
                 </h4>
 
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Memiliki Riwayat Penyakit"
-                        name="memiliki_riwayat_penyakit"
-                        value={form.memiliki_riwayat_penyakit}
+                <div className="space-y-5">
+                    <RadioGroup
+                        label="Apakah Anda Memiliki Riwayat Penyakit Menular? Contoh: TBC"
+                        name="penyakit_menular"
+                        value={
+                            form.penyakit_menular ||
+                            form.riwayat_penyakit_menular ||
+                            ""
+                        }
                         onChange={handleChange}
-                        required={isRequired("memiliki_riwayat_penyakit")}
-                        error={errors.memiliki_riwayat_penyakit}
-                        options={["Tidak Ada", "Ada"]}
+                        error={
+                            errors.penyakit_menular ||
+                            errors.riwayat_penyakit_menular
+                        }
+                        options={["Ya", "Tidak"]}
                     />
 
-                    <Textarea
-                        label="Detail Riwayat Penyakit"
-                        name="riwayat_penyakit"
-                        value={form.riwayat_penyakit}
-                        onChange={handleChange}
-                        placeholder="Contoh: Asma, diabetes, hipertensi"
-                        required={showRiwayatPenyakit}
-                        error={errors.riwayat_penyakit}
-                        disabled={!showRiwayatPenyakit}
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Punya Penyakit Genetik"
+                    <RadioGroup
+                        label="Apakah Anda Punya Penyakit Genetik?"
                         name="punya_penyakit_genetik"
                         value={form.punya_penyakit_genetik}
                         onChange={handleChange}
-                        required={isRequired("punya_penyakit_genetik")}
                         error={errors.punya_penyakit_genetik}
                         options={["Ya", "Tidak"]}
                     />
@@ -211,30 +209,16 @@ export default function StepRiwayatKesehatan({
                         value={form.nama_penyakit}
                         onChange={handleChange}
                         placeholder="Isi jika memilih Ya"
-                        required={showPenyakitGenetik}
                         error={errors.nama_penyakit}
-                        disabled={!showPenyakitGenetik}
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Riwayat Kronis"
-                        name="riwayat_kronis"
-                        value={form.riwayat_kronis}
-                        onChange={handleChange}
-                        required={isRequired("riwayat_kronis")}
-                        error={errors.riwayat_kronis}
-                        options={["Ya", "Tidak"]}
+                        disabled={!showNamaPenyakitGenetik}
                     />
 
                     <RadioGroup
-                        label="Apakah Anda Memiliki Riwayat Penyakit Menular? Contoh: TBC"
-                        name="riwayat_penyakit_menular"
-                        value={form.riwayat_penyakit_menular}
+                        label="Apakah Anda Memiliki Riwayat Penyakit Kronis?"
+                        name="riwayat_kronis"
+                        value={form.riwayat_kronis}
                         onChange={handleChange}
-                        required={isRequired("riwayat_penyakit_menular")}
-                        error={errors.riwayat_penyakit_menular}
+                        error={errors.riwayat_kronis}
                         options={["Ya", "Tidak"]}
                     />
                 </div>
@@ -242,41 +226,27 @@ export default function StepRiwayatKesehatan({
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h4 className="mb-5 text-lg font-bold text-slate-800">
-                    Alergi & Obat
+                    Alergi
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Memiliki Alergi"
-                        name="memiliki_alergi"
-                        value={form.memiliki_alergi}
+                    <RadioGroup
+                        label="Apakah Anda Punya Alergi?"
+                        name="punya_alergi"
+                        value={form.punya_alergi || form.memiliki_alergi || ""}
                         onChange={handleChange}
-                        required={isRequired("memiliki_alergi")}
-                        error={errors.memiliki_alergi}
-                        options={["Tidak Ada", "Ada"]}
+                        error={errors.punya_alergi || errors.memiliki_alergi}
+                        options={["Ya", "Tidak"]}
                     />
 
                     <Input
-                        label="Detail Alergi"
-                        name="alergi"
-                        value={form.alergi}
+                        label="Nama Alergi"
+                        name="nama_alergi"
+                        value={form.nama_alergi || form.alergi || ""}
                         onChange={handleChange}
                         placeholder="Contoh: Obat, makanan, debu"
-                        required={showAlergi}
-                        error={errors.alergi}
-                        disabled={!showAlergi}
-                    />
-                </div>
-
-                <div className="mt-5">
-                    <Textarea
-                        label="Obat yang Sedang Dikonsumsi"
-                        name="obat_dikonsumsi"
-                        value={form.obat_dikonsumsi}
-                        onChange={handleChange}
-                        placeholder="Tulis nama obat jika ada"
-                        required={isRequired("obat_dikonsumsi")}
-                        error={errors.obat_dikonsumsi}
+                        error={errors.nama_alergi || errors.alergi}
+                        disabled={!showNamaAlergi}
                     />
                 </div>
             </section>
@@ -287,12 +257,11 @@ export default function StepRiwayatKesehatan({
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Pernah Pengobatan Psikolog"
+                    <RadioGroup
+                        label="Pernah Pengobatan Psikolog?"
                         name="pengobatan_psikolog"
                         value={form.pengobatan_psikolog}
                         onChange={handleChange}
-                        required={isRequired("pengobatan_psikolog")}
                         error={errors.pengobatan_psikolog}
                         options={["Ya", "Tidak"]}
                     />
@@ -303,7 +272,6 @@ export default function StepRiwayatKesehatan({
                         value={form.kapan_dilakukan}
                         onChange={handleChange}
                         placeholder="Contoh: 2022 / 3 bulan lalu"
-                        required={showPengobatanPsikolog}
                         error={errors.kapan_dilakukan}
                         disabled={!showPengobatanPsikolog}
                     />
@@ -316,12 +284,11 @@ export default function StepRiwayatKesehatan({
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Pernah Kecelakaan"
+                    <RadioGroup
+                        label="Pernah Kecelakaan?"
                         name="pernah_kecelakaan"
                         value={form.pernah_kecelakaan}
                         onChange={handleChange}
-                        required={isRequired("pernah_kecelakaan")}
                         error={errors.pernah_kecelakaan}
                         options={["Ya", "Tidak"]}
                     />
@@ -332,19 +299,17 @@ export default function StepRiwayatKesehatan({
                         value={form.bagian_tubuh_kecelakaan}
                         onChange={handleChange}
                         placeholder="Contoh: Tangan kanan, kaki kiri"
-                        required={showKecelakaan}
                         error={errors.bagian_tubuh_kecelakaan}
                         disabled={!showKecelakaan}
                     />
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Pernah Operasi"
+                    <RadioGroup
+                        label="Pernah Operasi?"
                         name="pernah_operasi"
                         value={form.pernah_operasi}
                         onChange={handleChange}
-                        required={isRequired("pernah_operasi")}
                         error={errors.pernah_operasi}
                         options={["Ya", "Tidak"]}
                     />
@@ -355,38 +320,8 @@ export default function StepRiwayatKesehatan({
                         value={form.diagnosa_dokter}
                         onChange={handleChange}
                         placeholder="Isi diagnosa dokter jika pernah operasi"
-                        required={showOperasi}
                         error={errors.diagnosa_dokter}
                         disabled={!showOperasi}
-                    />
-                </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h4 className="mb-5 text-lg font-bold text-slate-800">
-                    Riwayat Perawatan
-                </h4>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="Pernah Dirawat di Rumah Sakit"
-                        name="pernah_dirawat"
-                        value={form.pernah_dirawat}
-                        onChange={handleChange}
-                        required={isRequired("pernah_dirawat")}
-                        error={errors.pernah_dirawat}
-                        options={["Tidak Pernah", "Pernah"]}
-                    />
-
-                    <Input
-                        label="Tahun Dirawat"
-                        name="tahun_dirawat"
-                        value={form.tahun_dirawat}
-                        onChange={handleChange}
-                        placeholder="Contoh: 2022"
-                        required={showTahunDirawat}
-                        error={errors.tahun_dirawat}
-                        disabled={!showTahunDirawat}
                     />
                 </div>
             </section>
@@ -401,37 +336,60 @@ export default function StepRiwayatKesehatan({
                     name="program_kehamilan"
                     value={form.program_kehamilan}
                     onChange={handleChange}
-                    required={isRequired("program_kehamilan")}
                     error={errors.program_kehamilan}
                     options={["Ya", "Tidak"]}
-                />
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h4 className="mb-5 text-lg font-bold text-slate-800">
-                    Catatan Tambahan
-                </h4>
-
-                <Textarea
-                    label="Catatan Kesehatan Tambahan"
-                    name="catatan_kesehatan"
-                    value={form.catatan_kesehatan}
-                    onChange={handleChange}
-                    rows={4}
-                    placeholder="Tulis catatan tambahan jika ada"
-                    required={isRequired("catatan_kesehatan")}
-                    error={errors.catatan_kesehatan}
                 />
             </section>
         </div>
     );
 }
 
-function FieldLabel({ label, required }) {
+function normalizeOptions(options = []) {
+    if (!Array.isArray(options)) {
+        return [];
+    }
+
+    return options
+        .map((item) => {
+            if (typeof item === "string") {
+                return {
+                    value: item,
+                    label: item,
+                    id: item,
+                };
+            }
+
+            const value =
+                item?.value ??
+                item?.id ??
+                item?.uuid ??
+                item?.code ??
+                item?.opsi ??
+                item?.label ??
+                "";
+
+            const label =
+                item?.label ??
+                item?.name ??
+                item?.nama ??
+                item?.opsi ??
+                item?.text ??
+                value;
+
+            return {
+                ...item,
+                value: String(value ?? ""),
+                label: String(label ?? ""),
+                id: item?.id ?? value,
+            };
+        })
+        .filter((item) => item.value !== "" && item.label !== "");
+}
+
+function FieldLabel({ label }) {
     return (
         <label className="mb-2 block text-sm font-semibold text-slate-700">
             {label}
-            {required && <span className="ml-1 text-red-500">*</span>}
         </label>
     );
 }
@@ -439,11 +397,7 @@ function FieldLabel({ label, required }) {
 function ErrorMessage({ message }) {
     if (!message) return null;
 
-    return (
-        <p className="mt-2 text-xs font-semibold text-red-500">
-            {message}
-        </p>
-    );
+    return <p className="mt-2 text-xs font-semibold text-red-500">{message}</p>;
 }
 
 function fieldClass(error, disabled = false) {
@@ -463,14 +417,13 @@ function Input({
     value,
     onChange,
     placeholder,
-    required = false,
     error,
     suffix,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <div className="relative">
                 <input
@@ -483,6 +436,7 @@ function Input({
                     className={`${fieldClass(error, disabled)} ${
                         suffix ? "pr-14" : ""
                     }`}
+                    autoComplete="off"
                 />
 
                 {suffix && (
@@ -497,34 +451,150 @@ function Input({
     );
 }
 
-function Select({
+function SelectField({
     label,
     name,
     value,
     onChange,
     options = [],
-    required = false,
     error,
+    placeholder,
     disabled = false,
+    isLoading = false,
 }) {
+    const normalizedOptions = normalizeOptions(options);
+    const cleanValue = value ?? "";
+
+    const selectedOption =
+        normalizedOptions.find(
+            (item) => String(item.value) === String(cleanValue)
+        ) ||
+        normalizedOptions.find(
+            (item) => String(item.id) === String(cleanValue)
+        ) ||
+        null;
+
+    const handleSelectChange = (selected) => {
+        onChange({
+            target: {
+                name,
+                value: selected ? selected.value : "",
+            },
+        });
+    };
+
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
-            <select
+            <Select2
+                inputId={name}
                 name={name}
-                value={value ?? ""}
-                onChange={onChange}
-                disabled={disabled}
-                className={fieldClass(error, disabled)}
-            >
-                <option value="">Pilih {label.toLowerCase()}</option>
-                {options.map((item) => (
-                    <option key={item} value={item}>
-                        {item}
-                    </option>
-                ))}
-            </select>
+                value={selectedOption}
+                onChange={handleSelectChange}
+                options={normalizedOptions}
+                isClearable
+                isSearchable
+                isDisabled={disabled}
+                isLoading={isLoading}
+                placeholder={placeholder || `Pilih ${label.toLowerCase()}`}
+                noOptionsMessage={() =>
+                    isLoading ? "Memuat data..." : "Data tidak ditemukan"
+                }
+                loadingMessage={() => "Memuat data..."}
+                classNamePrefix="select2"
+                menuPortalTarget={
+                    typeof document !== "undefined" ? document.body : null
+                }
+                styles={{
+                    control: (base, state) => ({
+                        ...base,
+                        minHeight: "48px",
+                        borderRadius: "1rem",
+                        borderColor: error
+                            ? "#fca5a5"
+                            : state.isFocused
+                            ? "#10b981"
+                            : "#e2e8f0",
+                        backgroundColor: disabled
+                            ? "#f1f5f9"
+                            : error
+                            ? "#fef2f2"
+                            : "#ffffff",
+                        boxShadow: state.isFocused
+                            ? error
+                                ? "0 0 0 4px #fee2e2"
+                                : "0 0 0 4px #d1fae5"
+                            : "none",
+                        cursor: disabled ? "not-allowed" : "default",
+                        "&:hover": {
+                            borderColor: error ? "#ef4444" : "#10b981",
+                        },
+                    }),
+                    valueContainer: (base) => ({
+                        ...base,
+                        padding: "0 14px",
+                    }),
+                    input: (base) => ({
+                        ...base,
+                        color: "#0f172a",
+                        fontSize: "0.875rem",
+                    }),
+                    singleValue: (base) => ({
+                        ...base,
+                        color: "#0f172a",
+                        fontSize: "0.875rem",
+                    }),
+                    placeholder: (base) => ({
+                        ...base,
+                        color: "#94a3b8",
+                        fontSize: "0.875rem",
+                    }),
+                    indicatorSeparator: () => ({
+                        display: "none",
+                    }),
+                    dropdownIndicator: (base, state) => ({
+                        ...base,
+                        color: state.isFocused ? "#059669" : "#64748b",
+                        "&:hover": {
+                            color: "#059669",
+                        },
+                    }),
+                    clearIndicator: (base) => ({
+                        ...base,
+                        color: "#94a3b8",
+                        "&:hover": {
+                            color: "#ef4444",
+                        },
+                    }),
+                    menu: (base) => ({
+                        ...base,
+                        zIndex: 9999,
+                        borderRadius: "1rem",
+                        overflow: "hidden",
+                        boxShadow:
+                            "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+                    }),
+                    menuPortal: (base) => ({
+                        ...base,
+                        zIndex: 9999,
+                    }),
+                    option: (base, state) => ({
+                        ...base,
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                        backgroundColor: state.isSelected
+                            ? "#059669"
+                            : state.isFocused
+                            ? "#ecfdf5"
+                            : "#ffffff",
+                        color: state.isSelected ? "#ffffff" : "#0f172a",
+                        "&:active": {
+                            backgroundColor: "#d1fae5",
+                        },
+                    }),
+                }}
+            />
 
             <ErrorMessage message={error} />
         </div>
@@ -537,14 +607,17 @@ function RadioGroup({
     value,
     onChange,
     options = [],
-    required = false,
     error,
 }) {
     return (
-        <div className={`rounded-2xl border p-4 ${
-            error ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"
-        }`}>
-            <FieldLabel label={label} required={required} />
+        <div
+            className={`rounded-2xl border p-4 ${
+                error
+                    ? "border-red-200 bg-red-50"
+                    : "border-slate-200 bg-slate-50"
+            }`}
+        >
+            <FieldLabel label={label} />
 
             <div className="mt-3 space-y-3">
                 {options.map((item) => (
@@ -560,77 +633,7 @@ function RadioGroup({
                             onChange={onChange}
                             className="h-4 w-4 accent-emerald-600"
                         />
-                        <span>{item}</span>
-                    </label>
-                ))}
-            </div>
 
-            <ErrorMessage message={error} />
-        </div>
-    );
-}
-
-function CheckboxGroup({
-    label,
-    description,
-    name,
-    value,
-    onChange,
-    options = [],
-    required = false,
-    error,
-}) {
-    const selectedValues = Array.isArray(value) ? value : [];
-
-    const handleCheckboxChange = (checkedValue) => {
-        let nextValues = selectedValues.includes(checkedValue)
-            ? selectedValues.filter((item) => item !== checkedValue)
-            : [...selectedValues, checkedValue];
-
-        if (checkedValue === "Tidak Menggunakan Kaca Mata") {
-            nextValues = selectedValues.includes(checkedValue)
-                ? []
-                : ["Tidak Menggunakan Kaca Mata"];
-        } else {
-            nextValues = nextValues.filter(
-                (item) => item !== "Tidak Menggunakan Kaca Mata"
-            );
-        }
-
-        onChange({
-            target: {
-                name,
-                value: nextValues,
-            },
-        });
-    };
-
-    return (
-        <div className={`rounded-2xl border p-4 ${
-            error ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"
-        }`}>
-            <FieldLabel label={label} required={required} />
-
-            {description && (
-                <p className="mt-1 text-xs font-semibold text-slate-500">
-                    {description}
-                </p>
-            )}
-
-            <div className="mt-3 space-y-3">
-                {options.map((item) => (
-                    <label
-                        key={item}
-                        className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700"
-                    >
-                        <input
-                            type="checkbox"
-                            name={name}
-                            value={item}
-                            checked={selectedValues.includes(item)}
-                            onChange={() => handleCheckboxChange(item)}
-                            className="h-4 w-4 rounded accent-emerald-600"
-                        />
                         <span>{item}</span>
                     </label>
                 ))}
@@ -648,13 +651,12 @@ function Textarea({
     onChange,
     placeholder,
     rows = 3,
-    required = false,
     error,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <textarea
                 name={name}

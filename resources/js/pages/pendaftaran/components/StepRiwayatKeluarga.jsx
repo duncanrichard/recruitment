@@ -1,9 +1,20 @@
 import React from "react";
 
+const HUBUNGAN_KERABAT_INSTANSI_OPTIONS = [
+    "TNI",
+    "KEPOLISIAN",
+    "ASN",
+    "BUMN",
+    "KESEHATAN",
+    "PEMKOT/PEMPROV",
+    "TIDAK ADA HUBUNGAN KEKERABATAN DENGAN INSTANSI",
+];
+
+const TIDAK_ADA_HUBUNGAN = "TIDAK ADA HUBUNGAN KEKERABATAN DENGAN INSTANSI";
+
 export default function StepRiwayatKeluarga({
     form,
     errors = {},
-    requiredFields = [],
     handleChange,
 
     handleKontakDaruratChange,
@@ -18,8 +29,6 @@ export default function StepRiwayatKeluarga({
     addSaudaraIpar,
     removeSaudaraIpar,
 }) {
-    const isRequired = (name) => requiredFields.includes(name);
-
     const kontakDaruratList =
         Array.isArray(form.kontak_darurat) && form.kontak_darurat.length > 0
             ? form.kontak_darurat
@@ -53,6 +62,41 @@ export default function StepRiwayatKeluarga({
                   },
               ];
 
+    const hubunganKerabatInstansi = normalizeCheckboxValue(
+        form.hubungan_kerabat_instansi
+    );
+
+    const handleHubunganKerabatInstansiChange = (option) => {
+        const currentValues = normalizeCheckboxValue(
+            form.hubungan_kerabat_instansi
+        );
+
+        let nextValues = [];
+
+        if (option === TIDAK_ADA_HUBUNGAN) {
+            nextValues = currentValues.includes(TIDAK_ADA_HUBUNGAN)
+                ? []
+                : [TIDAK_ADA_HUBUNGAN];
+        } else {
+            const withoutTidakAda = currentValues.filter(
+                (item) => item !== TIDAK_ADA_HUBUNGAN
+            );
+
+            if (withoutTidakAda.includes(option)) {
+                nextValues = withoutTidakAda.filter((item) => item !== option);
+            } else {
+                nextValues = [...withoutTidakAda, option];
+            }
+        }
+
+        handleChange({
+            target: {
+                name: "hubungan_kerabat_instansi",
+                value: nextValues,
+            },
+        });
+    };
+
     return (
         <div className="space-y-8">
             <div className="rounded-2xl border border-pink-100 bg-pink-50 p-4">
@@ -61,9 +105,23 @@ export default function StepRiwayatKeluarga({
                 </h3>
                 <p className="mt-1 text-sm text-pink-600">
                     Lengkapi data keluarga, pasangan, mertua, kontak darurat,
-                    saudara kandung, dan saudara ipar.
+                    saudara kandung, saudara ipar, dan hubungan kekerabatan
+                    dengan instansi.
                 </p>
             </div>
+
+            <Card title="Hubungan Kekerabatan dengan Instansi">
+                <CheckboxGroup
+                    label="Apakah Anda memiliki hubungan kekerabatan (kerabat dekat maupun jauh) yang bekerja di instansi"
+                    helper="Dapat memilih lebih dari 1 opsi"
+                    required
+                    name="hubungan_kerabat_instansi"
+                    options={HUBUNGAN_KERABAT_INSTANSI_OPTIONS}
+                    value={hubunganKerabatInstansi}
+                    onChange={handleHubunganKerabatInstansiChange}
+                    error={errors.hubungan_kerabat_instansi}
+                />
+            </Card>
 
             <Card title="Orang Tua Kandung">
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -72,7 +130,6 @@ export default function StepRiwayatKeluarga({
                         name="nama_ayah_kandung"
                         value={form.nama_ayah_kandung}
                         onChange={handleChange}
-                        required={isRequired("nama_ayah_kandung")}
                         error={errors.nama_ayah_kandung}
                     />
 
@@ -81,7 +138,6 @@ export default function StepRiwayatKeluarga({
                         name="pekerjaan_ayah_kandung"
                         value={form.pekerjaan_ayah_kandung}
                         onChange={handleChange}
-                        required={isRequired("pekerjaan_ayah_kandung")}
                         error={errors.pekerjaan_ayah_kandung}
                     />
                 </div>
@@ -92,7 +148,6 @@ export default function StepRiwayatKeluarga({
                         name="nama_ibu_kandung"
                         value={form.nama_ibu_kandung}
                         onChange={handleChange}
-                        required={isRequired("nama_ibu_kandung")}
                         error={errors.nama_ibu_kandung}
                     />
 
@@ -101,7 +156,6 @@ export default function StepRiwayatKeluarga({
                         name="pekerjaan_ibu_kandung"
                         value={form.pekerjaan_ibu_kandung}
                         onChange={handleChange}
-                        required={isRequired("pekerjaan_ibu_kandung")}
                         error={errors.pekerjaan_ibu_kandung}
                     />
                 </div>
@@ -254,7 +308,6 @@ export default function StepRiwayatKeluarga({
                         name="nama_suami_istri"
                         value={form.nama_suami_istri}
                         onChange={handleChange}
-                        required={isRequired("nama_suami_istri")}
                         error={errors.nama_suami_istri}
                     />
 
@@ -263,7 +316,6 @@ export default function StepRiwayatKeluarga({
                         name="pekerjaan_suami_istri"
                         value={form.pekerjaan_suami_istri}
                         onChange={handleChange}
-                        required={isRequired("pekerjaan_suami_istri")}
                         error={errors.pekerjaan_suami_istri}
                     />
 
@@ -273,7 +325,6 @@ export default function StepRiwayatKeluarga({
                         value={form.tlpn_suami_istri}
                         onChange={handleChange}
                         placeholder="Contoh: 08xxxxxxxxxx"
-                        required={isRequired("tlpn_suami_istri")}
                         error={errors.tlpn_suami_istri}
                     />
                 </div>
@@ -286,7 +337,6 @@ export default function StepRiwayatKeluarga({
                         name="nama_bapak_mertua"
                         value={form.nama_bapak_mertua}
                         onChange={handleChange}
-                        required={isRequired("nama_bapak_mertua")}
                         error={errors.nama_bapak_mertua}
                     />
 
@@ -295,7 +345,6 @@ export default function StepRiwayatKeluarga({
                         name="pekerjaan_bapak_mertua"
                         value={form.pekerjaan_bapak_mertua}
                         onChange={handleChange}
-                        required={isRequired("pekerjaan_bapak_mertua")}
                         error={errors.pekerjaan_bapak_mertua}
                     />
                 </div>
@@ -306,7 +355,6 @@ export default function StepRiwayatKeluarga({
                         name="nama_ibu_mertua"
                         value={form.nama_ibu_mertua}
                         onChange={handleChange}
-                        required={isRequired("nama_ibu_mertua")}
                         error={errors.nama_ibu_mertua}
                     />
 
@@ -315,7 +363,6 @@ export default function StepRiwayatKeluarga({
                         name="pekerjaan_ibu_mertua"
                         value={form.pekerjaan_ibu_mertua}
                         onChange={handleChange}
-                        required={isRequired("pekerjaan_ibu_mertua")}
                         error={errors.pekerjaan_ibu_mertua}
                     />
                 </div>
@@ -350,7 +397,9 @@ export default function StepRiwayatKeluarga({
                                 {kontakDaruratList.length > 1 && (
                                     <button
                                         type="button"
-                                        onClick={() => removeKontakDarurat(index)}
+                                        onClick={() =>
+                                            removeKontakDarurat(index)
+                                        }
                                         className="rounded-xl bg-red-100 px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-200"
                                     >
                                         Hapus
@@ -371,11 +420,12 @@ export default function StepRiwayatKeluarga({
                                         )
                                     }
                                     placeholder="Contoh: Budi Santoso"
-                                    required={index === 0 && isRequired("kontak_darurat")}
                                     error={
                                         index === 0
                                             ? errors.kontak_darurat_nama
-                                            : errors[`kontak_darurat_${index}_nama`]
+                                            : errors[
+                                                  `kontak_darurat_${index}_nama`
+                                              ]
                                     }
                                 />
 
@@ -403,11 +453,12 @@ export default function StepRiwayatKeluarga({
                                         "Tetangga",
                                         "Lainnya",
                                     ]}
-                                    required={index === 0 && isRequired("kontak_darurat")}
                                     error={
                                         index === 0
                                             ? errors.kontak_darurat_status
-                                            : errors[`kontak_darurat_${index}_status`]
+                                            : errors[
+                                                  `kontak_darurat_${index}_status`
+                                              ]
                                     }
                                 />
 
@@ -423,11 +474,12 @@ export default function StepRiwayatKeluarga({
                                         )
                                     }
                                     placeholder="Contoh: 08xxxxxxxxxx"
-                                    required={index === 0 && isRequired("kontak_darurat")}
                                     error={
                                         index === 0
                                             ? errors.kontak_darurat_nomor
-                                            : errors[`kontak_darurat_${index}_nomor`]
+                                            : errors[
+                                                  `kontak_darurat_${index}_nomor`
+                                              ]
                                     }
                                 />
                             </div>
@@ -458,6 +510,82 @@ export default function StepRiwayatKeluarga({
                 alamatPlaceholder="Masukkan alamat saudara ipar"
                 buttonColor="pink"
             />
+        </div>
+    );
+}
+
+function normalizeCheckboxValue(value) {
+    if (Array.isArray(value)) {
+        return value.filter(Boolean);
+    }
+
+    if (typeof value === "string") {
+        try {
+            const parsed = JSON.parse(value);
+
+            if (Array.isArray(parsed)) {
+                return parsed.filter(Boolean);
+            }
+        } catch (error) {
+            return value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+    }
+
+    return [];
+}
+
+function CheckboxGroup({
+    label,
+    helper,
+    required = false,
+    options = [],
+    value = [],
+    onChange,
+    error,
+}) {
+    const selectedValues = normalizeCheckboxValue(value);
+
+    return (
+        <div>
+            <div className="mb-5">
+                <p className="text-base font-semibold uppercase leading-relaxed text-slate-900">
+                    {label}
+                    {required && <span className="ml-1 text-red-500">*</span>}
+                </p>
+
+                {helper && (
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                        ({helper})
+                    </p>
+                )}
+            </div>
+
+            <div className="space-y-4">
+                {options.map((option) => {
+                    const checked = selectedValues.includes(option);
+
+                    return (
+                        <label
+                            key={option}
+                            className="flex cursor-pointer items-start gap-3 text-sm font-medium text-slate-900"
+                        >
+                            <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => onChange(option)}
+                                className="mt-0.5 h-5 w-5 rounded border-slate-400 text-purple-600 focus:ring-4 focus:ring-purple-100"
+                            />
+
+                            <span className="leading-6">{option}</span>
+                        </label>
+                    );
+                })}
+            </div>
+
+            <ErrorMessage message={error} />
         </div>
     );
 }
@@ -518,7 +646,11 @@ function FamilyList({
                                 name="nama"
                                 value={item.nama}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                             />
 
@@ -527,7 +659,11 @@ function FamilyList({
                                 name="jenis_kelamin"
                                 value={item.jenis_kelamin}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                                 options={["Laki-laki", "Perempuan"]}
                             />
@@ -539,7 +675,11 @@ function FamilyList({
                                 name="hubungan"
                                 value={item.hubungan}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                                 placeholder="Contoh: Kakak / Adik"
                             />
@@ -549,7 +689,11 @@ function FamilyList({
                                 name="pekerjaan"
                                 value={item.pekerjaan}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                             />
 
@@ -558,7 +702,11 @@ function FamilyList({
                                 name="no_hp"
                                 value={item.no_hp}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                                 placeholder="Contoh: 08xxxxxxxxxx"
                             />
@@ -570,7 +718,11 @@ function FamilyList({
                                 name="alamat"
                                 value={item.alamat}
                                 onChange={(e) =>
-                                    onChange(index, e.target.name, e.target.value)
+                                    onChange(
+                                        index,
+                                        e.target.name,
+                                        e.target.value
+                                    )
                                 }
                                 placeholder={alamatPlaceholder}
                             />
@@ -591,11 +743,10 @@ function Card({ title, children }) {
     );
 }
 
-function FieldLabel({ label, required }) {
+function FieldLabel({ label }) {
     return (
         <label className="mb-2 block text-sm font-semibold text-slate-700">
             {label}
-            {required && <span className="ml-1 text-red-500">*</span>}
         </label>
     );
 }
@@ -625,7 +776,6 @@ function Input({
     value,
     onChange,
     placeholder,
-    required = false,
     error,
     onlyPicker = false,
     disabled = false,
@@ -670,7 +820,7 @@ function Input({
 
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <div className="relative">
                 <input
@@ -714,13 +864,12 @@ function Select({
     value,
     onChange,
     options = [],
-    required = false,
     error,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <select
                 name={name}
@@ -748,13 +897,12 @@ function Textarea({
     value,
     onChange,
     placeholder,
-    required = false,
     error,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <textarea
                 name={name}

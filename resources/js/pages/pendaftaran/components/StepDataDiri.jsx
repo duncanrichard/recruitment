@@ -1,4 +1,5 @@
 import React from "react";
+import Select2 from "react-select";
 
 export default function StepDataDiri({
     form,
@@ -8,8 +9,297 @@ export default function StepDataDiri({
     handleSosialMediaChange,
     addSosialMedia,
     removeSosialMedia,
+    masterOptions = {},
 }) {
     const isRequired = (name) => requiredFields.includes(name);
+    const posisiStrAktif = String(form.posisi_str_aktif || "").toLowerCase();
+    const tampilkanStrAktif = posisiStrAktif === "active";
+
+    const sosialMediaItems = Array.isArray(form.sosial_media)
+        ? form.sosial_media
+        : [];
+
+    const selectedProvinsi = form.provinsi_id || form.provinsi || "";
+    const selectedKabupaten = form.kabupaten_id || form.kabupaten || "";
+    const selectedKecamatan = form.kecamatan_id || form.kecamatan || "";
+    const selectedKelurahan = form.kelurahan_id || form.kelurahan || "";
+
+    const [wilayahOptions, setWilayahOptions] = React.useState({
+        provinces: [],
+        regencies: [],
+        districts: [],
+        villages: [],
+    });
+
+    const [wilayahLoading, setWilayahLoading] = React.useState({
+        provinces: false,
+        regencies: false,
+        districts: false,
+        villages: false,
+    });
+
+    const fetchWilayah = React.useCallback(async (url) => {
+        try {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                return [];
+            }
+
+            return Array.isArray(result.data) ? result.data : [];
+        } catch (error) {
+            return [];
+        }
+    }, []);
+
+    const updateField = React.useCallback(
+        (name, value) => {
+            handleChange({
+                target: {
+                    name,
+                    value,
+                },
+            });
+        },
+        [handleChange]
+    );
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        setWilayahLoading((prev) => ({
+            ...prev,
+            provinces: true,
+        }));
+
+        fetchWilayah("/pendaftaran/api/wilayah/provinces")
+            .then((data) => {
+                if (!mounted) return;
+
+                setWilayahOptions((prev) => ({
+                    ...prev,
+                    provinces: data,
+                }));
+            })
+            .finally(() => {
+                if (!mounted) return;
+
+                setWilayahLoading((prev) => ({
+                    ...prev,
+                    provinces: false,
+                }));
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [fetchWilayah]);
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        if (!selectedProvinsi) {
+            setWilayahOptions((prev) => ({
+                ...prev,
+                regencies: [],
+                districts: [],
+                villages: [],
+            }));
+
+            return () => {
+                mounted = false;
+            };
+        }
+
+        setWilayahLoading((prev) => ({
+            ...prev,
+            regencies: true,
+        }));
+
+        fetchWilayah(
+            `/pendaftaran/api/wilayah/regencies/${encodeURIComponent(
+                selectedProvinsi
+            )}`
+        )
+            .then((data) => {
+                if (!mounted) return;
+
+                setWilayahOptions((prev) => ({
+                    ...prev,
+                    regencies: data,
+                }));
+            })
+            .finally(() => {
+                if (!mounted) return;
+
+                setWilayahLoading((prev) => ({
+                    ...prev,
+                    regencies: false,
+                }));
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [selectedProvinsi, fetchWilayah]);
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        if (!selectedKabupaten) {
+            setWilayahOptions((prev) => ({
+                ...prev,
+                districts: [],
+                villages: [],
+            }));
+
+            return () => {
+                mounted = false;
+            };
+        }
+
+        setWilayahLoading((prev) => ({
+            ...prev,
+            districts: true,
+        }));
+
+        fetchWilayah(
+            `/pendaftaran/api/wilayah/districts/${encodeURIComponent(
+                selectedKabupaten
+            )}`
+        )
+            .then((data) => {
+                if (!mounted) return;
+
+                setWilayahOptions((prev) => ({
+                    ...prev,
+                    districts: data,
+                }));
+            })
+            .finally(() => {
+                if (!mounted) return;
+
+                setWilayahLoading((prev) => ({
+                    ...prev,
+                    districts: false,
+                }));
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [selectedKabupaten, fetchWilayah]);
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        if (!selectedKecamatan) {
+            setWilayahOptions((prev) => ({
+                ...prev,
+                villages: [],
+            }));
+
+            return () => {
+                mounted = false;
+            };
+        }
+
+        setWilayahLoading((prev) => ({
+            ...prev,
+            villages: true,
+        }));
+
+        fetchWilayah(
+            `/pendaftaran/api/wilayah/villages/${encodeURIComponent(
+                selectedKecamatan
+            )}`
+        )
+            .then((data) => {
+                if (!mounted) return;
+
+                setWilayahOptions((prev) => ({
+                    ...prev,
+                    villages: data,
+                }));
+            })
+            .finally(() => {
+                if (!mounted) return;
+
+                setWilayahLoading((prev) => ({
+                    ...prev,
+                    villages: false,
+                }));
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [selectedKecamatan, fetchWilayah]);
+
+    const handleWilayahChange = (event) => {
+        const { name, value } = event.target;
+
+        updateField(name, value);
+
+        if (name === "provinsi_id") {
+            updateField("provinsi", value);
+
+            updateField("kabupaten_id", "");
+            updateField("kabupaten", "");
+
+            updateField("kecamatan_id", "");
+            updateField("kecamatan", "");
+
+            updateField("kelurahan_id", "");
+            updateField("kelurahan", "");
+
+            setWilayahOptions((prev) => ({
+                ...prev,
+                regencies: [],
+                districts: [],
+                villages: [],
+            }));
+        }
+
+        if (name === "kabupaten_id") {
+            updateField("kabupaten", value);
+
+            updateField("kecamatan_id", "");
+            updateField("kecamatan", "");
+
+            updateField("kelurahan_id", "");
+            updateField("kelurahan", "");
+
+            setWilayahOptions((prev) => ({
+                ...prev,
+                districts: [],
+                villages: [],
+            }));
+        }
+
+        if (name === "kecamatan_id") {
+            updateField("kecamatan", value);
+
+            updateField("kelurahan_id", "");
+            updateField("kelurahan", "");
+
+            setWilayahOptions((prev) => ({
+                ...prev,
+                villages: [],
+            }));
+        }
+
+        if (name === "kelurahan_id") {
+            updateField("kelurahan", value);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -17,6 +307,7 @@ export default function StepDataDiri({
                 <h3 className="text-base font-bold text-blue-800">
                     Data Diri
                 </h3>
+
                 <p className="mt-1 text-sm text-blue-600">
                     Lengkapi informasi pribadi sesuai identitas resmi. Field
                     bertanda <span className="font-bold text-red-500">*</span>{" "}
@@ -32,24 +323,31 @@ export default function StepDataDiri({
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <Input
                         label="Posisi yang Dilamar"
-                        name="posisi_dilamar"
-                        value={form.posisi_dilamar}
-                        onChange={handleChange}
-                        placeholder="Contoh: Operator Produksi"
+                        name="posisi_dilamar_label"
+                        value={form.posisi_dilamar_label || ""}
+                        onChange={() => {}}
+                        placeholder="Posisi yang dilamar"
                         required={isRequired("posisi_dilamar")}
                         error={errors.posisi_dilamar}
+                        disabled
                     />
 
                     <Input
                         label="Perusahaan yang Dilamar"
-                        name="perusahaan_dilamar"
-                        value={form.perusahaan_dilamar}
-                        onChange={handleChange}
-                        placeholder="Contoh: PT Maju Sejahtera"
+                        name="perusahaan_dilamar_label"
+                        value={form.perusahaan_dilamar_label || ""}
+                        onChange={() => {}}
+                        placeholder="Perusahaan yang dilamar"
                         required={isRequired("perusahaan_dilamar")}
                         error={errors.perusahaan_dilamar}
+                        disabled
                     />
                 </div>
+
+                <p className="mt-3 text-xs font-medium text-slate-500">
+                    Posisi dan perusahaan mengikuti link pendaftaran yang
+                    diberikan HR. Data yang disimpan tetap memakai UUID relasi.
+                </p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -77,42 +375,37 @@ export default function StepDataDiri({
                         required={isRequired("nama_panggilan")}
                         error={errors.nama_panggilan}
                     />
-                </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="NIK"
-                        name="nik"
-                        value={form.nik}
-                        onChange={handleChange}
-                        placeholder="Masukkan NIK"
-                        required={isRequired("nik")}
-                        error={errors.nik}
-                    />
-
-                    <Select
+                    <SelectField
                         label="Pendidikan Terakhir"
                         name="pendidikan"
                         value={form.pendidikan}
                         onChange={handleChange}
                         required={isRequired("pendidikan")}
                         error={errors.pendidikan}
-                        options={[
-                            { value: "SD", label: "SD" },
-                            { value: "SMP", label: "SMP" },
-                            { value: "SMA / SMK", label: "SMA / SMK" },
-                            { value: "D1", label: "D1" },
-                            { value: "D2", label: "D2" },
-                            { value: "D3", label: "D3" },
-                            { value: "D4", label: "D4" },
-                            { value: "S1", label: "S1" },
-                            { value: "S2", label: "S2" },
-                            { value: "S3", label: "S3" },
-                        ]}
+                        options={masterOptions.pendidikan || []}
                     />
-                </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Jurusan"
+                        name="jurusan"
+                        value={form.jurusan}
+                        onChange={handleChange}
+                        placeholder="Contoh: Teknik Informatika"
+                        required={isRequired("jurusan")}
+                        error={errors.jurusan}
+                    />
+
+                    <Input
+                        label="Nama Institusi"
+                        name="nama_institusi"
+                        value={form.nama_institusi}
+                        onChange={handleChange}
+                        placeholder="Contoh: Universitas Indonesia"
+                        required={isRequired("nama_institusi")}
+                        error={errors.nama_institusi}
+                    />
+
                     <Input
                         label="Tempat Lahir"
                         name="tempat_lahir"
@@ -133,83 +426,70 @@ export default function StepDataDiri({
                         error={errors.tanggal_lahir}
                         onlyPicker
                     />
-                </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
+                    <SelectField
                         label="Jenis Kelamin"
                         name="jenis_kelamin"
                         value={form.jenis_kelamin}
                         onChange={handleChange}
                         required={isRequired("jenis_kelamin")}
                         error={errors.jenis_kelamin}
-                        options={[
-                            { value: "Laki-laki", label: "Laki-laki" },
-                            { value: "Perempuan", label: "Perempuan" },
-                        ]}
+                        options={masterOptions.jenis_kelamin || []}
                     />
 
-                    <Select
+                    <SelectField
                         label="Agama"
                         name="agama"
                         value={form.agama}
                         onChange={handleChange}
                         required={isRequired("agama")}
                         error={errors.agama}
-                        options={[
-                            { value: "Islam", label: "Islam" },
-                            { value: "Kristen", label: "Kristen" },
-                            { value: "Katolik", label: "Katolik" },
-                            { value: "Hindu", label: "Hindu" },
-                            { value: "Buddha", label: "Buddha" },
-                            { value: "Konghucu", label: "Konghucu" },
-                        ]}
+                        options={masterOptions.agama || []}
                     />
-                </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
+                    <SelectField
                         label="Status Perkawinan"
-                        name="status_perkawinan"
-                        value={form.status_perkawinan}
+                        name="status_pernikahan_id"
+                        value={
+                            form.status_pernikahan_id ||
+                            form.status_perkawinan ||
+                            ""
+                        }
                         onChange={handleChange}
-                        required={isRequired("status_perkawinan")}
-                        error={errors.status_perkawinan}
-                        options={[
-                            { value: "Belum Kawin", label: "Belum Kawin" },
-                            { value: "Kawin", label: "Kawin" },
-                            { value: "Cerai Hidup", label: "Cerai Hidup" },
-                            { value: "Cerai Mati", label: "Cerai Mati" },
-                        ]}
+                        required={
+                            isRequired("status_pernikahan_id") ||
+                            isRequired("status_perkawinan")
+                        }
+                        error={
+                            errors.status_pernikahan_id ||
+                            errors.status_perkawinan
+                        }
+                        options={masterOptions.status_pernikahan || []}
                     />
 
-                    <Select
+                    <SelectField
                         label="Kewarganegaraan"
                         name="kewarganegaraan"
                         value={form.kewarganegaraan}
                         onChange={handleChange}
                         required={isRequired("kewarganegaraan")}
                         error={errors.kewarganegaraan}
-                        options={[
-                            { value: "WNI", label: "WNI" },
-                            { value: "WNA", label: "WNA" },
-                        ]}
+                        options={masterOptions.kewarganegaraan || []}
                     />
-                </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Select
-                        label="STR Aktif"
-                        name="str_aktif"
-                        value={form.str_aktif}
-                        onChange={handleChange}
-                        required={isRequired("str_aktif")}
-                        error={errors.str_aktif}
-                        options={[
-                            { value: "Ya", label: "Ya" },
-                            { value: "Tidak", label: "Tidak" },
-                        ]}
-                    />
+                    {tampilkanStrAktif && (
+                        <SelectField
+                            label="STR Aktif"
+                            name="str_aktif"
+                            value={form.str_aktif}
+                            onChange={handleChange}
+                            required={
+                                isRequired("str_aktif") || tampilkanStrAktif
+                            }
+                            error={errors.str_aktif}
+                            options={masterOptions.str_aktif || []}
+                        />
+                    )}
                 </div>
             </div>
 
@@ -219,8 +499,10 @@ export default function StepDataDiri({
                         <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
                             Sosial Media
                         </h3>
+
                         <p className="mt-1 text-xs text-slate-500">
-                            Pilih platform sosial media, lalu masukkan nama akun.
+                            Pilih platform sosial media, lalu masukkan nama
+                            akun.
                         </p>
                     </div>
 
@@ -233,65 +515,98 @@ export default function StepDataDiri({
                     </button>
                 </div>
 
-                <div className="space-y-4">
-                    {(form.sosial_media || []).map((item, index) => (
-                        <div
-                            key={index}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                {sosialMediaItems.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                        <p className="text-sm font-semibold text-slate-500">
+                            Belum ada sosial media.
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={addSosialMedia}
+                            className="mt-3 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700"
                         >
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                                <h4 className="text-sm font-bold text-slate-700">
-                                    Sosial Media {index + 1}
-                                </h4>
+                            Tambah Sosial Media
+                        </button>
+                    </div>
+                )}
 
-                                <button
-                                    type="button"
-                                    onClick={() => removeSosialMedia(index)}
-                                    className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100"
-                                >
-                                    Hapus
-                                </button>
+                <div className="space-y-4">
+                    {sosialMediaItems.map((item, index) => {
+                        const platformValue = item?.platform ?? "";
+                        const namaAkunValue =
+                            item?.nama_akun ?? item?.nama_account ?? "";
+
+                        return (
+                            <div
+                                key={item?.id || index}
+                                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            >
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <h4 className="text-sm font-bold text-slate-700">
+                                        Sosial Media {index + 1}
+                                    </h4>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            removeSosialMedia(index)
+                                        }
+                                        className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-100"
+                                    >
+                                        Hapus
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    <SelectField
+                                        label="Platform"
+                                        name={`sosial_media.${index}.platform`}
+                                        value={platformValue}
+                                        onChange={(event) =>
+                                            handleSosialMediaChange(
+                                                index,
+                                                "platform",
+                                                event.target.value
+                                            )
+                                        }
+                                        options={
+                                            masterOptions.sosial_media || []
+                                        }
+                                        placeholder="Pilih platform"
+                                        error={getNestedError(
+                                            errors,
+                                            `sosial_media.${index}.platform`
+                                        )}
+                                    />
+
+                                    <Input
+                                        label="Nama Akun"
+                                        name={`sosial_media.${index}.nama_akun`}
+                                        value={namaAkunValue}
+                                        onChange={(event) =>
+                                            handleSosialMediaChange(
+                                                index,
+                                                "nama_akun",
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder="Contoh: @namaakun"
+                                        error={
+                                            getNestedError(
+                                                errors,
+                                                `sosial_media.${index}.nama_akun`
+                                            ) ||
+                                            getNestedError(
+                                                errors,
+                                                `sosial_media.${index}.nama_account`
+                                            )
+                                        }
+                                    />
+                                </div>
                             </div>
-
-                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                <Select
-                                    label="Platform"
-                                    name={`sosial_media_${index}_platform`}
-                                    value={item.platform}
-                                    onChange={(event) =>
-                                        handleSosialMediaChange(
-                                            index,
-                                            "platform",
-                                            event.target.value
-                                        )
-                                    }
-                                    options={[
-                                        { value: "Instagram", label: "Instagram" },
-                                        { value: "Facebook", label: "Facebook" },
-                                        { value: "TikTok", label: "TikTok" },
-                                        { value: "X / Twitter", label: "X / Twitter" },
-                                        { value: "LinkedIn", label: "LinkedIn" },
-                                        { value: "YouTube", label: "YouTube" },
-                                        { value: "Lainnya", label: "Lainnya" },
-                                    ]}
-                                />
-
-                                <Input
-                                    label="Nama Akun"
-                                    name={`sosial_media_${index}_nama_akun`}
-                                    value={item.nama_akun}
-                                    onChange={(event) =>
-                                        handleSosialMediaChange(
-                                            index,
-                                            "nama_akun",
-                                            event.target.value
-                                        )
-                                    }
-                                    placeholder="Contoh: @namaakun"
-                                />
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -331,82 +646,173 @@ export default function StepDataDiri({
                 </h3>
 
                 <Textarea
-                    label="Alamat Lengkap"
-                    name="alamat"
-                    value={form.alamat}
+                    label="Alamat KTP"
+                    name="alamat_ktp"
+                    value={form.alamat_ktp ?? ""}
                     onChange={handleChange}
-                    placeholder="Masukkan alamat lengkap"
-                    required={isRequired("alamat")}
-                    error={errors.alamat}
+                    placeholder="Masukkan alamat sesuai KTP"
+                    required={isRequired("alamat_ktp")}
+                    error={errors.alamat_ktp}
                     rows={4}
                 />
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
-                    <Input
-                        label="Provinsi"
-                        name="provinsi"
-                        value={form.provinsi}
+                <div className="mt-5">
+                    <Textarea
+                        label="Alamat Domisili"
+                        name="alamat_domisili"
+                        value={form.alamat_domisili ?? form.alamat ?? ""}
                         onChange={handleChange}
-                        placeholder="Provinsi"
-                        required={isRequired("provinsi")}
-                        error={errors.provinsi}
-                    />
-
-                    <Input
-                        label="Kabupaten / Kota"
-                        name="kabupaten"
-                        value={form.kabupaten}
-                        onChange={handleChange}
-                        placeholder="Kabupaten / Kota"
-                        required={isRequired("kabupaten")}
-                        error={errors.kabupaten}
-                    />
-
-                    <Input
-                        label="Kecamatan"
-                        name="kecamatan"
-                        value={form.kecamatan}
-                        onChange={handleChange}
-                        placeholder="Kecamatan"
-                        required={isRequired("kecamatan")}
-                        error={errors.kecamatan}
+                        placeholder="Masukkan alamat domisili"
+                        required={isRequired("alamat_domisili")}
+                        error={errors.alamat_domisili ?? errors.alamat}
+                        rows={4}
                     />
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
-                    <Input
+                    <SelectField
+                        label="Provinsi"
+                        name="provinsi_id"
+                        value={selectedProvinsi}
+                        onChange={handleWilayahChange}
+                        placeholder={
+                            wilayahLoading.provinces
+                                ? "Memuat provinsi..."
+                                : "Pilih provinsi"
+                        }
+                        required={isRequired("provinsi_id") || isRequired("provinsi")}
+                        error={errors.provinsi_id || errors.provinsi}
+                        options={wilayahOptions.provinces}
+                        disabled={wilayahLoading.provinces}
+                        isLoading={wilayahLoading.provinces}
+                    />
+
+                    <SelectField
+                        label="Kabupaten / Kota"
+                        name="kabupaten_id"
+                        value={selectedKabupaten}
+                        onChange={handleWilayahChange}
+                        placeholder={
+                            !selectedProvinsi
+                                ? "Pilih provinsi dulu"
+                                : wilayahLoading.regencies
+                                ? "Memuat kabupaten / kota..."
+                                : "Pilih kabupaten / kota"
+                        }
+                        required={isRequired("kabupaten_id") || isRequired("kabupaten")}
+                        error={errors.kabupaten_id || errors.kabupaten}
+                        options={wilayahOptions.regencies}
+                        disabled={!selectedProvinsi || wilayahLoading.regencies}
+                        isLoading={wilayahLoading.regencies}
+                    />
+
+                    <SelectField
+                        label="Kecamatan"
+                        name="kecamatan_id"
+                        value={selectedKecamatan}
+                        onChange={handleWilayahChange}
+                        placeholder={
+                            !selectedKabupaten
+                                ? "Pilih kabupaten / kota dulu"
+                                : wilayahLoading.districts
+                                ? "Memuat kecamatan..."
+                                : "Pilih kecamatan"
+                        }
+                        required={isRequired("kecamatan_id") || isRequired("kecamatan")}
+                        error={errors.kecamatan_id || errors.kecamatan}
+                        options={wilayahOptions.districts}
+                        disabled={!selectedKabupaten || wilayahLoading.districts}
+                        isLoading={wilayahLoading.districts}
+                    />
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <SelectField
                         label="Kelurahan / Desa"
-                        name="kelurahan"
-                        value={form.kelurahan}
-                        onChange={handleChange}
-                        placeholder="Kelurahan / Desa"
-                        required={isRequired("kelurahan")}
-                        error={errors.kelurahan}
-                    />
-
-                    <Input
-                        label="RT"
-                        name="rt"
-                        value={form.rt}
-                        onChange={handleChange}
-                        placeholder="RT"
-                        required={isRequired("rt")}
-                        error={errors.rt}
-                    />
-
-                    <Input
-                        label="RW"
-                        name="rw"
-                        value={form.rw}
-                        onChange={handleChange}
-                        placeholder="RW"
-                        required={isRequired("rw")}
-                        error={errors.rw}
+                        name="kelurahan_id"
+                        value={selectedKelurahan}
+                        onChange={handleWilayahChange}
+                        placeholder={
+                            !selectedKecamatan
+                                ? "Pilih kecamatan dulu"
+                                : wilayahLoading.villages
+                                ? "Memuat kelurahan / desa..."
+                                : "Pilih kelurahan / desa"
+                        }
+                        required={isRequired("kelurahan_id") || isRequired("kelurahan")}
+                        error={errors.kelurahan_id || errors.kelurahan}
+                        options={wilayahOptions.villages}
+                        disabled={!selectedKecamatan || wilayahLoading.villages}
+                        isLoading={wilayahLoading.villages}
                     />
                 </div>
             </div>
         </div>
     );
+}
+
+function getNestedError(errors, path) {
+    if (!errors || !path) return null;
+
+    if (errors[path]) {
+        return Array.isArray(errors[path]) ? errors[path][0] : errors[path];
+    }
+
+    const normalizedPath = path.replace(/\.(\d+)\./g, ".$1.");
+
+    if (errors[normalizedPath]) {
+        return Array.isArray(errors[normalizedPath])
+            ? errors[normalizedPath][0]
+            : errors[normalizedPath];
+    }
+
+    return null;
+}
+
+function normalizeOptions(options = []) {
+    if (!Array.isArray(options)) {
+        return [];
+    }
+
+    return options
+        .map((item) => {
+            if (typeof item === "string") {
+                return {
+                    value: item,
+                    label: item,
+                    id: item,
+                };
+            }
+
+            const value =
+                item?.value ??
+                item?.id ??
+                item?.code ??
+                item?.kode ??
+                item?.platform ??
+                item?.label ??
+                "";
+
+            const label =
+                item?.label ??
+                item?.name ??
+                item?.nama ??
+                item?.platform ??
+                item?.pendidikan ??
+                item?.agama ??
+                item?.status_pernikahan ??
+                item?.kewarganegaraan ??
+                item?.informasi ??
+                value;
+
+            return {
+                ...item,
+                value: String(value ?? ""),
+                label: String(label ?? ""),
+                id: item?.id ?? value,
+            };
+        })
+        .filter((item) => item.value !== "" && item.label !== "");
 }
 
 function FieldLabel({ label, required }) {
@@ -421,18 +827,16 @@ function FieldLabel({ label, required }) {
 function ErrorMessage({ message }) {
     if (!message) return null;
 
-    return (
-        <p className="mt-2 text-xs font-semibold text-red-500">
-            {message}
-        </p>
-    );
+    return <p className="mt-2 text-xs font-semibold text-red-500">{message}</p>;
 }
 
-function fieldClass(error, type) {
+function fieldClass(error, type = "text", disabled = false) {
     return `w-full rounded-xl border px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 ${
         type === "date" ? "cursor-pointer pr-12" : ""
     } ${
-        error
+        disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-600"
+            : error
             ? "border-red-300 bg-red-50 focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-100"
             : "border-slate-300 bg-white focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
     }`;
@@ -448,12 +852,13 @@ function Input({
     required = false,
     error,
     onlyPicker = false,
+    disabled = false,
 }) {
     const inputValue = value ?? "";
     const inputRef = React.useRef(null);
 
     const openDatePicker = () => {
-        if (type !== "date") return;
+        if (disabled || type !== "date") return;
 
         const input = inputRef.current;
 
@@ -465,12 +870,17 @@ function Input({
             try {
                 input.showPicker();
             } catch (error) {
-                // Fallback browser.
+                // fallback browser
             }
         }
     };
 
     const handleKeyDown = (event) => {
+        if (disabled) {
+            event.preventDefault();
+            return;
+        }
+
         if (onlyPicker && type === "date") {
             const allowedKeys = [
                 "Tab",
@@ -489,7 +899,7 @@ function Input({
     };
 
     return (
-        <div>
+        <div className="min-w-0">
             <FieldLabel label={label} required={required} />
 
             <div className="relative">
@@ -502,11 +912,13 @@ function Input({
                     onClick={type === "date" ? openDatePicker : undefined}
                     onKeyDown={handleKeyDown}
                     placeholder={type === "date" ? undefined : placeholder}
-                    className={fieldClass(error, type)}
+                    className={fieldClass(error, type, disabled)}
                     autoComplete="off"
+                    disabled={disabled}
+                    readOnly={disabled}
                 />
 
-                {type === "date" && (
+                {type === "date" && !disabled && (
                     <button
                         type="button"
                         onClick={openDatePicker}
@@ -518,18 +930,12 @@ function Input({
                 )}
             </div>
 
-           {/*  {type === "date" && (
-                <p className="mt-1 text-xs text-slate-400">
-                    Klik kolom atau ikon kalender untuk memilih tanggal.
-                </p>
-            )} */}
-
             <ErrorMessage message={error} />
         </div>
     );
 }
 
-function Select({
+function SelectField({
     label,
     name,
     value,
@@ -537,24 +943,149 @@ function Select({
     options = [],
     required = false,
     error,
+    placeholder,
+    disabled = false,
+    isLoading = false,
 }) {
+    const cleanValue = value ?? "";
+    const normalizedOptions = normalizeOptions(options);
+
+    const selectedOption =
+        normalizedOptions.find(
+            (item) => String(item.value) === String(cleanValue)
+        ) ||
+        normalizedOptions.find(
+            (item) => String(item.id) === String(cleanValue)
+        ) ||
+        normalizedOptions.find(
+            (item) => String(item.code) === String(cleanValue)
+        ) ||
+        normalizedOptions.find(
+            (item) => String(item.label) === String(cleanValue)
+        ) ||
+        null;
+
+    const handleSelectChange = (selected) => {
+        onChange({
+            target: {
+                name,
+                value: selected ? selected.value : "",
+            },
+        });
+    };
+
     return (
-        <div>
+        <div className="min-w-0">
             <FieldLabel label={label} required={required} />
 
-            <select
+            <Select2
+                inputId={name}
                 name={name}
-                value={value ?? ""}
-                onChange={onChange}
-                className={fieldClass(error)}
-            >
-                <option value="">Pilih {label.toLowerCase()}</option>
-                {options.map((item) => (
-                    <option key={item.value} value={item.value}>
-                        {item.label}
-                    </option>
-                ))}
-            </select>
+                value={selectedOption}
+                onChange={handleSelectChange}
+                options={normalizedOptions}
+                isClearable
+                isSearchable
+                isDisabled={disabled}
+                isLoading={isLoading}
+                placeholder={placeholder || `Pilih ${label.toLowerCase()}`}
+                noOptionsMessage={() =>
+                    isLoading ? "Memuat data..." : "Data tidak ditemukan"
+                }
+                loadingMessage={() => "Memuat data..."}
+                classNamePrefix="select2"
+                menuPortalTarget={
+                    typeof document !== "undefined" ? document.body : null
+                }
+                styles={{
+                    control: (base, state) => ({
+                        ...base,
+                        minHeight: "46px",
+                        borderRadius: "0.75rem",
+                        borderColor: error
+                            ? "#fca5a5"
+                            : state.isFocused
+                            ? "#3b82f6"
+                            : "#cbd5e1",
+                        backgroundColor: disabled
+                            ? "#f1f5f9"
+                            : error
+                            ? "#fef2f2"
+                            : "#ffffff",
+                        boxShadow: state.isFocused
+                            ? error
+                                ? "0 0 0 4px #fee2e2"
+                                : "0 0 0 4px #dbeafe"
+                            : "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+                        cursor: disabled ? "not-allowed" : "default",
+                        "&:hover": {
+                            borderColor: error ? "#ef4444" : "#3b82f6",
+                        },
+                    }),
+                    valueContainer: (base) => ({
+                        ...base,
+                        padding: "0 14px",
+                    }),
+                    input: (base) => ({
+                        ...base,
+                        color: "#0f172a",
+                        fontSize: "0.875rem",
+                    }),
+                    singleValue: (base) => ({
+                        ...base,
+                        color: "#0f172a",
+                        fontSize: "0.875rem",
+                    }),
+                    placeholder: (base) => ({
+                        ...base,
+                        color: "#94a3b8",
+                        fontSize: "0.875rem",
+                    }),
+                    indicatorSeparator: () => ({
+                        display: "none",
+                    }),
+                    dropdownIndicator: (base, state) => ({
+                        ...base,
+                        color: state.isFocused ? "#2563eb" : "#64748b",
+                        "&:hover": {
+                            color: "#2563eb",
+                        },
+                    }),
+                    clearIndicator: (base) => ({
+                        ...base,
+                        color: "#94a3b8",
+                        "&:hover": {
+                            color: "#ef4444",
+                        },
+                    }),
+                    menu: (base) => ({
+                        ...base,
+                        zIndex: 9999,
+                        borderRadius: "0.75rem",
+                        overflow: "hidden",
+                        boxShadow:
+                            "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+                    }),
+                    menuPortal: (base) => ({
+                        ...base,
+                        zIndex: 9999,
+                    }),
+                    option: (base, state) => ({
+                        ...base,
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                        backgroundColor: state.isSelected
+                            ? "#2563eb"
+                            : state.isFocused
+                            ? "#eff6ff"
+                            : "#ffffff",
+                        color: state.isSelected ? "#ffffff" : "#0f172a",
+                        "&:active": {
+                            backgroundColor: "#dbeafe",
+                        },
+                    }),
+                }}
+            />
 
             <ErrorMessage message={error} />
         </div>
@@ -572,7 +1103,7 @@ function Textarea({
     error,
 }) {
     return (
-        <div>
+        <div className="min-w-0">
             <FieldLabel label={label} required={required} />
 
             <textarea

@@ -28,6 +28,12 @@ class DataRiwayatDiri extends Model
         'tanggal_skrining',
         'alamat_ktp',
         'alamat_domisili',
+
+        'provinsi_id',
+        'kabupaten_id',
+        'kecamatan_id',
+        'kelurahan_id',
+
         'kewarganegaraan_id',
         'status_pernikahan_id',
         'no_wa',
@@ -101,11 +107,29 @@ class DataRiwayatDiri extends Model
 
     public function sosialMedia()
     {
-        return $this->belongsTo(SosialMedia::class, 'sosial_media_id', 'id');
+        return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id');
     }
 
     public function sumberInformasi()
     {
         return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id');
     }
+    public function riwayatKeluarga()
+{
+    return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id');
+}
+
+public function saudaraKandung()
+{
+    return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id');
+}
+
+public function saudaraIpar()
+{
+    return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id');
+}
+public function riwayatKesehatan()
+{
+    return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id');
+}
 }

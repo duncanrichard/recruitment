@@ -1,78 +1,100 @@
 <?php
 
-use App\Http\Controllers\Admin\DataPelamarController;
+use App\Http\Controllers\PendaftaranController;
 use Illuminate\Support\Facades\Route;
-
-/*
-|--------------------------------------------------------------------------
-| Halaman Pendaftaran Kandidat
-|--------------------------------------------------------------------------
-| /pendaftaran
-| /pendaftaran/{token}
-*/
-
-Route::get('/pendaftaran', [DataPelamarController::class, 'pendaftaranIndex'])
-    ->name('pendaftaran.index');
-
-Route::get('/pendaftaran/{token}', [DataPelamarController::class, 'pendaftaranShow'])
-    ->name('pendaftaran.show');
 
 /*
 |--------------------------------------------------------------------------
 | API Pendaftaran Kandidat
 |--------------------------------------------------------------------------
-| Dipakai React halaman pendaftaran untuk mencari data berdasarkan token.
+| Semua route API wajib diletakkan di atas /pendaftaran/{token}
+| agar tidak terbaca sebagai token pendaftaran.
 */
-
-Route::get('/pendaftaran/api/token/{token}', [DataPelamarController::class, 'findByToken'])
-    ->name('pendaftaran.api.token');
 
 /*
 |--------------------------------------------------------------------------
-| Admin Data Pelamar
+| Master Data
 |--------------------------------------------------------------------------
 */
+Route::get('/pendaftaran/api/master/pendaftaran', [PendaftaranController::class, 'masterPendaftaran'])
+    ->name('pendaftaran.api.master.pendaftaran');
 
-Route::prefix('admin')->name('admin.')->group(function () {
-    Route::get('/data-pelamar', [DataPelamarController::class, 'index'])
-        ->name('data-pelamar.index');
+Route::get('/pendaftaran/api/master/pendidikan', [PendaftaranController::class, 'masterPendidikan'])
+    ->name('pendaftaran.api.master.pendidikan');
 
-    Route::get('/data-pelamar/list', [DataPelamarController::class, 'list'])
-        ->name('data-pelamar.list');
+Route::get('/pendaftaran/api/master/status-pernikahan', [PendaftaranController::class, 'masterStatusPernikahan'])
+    ->name('pendaftaran.api.master.status-pernikahan');
 
-    Route::get('/data-pelamar/posisi/list', [DataPelamarController::class, 'posisiList'])
-        ->name('data-pelamar.posisi.list');
+/*
+|--------------------------------------------------------------------------
+| API Wilayah
+|--------------------------------------------------------------------------
+*/
+Route::get('/pendaftaran/api/wilayah/provinces', [PendaftaranController::class, 'wilayahProvinces'])
+    ->name('pendaftaran.api.wilayah.provinces');
 
-    Route::get('/data-pelamar/perusahaan/list', [DataPelamarController::class, 'perusahaanList'])
-        ->name('data-pelamar.perusahaan.list');
+Route::get('/pendaftaran/api/wilayah/regencies/{province_code}', [PendaftaranController::class, 'wilayahRegencies'])
+    ->name('pendaftaran.api.wilayah.regencies');
 
-    Route::get('/data-pelamar/sumber-informasi/list', [DataPelamarController::class, 'sumberInformasiList'])
-        ->name('data-pelamar.sumber-informasi.list');
+Route::get('/pendaftaran/api/wilayah/districts/{regency_code}', [PendaftaranController::class, 'wilayahDistricts'])
+    ->name('pendaftaran.api.wilayah.districts');
 
-    Route::get('/data-pelamar/pendidikan/list', [DataPelamarController::class, 'pendidikanList'])
-        ->name('data-pelamar.pendidikan.list');
+Route::get('/pendaftaran/api/wilayah/villages/{district_code}', [PendaftaranController::class, 'wilayahVillages'])
+    ->name('pendaftaran.api.wilayah.villages');
 
-    Route::get('/data-pelamar/agama/list', [DataPelamarController::class, 'agamaList'])
-        ->name('data-pelamar.agama.list');
+/*
+|--------------------------------------------------------------------------
+| API Token Pelamar
+|--------------------------------------------------------------------------
+*/
+Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'findByToken'])
+    ->name('pendaftaran.api.token');
 
-    Route::get('/data-pelamar/kewarganegaraan/list', [DataPelamarController::class, 'kewarganegaraanList'])
-        ->name('data-pelamar.kewarganegaraan.list');
+/*
+| Step 1 - Data Diri
+*/
+Route::patch('/pendaftaran/api/token/{token}/data-diri', [PendaftaranController::class, 'updateDataDiriByToken'])
+    ->name('pendaftaran.api.token.data-diri.update');
 
-    Route::get('/data-pelamar/status-pernikahan/list', [DataPelamarController::class, 'statusPernikahanList'])
-        ->name('data-pelamar.status-pernikahan.list');
+Route::get('/pendaftaran/api/token/{token}/data-diri', function (string $token) {
+    return redirect()->route('pendaftaran.show', ['token' => $token]);
+})->name('pendaftaran.api.token.data-diri.show');
 
-    Route::post('/data-pelamar', [DataPelamarController::class, 'store'])
-        ->name('data-pelamar.store');
+/*
+| Step 2 - Riwayat Keluarga
+*/
+Route::patch('/pendaftaran/api/token/{token}/riwayat-keluarga', [PendaftaranController::class, 'updateRiwayatKeluargaByToken'])
+    ->name('pendaftaran.api.token.riwayat-keluarga.update');
 
-    Route::get('/data-pelamar/{id}', [DataPelamarController::class, 'show'])
-        ->name('data-pelamar.show');
+Route::get('/pendaftaran/api/token/{token}/riwayat-keluarga', function (string $token) {
+    return redirect()->route('pendaftaran.show', ['token' => $token]);
+})->name('pendaftaran.api.token.riwayat-keluarga.show');
 
-    Route::put('/data-pelamar/{id}', [DataPelamarController::class, 'update'])
-        ->name('data-pelamar.update');
+/*
+| Step 3 - Riwayat Kesehatan
+*/
+Route::patch('/pendaftaran/api/token/{token}/riwayat-kesehatan', [PendaftaranController::class, 'updateRiwayatKesehatanByToken'])
+    ->name('pendaftaran.api.token.riwayat-kesehatan.update');
 
-    Route::patch('/data-pelamar/{id}', [DataPelamarController::class, 'update'])
-        ->name('data-pelamar.patch');
+Route::get('/pendaftaran/api/token/{token}/riwayat-kesehatan', function (string $token) {
+    return redirect()->route('pendaftaran.show', ['token' => $token]);
+})->name('pendaftaran.api.token.riwayat-kesehatan.show');
 
-    Route::delete('/data-pelamar/{id}', [DataPelamarController::class, 'destroy'])
-        ->name('data-pelamar.destroy');
-});
+/*
+|--------------------------------------------------------------------------
+| Halaman Pendaftaran Kandidat
+|--------------------------------------------------------------------------
+*/
+Route::get('/pendaftaran', [PendaftaranController::class, 'index'])
+    ->name('pendaftaran.index');
+
+/*
+| Route token wajib paling bawah agar route seperti:
+| /pendaftaran/api/master/pendaftaran
+| /pendaftaran/api/token/{token}/riwayat-keluarga
+| /pendaftaran/api/token/{token}/riwayat-kesehatan
+| /pendaftaran/api/wilayah/provinces
+| tidak tertangkap sebagai token.
+*/
+Route::get('/pendaftaran/{token}', [PendaftaranController::class, 'show'])
+    ->name('pendaftaran.show');

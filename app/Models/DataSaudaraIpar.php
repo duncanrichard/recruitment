@@ -3,14 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-class SosialMedia extends Model
+class DataSaudaraIpar extends Model
 {
-    use SoftDeletes;
-
-    protected $table = 'sosial_media';
+    protected $table = 'data_saudara_ipar';
 
     protected $keyType = 'string';
 
@@ -18,8 +15,14 @@ class SosialMedia extends Model
 
     protected $fillable = [
         'data_riwayat_diri_id',
-        'platform',
-        'nama_account',
+        'data_riwayat_keluarga_id',
+        'nama_saudara_ipar',
+        'pekerjaan',
+        'jenis_kelamin',
+        'hubungan',
+        'no_hp',
+        'alamat',
+        'deleted_by',
     ];
 
     protected static function boot()
@@ -31,6 +34,11 @@ class SosialMedia extends Model
                 $model->id = (string) Str::uuid();
             }
         });
+    }
+
+    public function dataRiwayatKeluarga()
+    {
+        return $this->belongsTo(DataRiwayatKeluarga::class, 'data_riwayat_keluarga_id', 'id');
     }
 
     public function dataRiwayatDiri()

@@ -4,15 +4,9 @@ export default function StepRiwayatPekerjaan({
     form,
     handleChange,
     errors = {},
-    requiredFields = [],
 }) {
-    const isRequired = (name) => requiredFields.includes(name);
-
     const statusPekerjaan = form.status_pekerjaan ?? "";
     const isBelumBekerja = statusPekerjaan === "Belum Bekerja";
-
-    const isPosisiRequired =
-        isRequired("posisi_pekerjaan") && !isBelumBekerja;
 
     return (
         <div className="space-y-6">
@@ -22,16 +16,11 @@ export default function StepRiwayatPekerjaan({
                 </h3>
                 <p className="mt-1 text-sm text-orange-600">
                     Lengkapi pengalaman kerja terakhir atau pengalaman yang relevan.
-                    Field bertanda{" "}
-                    <span className="font-bold text-red-500">*</span> wajib diisi.
                 </p>
             </div>
 
             <div>
-                <FieldLabel
-                    label="Status Pekerjaan Saat Ini"
-                    required={isRequired("status_pekerjaan")}
-                />
+                <FieldLabel label="Status Pekerjaan Saat Ini" />
 
                 <select
                     name="status_pekerjaan"
@@ -56,7 +45,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.nama_perusahaan}
                     onChange={handleChange}
                     placeholder="Contoh: PT Maju Bersama"
-                    required={isRequired("nama_perusahaan")}
                     error={errors.nama_perusahaan}
                 />
 
@@ -70,7 +58,6 @@ export default function StepRiwayatPekerjaan({
                             ? "Tidak wajib diisi jika belum bekerja"
                             : "Contoh: Staff Administrasi"
                     }
-                    required={isPosisiRequired}
                     error={errors.posisi_pekerjaan}
                     disabled={isBelumBekerja}
                 />
@@ -83,7 +70,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.bidang_pekerjaan}
                     onChange={handleChange}
                     placeholder="Contoh: Administrasi, IT, Marketing"
-                    required={isRequired("bidang_pekerjaan")}
                     error={errors.bidang_pekerjaan}
                 />
 
@@ -93,7 +79,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.lokasi_perusahaan}
                     onChange={handleChange}
                     placeholder="Contoh: Jakarta"
-                    required={isRequired("lokasi_perusahaan")}
                     error={errors.lokasi_perusahaan}
                 />
             </div>
@@ -105,7 +90,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.tahun_mulai_bekerja}
                     onChange={handleChange}
                     placeholder="Contoh: 2020"
-                    required={isRequired("tahun_mulai_bekerja")}
                     error={errors.tahun_mulai_bekerja}
                 />
 
@@ -115,7 +99,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.tahun_selesai_bekerja}
                     onChange={handleChange}
                     placeholder="Contoh: 2023 / Sekarang"
-                    required={isRequired("tahun_selesai_bekerja")}
                     error={errors.tahun_selesai_bekerja}
                 />
 
@@ -125,16 +108,12 @@ export default function StepRiwayatPekerjaan({
                     value={form.lama_bekerja}
                     onChange={handleChange}
                     placeholder="Contoh: 2 tahun"
-                    required={isRequired("lama_bekerja")}
                     error={errors.lama_bekerja}
                 />
             </div>
 
             <div>
-                <FieldLabel
-                    label="Deskripsi Pekerjaan"
-                    required={isRequired("deskripsi_pekerjaan")}
-                />
+                <FieldLabel label="Deskripsi Pekerjaan" />
 
                 <textarea
                     name="deskripsi_pekerjaan"
@@ -155,7 +134,6 @@ export default function StepRiwayatPekerjaan({
                     value={form.alasan_berhenti}
                     onChange={handleChange}
                     placeholder="Contoh: Kontrak selesai"
-                    required={isRequired("alasan_berhenti")}
                     error={errors.alasan_berhenti}
                 />
 
@@ -165,16 +143,12 @@ export default function StepRiwayatPekerjaan({
                     value={form.gaji_terakhir}
                     onChange={handleChange}
                     placeholder="Contoh: 4000000"
-                    required={isRequired("gaji_terakhir")}
                     error={errors.gaji_terakhir}
                 />
             </div>
 
             <div>
-                <FieldLabel
-                    label="Keahlian / Skill"
-                    required={isRequired("keahlian")}
-                />
+                <FieldLabel label="Keahlian / Skill" />
 
                 <textarea
                     name="keahlian"
@@ -189,10 +163,7 @@ export default function StepRiwayatPekerjaan({
             </div>
 
             <div>
-                <FieldLabel
-                    label="Catatan Pengalaman Kerja"
-                    required={isRequired("catatan_pekerjaan")}
-                />
+                <FieldLabel label="Catatan Pengalaman Kerja" />
 
                 <textarea
                     name="catatan_pekerjaan"
@@ -209,11 +180,10 @@ export default function StepRiwayatPekerjaan({
     );
 }
 
-function FieldLabel({ label, required }) {
+function FieldLabel({ label }) {
     return (
         <label className="mb-2 block text-sm font-semibold text-slate-700">
             {label}
-            {required && <span className="ml-1 text-red-500">*</span>}
         </label>
     );
 }
@@ -245,13 +215,12 @@ function Input({
     value,
     onChange,
     placeholder,
-    required = false,
     error,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} required={required} />
+            <FieldLabel label={label} />
 
             <input
                 type={type}
