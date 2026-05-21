@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DataRiwayatDiri;
 use App\Models\DataRiwayatKeluarga;
 use App\Models\DataRiwayatKesehatan;
+use App\Models\DataRiwayatPekerjaan;
 use App\Models\DataSaudaraIpar;
 use App\Models\DataSaudaraKandung;
 use App\Models\OpsiKacamata;
@@ -34,6 +35,7 @@ class PendaftaranController extends Controller
                 'saudaraIpar',
                 'riwayatKesehatan',
                 'riwayatKesehatan.opsiKacamata',
+                'riwayatPekerjaan',
             ]);
     }
 
@@ -870,6 +872,133 @@ class PendaftaranController extends Controller
         ]);
     }
 
+
+    public function updateRiwayatPekerjaanByToken(Request $request, string $token): JsonResponse
+    {
+        $pelamar = DataRiwayatDiri::query()
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+            ], 404);
+        }
+
+        $request->merge([
+            'posisi_pekerjaan_terakhir' => $request->input('posisi_pekerjaan_terakhir')
+                ?: $request->input('posisi_pekerjaan')
+                ?: null,
+
+            'periode_kerja_awal' => $request->input('periode_kerja_awal')
+                ?: $request->input('tahun_mulai_bekerja')
+                ?: null,
+
+            'periode_kerja_akhir' => $request->input('periode_kerja_akhir')
+                ?: $request->input('tahun_selesai_bekerja')
+                ?: null,
+        ]);
+
+        $validated = $request->validate([
+            'nama_perusahaan' => ['nullable', 'string', 'max:255'],
+            'posisi_pekerjaan_terakhir' => ['nullable', 'string', 'max:255'],
+            'periode_kerja_awal' => ['nullable', 'date'],
+            'periode_kerja_akhir' => ['nullable', 'date', 'after_or_equal:periode_kerja_awal'],
+            'gaji_terakhir' => ['nullable', 'numeric', 'min:0', 'max:999999999999999999.99'],
+
+            'refrensi_kerja' => ['nullable', 'string', 'max:255'],
+            'nama_refrensi' => ['nullable', 'string', 'max:255'],
+            'telp_refrensi' => ['nullable', 'string', 'max:50'],
+
+            'refrensi_rekan_kerja' => ['nullable', 'string', 'max:255'],
+            'nama_refrensi_rekan' => ['nullable', 'string', 'max:255'],
+            'telp_refrensi_rekan' => ['nullable', 'string', 'max:50'],
+
+            'refrensi_kerabat' => ['nullable', 'string', 'max:255'],
+            'nama_refrensi_kerabat' => ['nullable', 'string', 'max:255'],
+            'telp_refrensi_kerabat' => ['nullable', 'string', 'max:50'],
+
+            // Alias lama dari form sebelumnya. Tetap diterima agar data lama tidak error.
+            'posisi_pekerjaan' => ['nullable', 'string', 'max:255'],
+            'tahun_mulai_bekerja' => ['nullable', 'string', 'max:50'],
+            'tahun_selesai_bekerja' => ['nullable', 'string', 'max:50'],
+        ], [
+            'periode_kerja_awal.date' => 'Periode kerja awal harus berupa tanggal yang valid.',
+            'periode_kerja_akhir.date' => 'Periode kerja akhir harus berupa tanggal yang valid.',
+            'periode_kerja_akhir.after_or_equal' => 'Periode kerja akhir tidak boleh lebih kecil dari periode kerja awal.',
+            'gaji_terakhir.numeric' => 'Gaji terakhir harus berupa angka.',
+            'gaji_terakhir.max' => 'Gaji terakhir terlalu besar.',
+        ]);
+
+        DB::transaction(function () use ($pelamar, $validated) {
+            $riwayatPekerjaan = DataRiwayatPekerjaan::query()
+                ->where('data_riwayat_diri_id', $pelamar->id)
+                ->first();
+
+            if (!$riwayatPekerjaan) {
+                $riwayatPekerjaan = new DataRiwayatPekerjaan();
+                $riwayatPekerjaan->data_riwayat_diri_id = $pelamar->id;
+            }
+
+            $table = $riwayatPekerjaan->getTable();
+
+            $posisiPekerjaanTerakhir = $validated['posisi_pekerjaan_terakhir']
+                ?? $validated['posisi_pekerjaan']
+                ?? null;
+
+            $periodeKerjaAwal = $this->normalizeRiwayatPekerjaanDate(
+                $validated['periode_kerja_awal']
+                    ?? $validated['tahun_mulai_bekerja']
+                    ?? null
+            );
+
+            $periodeKerjaAkhir = $this->normalizeRiwayatPekerjaanDate(
+                $validated['periode_kerja_akhir']
+                    ?? $validated['tahun_selesai_bekerja']
+                    ?? null
+            );
+
+            $data = [
+                'data_riwayat_diri_id' => $pelamar->id,
+                'nama_perusahaan' => $validated['nama_perusahaan'] ?? null,
+                'posisi_pekerjaan_terakhir' => $posisiPekerjaanTerakhir,
+                'periode_kerja_awal' => $periodeKerjaAwal,
+                'periode_kerja_akhir' => $periodeKerjaAkhir,
+                'gaji_terakhir' => $this->normalizeDecimalValue($validated['gaji_terakhir'] ?? null),
+
+                'refrensi_kerja' => $validated['refrensi_kerja'] ?? null,
+                'nama_refrensi' => $validated['nama_refrensi'] ?? null,
+                'telp_refrensi' => $validated['telp_refrensi'] ?? null,
+
+                'refrensi_rekan_kerja' => $validated['refrensi_rekan_kerja'] ?? null,
+                'nama_refrensi_rekan' => $validated['nama_refrensi_rekan'] ?? null,
+                'telp_refrensi_rekan' => $validated['telp_refrensi_rekan'] ?? null,
+
+                'refrensi_kerabat' => $validated['refrensi_kerabat'] ?? null,
+                'nama_refrensi_kerabat' => $validated['nama_refrensi_kerabat'] ?? null,
+                'telp_refrensi_kerabat' => $validated['telp_refrensi_kerabat'] ?? null,
+            ];
+
+            $data = collect($data)
+                ->filter(fn ($value, $column) => Schema::hasColumn($table, $column))
+                ->toArray();
+
+            $riwayatPekerjaan->forceFill($data);
+            $riwayatPekerjaan->save();
+        });
+
+        $pelamar = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Riwayat pekerjaan berhasil diperbarui.',
+            'data' => $this->appendPelamarExtraData($pelamar),
+        ]);
+    }
+
     public function wilayahProvinces(): JsonResponse
     {
         return response()->json([
@@ -1196,6 +1325,7 @@ class PendaftaranController extends Controller
         $this->appendWilayahLabels($pelamar);
         $this->appendRiwayatKeluargaData($pelamar);
         $this->appendRiwayatKesehatanData($pelamar);
+        $this->appendRiwayatPekerjaanData($pelamar);
 
         return $pelamar;
     }
@@ -1383,6 +1513,61 @@ class PendaftaranController extends Controller
         $pelamar->setAttribute(
             'alergi',
             $kesehatan->nama_alergi ?? null
+        );
+
+        return $pelamar;
+    }
+
+
+    private function appendRiwayatPekerjaanData(DataRiwayatDiri $pelamar): DataRiwayatDiri
+    {
+        $pelamar->loadMissing([
+            'riwayatPekerjaan',
+        ]);
+
+        $pekerjaan = $pelamar->riwayatPekerjaan;
+
+        if (!$pekerjaan) {
+            return $pelamar;
+        }
+
+        foreach ([
+            'nama_perusahaan',
+            'posisi_pekerjaan_terakhir',
+            'periode_kerja_awal',
+            'periode_kerja_akhir',
+            'gaji_terakhir',
+            'refrensi_kerja',
+            'nama_refrensi',
+            'telp_refrensi',
+            'refrensi_rekan_kerja',
+            'nama_refrensi_rekan',
+            'telp_refrensi_rekan',
+            'refrensi_kerabat',
+            'nama_refrensi_kerabat',
+            'telp_refrensi_kerabat',
+        ] as $column) {
+            if ($pekerjaan->{$column} !== null) {
+                $pelamar->setAttribute($column, $pekerjaan->{$column});
+            }
+        }
+
+        // Alias untuk kompatibilitas dengan form lama / state React lama.
+        if (!empty($pekerjaan->posisi_pekerjaan_terakhir)) {
+            $pelamar->setAttribute('posisi_pekerjaan', $pekerjaan->posisi_pekerjaan_terakhir);
+        }
+
+        if (!empty($pekerjaan->periode_kerja_awal)) {
+            $pelamar->setAttribute('tahun_mulai_bekerja', $this->dateToYear($pekerjaan->periode_kerja_awal));
+        }
+
+        if (!empty($pekerjaan->periode_kerja_akhir)) {
+            $pelamar->setAttribute('tahun_selesai_bekerja', $this->dateToYear($pekerjaan->periode_kerja_akhir));
+        }
+
+        $pelamar->setAttribute(
+            'lama_bekerja',
+            $this->calculateLamaBekerja($pekerjaan->periode_kerja_awal ?? null, $pekerjaan->periode_kerja_akhir ?? null)
         );
 
         return $pelamar;
@@ -1971,6 +2156,106 @@ class PendaftaranController extends Controller
             ?? null;
 
         return $fallbackId ? (string) $fallbackId : null;
+    }
+
+
+    private function normalizeYearToDate(?string $value): ?string
+    {
+        return $this->normalizeRiwayatPekerjaanDate($value);
+    }
+
+    private function normalizeRiwayatPekerjaanDate($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (Str::contains(Str::lower($value), ['sekarang', 'sampai sekarang', 'present', 'current'])) {
+            return null;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return $value;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}$/', $value)) {
+            return $value . '-01';
+        }
+
+        if (preg_match('/\b(19|20)\d{2}\b/', $value, $matches)) {
+            return $matches[0] . '-01-01';
+        }
+
+        return null;
+    }
+
+    private function normalizeDecimalValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $cleanValue = preg_replace('/[^0-9.]/', '', (string) $value);
+
+        if ($cleanValue === '' || !is_numeric($cleanValue)) {
+            return null;
+        }
+
+        $maxValue = 999999999999999999.99;
+        $numericValue = (float) $cleanValue;
+
+        if ($numericValue > $maxValue) {
+            $numericValue = $maxValue;
+        }
+
+        return number_format($numericValue, 2, '.', '');
+    }
+
+    private function dateToYear($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y');
+        }
+
+        $value = trim((string) $value);
+
+        if (preg_match('/\b(19|20)\d{2}\b/', $value, $matches)) {
+            return $matches[0];
+        }
+
+        return null;
+    }
+
+    private function calculateLamaBekerja($startDate, $endDate): ?string
+    {
+        $startYear = $this->dateToYear($startDate);
+        $endYear = $this->dateToYear($endDate);
+
+        if (!$startYear || !$endYear) {
+            return null;
+        }
+
+        $years = (int) $endYear - (int) $startYear;
+
+        if ($years < 0) {
+            return null;
+        }
+
+        if ($years === 0) {
+            return 'Kurang dari 1 tahun';
+        }
+
+        return $years . ' tahun';
     }
 
     private function tablesFor(array $modelClasses, array $fallbackTables): array

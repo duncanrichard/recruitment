@@ -196,16 +196,29 @@ function PendaftaranPage() {
         status_pekerjaan: "",
         nama_perusahaan: "",
         posisi_pekerjaan: "",
+        posisi_pekerjaan_terakhir: "",
         bidang_pekerjaan: "",
         lokasi_perusahaan: "",
         tahun_mulai_bekerja: "",
         tahun_selesai_bekerja: "",
+        periode_kerja_awal: "",
+        periode_kerja_akhir: "",
         lama_bekerja: "",
         deskripsi_pekerjaan: "",
         alasan_berhenti: "",
         gaji_terakhir: "",
         keahlian: "",
         catatan_pekerjaan: "",
+
+        refrensi_kerja: "",
+        nama_refrensi: "",
+        telp_refrensi: "",
+        refrensi_rekan_kerja: "",
+        nama_refrensi_rekan: "",
+        telp_refrensi_rekan: "",
+        refrensi_kerabat: "",
+        nama_refrensi_kerabat: "",
+        telp_refrensi_kerabat: "",
 
         bersedia_ditempatkan: "",
         bersedia_shift: "",
@@ -439,6 +452,65 @@ function PendaftaranPage() {
         return String(value).slice(0, 10);
     };
 
+    const normalizeDateForPayload = (value) => {
+        if (!value) {
+            return "";
+        }
+
+        const stringValue = String(value).trim();
+
+        if (!stringValue) {
+            return "";
+        }
+
+        if (/^\d{4}$/.test(stringValue)) {
+            return `${stringValue}-01-01`;
+        }
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(stringValue)) {
+            return stringValue;
+        }
+
+        const match = stringValue.match(/^(\d{4}-\d{2}-\d{2})/);
+
+        if (match) {
+            return match[1];
+        }
+
+        return "";
+    };
+
+    const getYearFromDate = (value) => {
+        const normalized = normalizeDateForPayload(value);
+
+        if (!normalized) {
+            return "";
+        }
+
+        return normalized.slice(0, 4);
+    };
+
+    const normalizeDecimalForPayload = (value) => {
+        if (value === undefined || value === null || value === "") {
+            return "";
+        }
+
+        const cleaned = String(value).replace(/[^0-9.]/g, "");
+        const firstDotIndex = cleaned.indexOf(".");
+
+        const normalized =
+            firstDotIndex === -1
+                ? cleaned
+                : cleaned.slice(0, firstDotIndex + 1) +
+                  cleaned.slice(firstDotIndex + 1).replace(/\./g, "");
+
+        if (!normalized || normalized === ".") {
+            return "";
+        }
+
+        return normalized;
+    };
+
     const normalizeArrayValue = (value) => {
         if (Array.isArray(value)) {
             return value.filter(Boolean);
@@ -646,6 +718,10 @@ function PendaftaranPage() {
 
         const keluarga = pelamar?.riwayatKeluarga || {};
         const kesehatan = pelamar?.riwayatKesehatan || {};
+        const pekerjaan =
+            pelamar?.riwayatPekerjaan ||
+            pelamar?.riwayat_pekerjaan ||
+            {};
 
         const alamatDomisili = pelamar?.alamat_domisili || pelamar?.alamat || "";
 
@@ -941,6 +1017,158 @@ function PendaftaranPage() {
             diagnosa_dokter:
                 pelamar?.diagnosa_dokter ||
                 kesehatan?.diagnosa_dokter ||
+                "",
+
+            status_pekerjaan:
+                pelamar?.status_pekerjaan ||
+                pekerjaan?.status_pekerjaan ||
+                "",
+
+            nama_perusahaan:
+                pelamar?.nama_perusahaan ||
+                pekerjaan?.nama_perusahaan ||
+                "",
+
+            posisi_pekerjaan:
+                pelamar?.posisi_pekerjaan ||
+                pekerjaan?.posisi_pekerjaan ||
+                pekerjaan?.posisi_pekerjaan_terakhir ||
+                "",
+
+            posisi_pekerjaan_terakhir:
+                pelamar?.posisi_pekerjaan_terakhir ||
+                pekerjaan?.posisi_pekerjaan_terakhir ||
+                pelamar?.posisi_pekerjaan ||
+                pekerjaan?.posisi_pekerjaan ||
+                "",
+
+            bidang_pekerjaan:
+                pelamar?.bidang_pekerjaan ||
+                pekerjaan?.bidang_pekerjaan ||
+                "",
+
+            lokasi_perusahaan:
+                pelamar?.lokasi_perusahaan ||
+                pekerjaan?.lokasi_perusahaan ||
+                "",
+
+            periode_kerja_awal:
+                normalizeDateInput(
+                    pelamar?.periode_kerja_awal ||
+                        pekerjaan?.periode_kerja_awal
+                ) || "",
+
+            periode_kerja_akhir:
+                normalizeDateInput(
+                    pelamar?.periode_kerja_akhir ||
+                        pekerjaan?.periode_kerja_akhir
+                ) || "",
+
+            tahun_mulai_bekerja:
+                pelamar?.tahun_mulai_bekerja ||
+                pekerjaan?.tahun_mulai_bekerja ||
+                getYearFromDate(
+                    pelamar?.periode_kerja_awal ||
+                        pekerjaan?.periode_kerja_awal
+                ) ||
+                "",
+
+            tahun_selesai_bekerja:
+                pelamar?.tahun_selesai_bekerja ||
+                pekerjaan?.tahun_selesai_bekerja ||
+                getYearFromDate(
+                    pelamar?.periode_kerja_akhir ||
+                        pekerjaan?.periode_kerja_akhir
+                ) ||
+                "",
+
+            lama_bekerja:
+                pelamar?.lama_bekerja ||
+                pekerjaan?.lama_bekerja ||
+                hitungLamaBekerja(
+                    pelamar?.tahun_mulai_bekerja ||
+                        pekerjaan?.tahun_mulai_bekerja ||
+                        getYearFromDate(
+                            pelamar?.periode_kerja_awal ||
+                                pekerjaan?.periode_kerja_awal
+                        ),
+                    pelamar?.tahun_selesai_bekerja ||
+                        pekerjaan?.tahun_selesai_bekerja ||
+                        getYearFromDate(
+                            pelamar?.periode_kerja_akhir ||
+                                pekerjaan?.periode_kerja_akhir
+                        )
+                ) ||
+                "",
+
+            deskripsi_pekerjaan:
+                pelamar?.deskripsi_pekerjaan ||
+                pekerjaan?.deskripsi_pekerjaan ||
+                "",
+
+            alasan_berhenti:
+                pelamar?.alasan_berhenti ||
+                pekerjaan?.alasan_berhenti ||
+                "",
+
+            gaji_terakhir:
+                pelamar?.gaji_terakhir ||
+                pekerjaan?.gaji_terakhir ||
+                "",
+
+            keahlian:
+                pelamar?.keahlian ||
+                pekerjaan?.keahlian ||
+                "",
+
+            catatan_pekerjaan:
+                pelamar?.catatan_pekerjaan ||
+                pekerjaan?.catatan_pekerjaan ||
+                "",
+
+            refrensi_kerja:
+                pelamar?.refrensi_kerja ||
+                pekerjaan?.refrensi_kerja ||
+                "",
+
+            nama_refrensi:
+                pelamar?.nama_refrensi ||
+                pekerjaan?.nama_refrensi ||
+                "",
+
+            telp_refrensi:
+                pelamar?.telp_refrensi ||
+                pekerjaan?.telp_refrensi ||
+                "",
+
+            refrensi_rekan_kerja:
+                pelamar?.refrensi_rekan_kerja ||
+                pekerjaan?.refrensi_rekan_kerja ||
+                "",
+
+            nama_refrensi_rekan:
+                pelamar?.nama_refrensi_rekan ||
+                pekerjaan?.nama_refrensi_rekan ||
+                "",
+
+            telp_refrensi_rekan:
+                pelamar?.telp_refrensi_rekan ||
+                pekerjaan?.telp_refrensi_rekan ||
+                "",
+
+            refrensi_kerabat:
+                pelamar?.refrensi_kerabat ||
+                pekerjaan?.refrensi_kerabat ||
+                "",
+
+            nama_refrensi_kerabat:
+                pelamar?.nama_refrensi_kerabat ||
+                pekerjaan?.nama_refrensi_kerabat ||
+                "",
+
+            telp_refrensi_kerabat:
+                pelamar?.telp_refrensi_kerabat ||
+                pekerjaan?.telp_refrensi_kerabat ||
                 "",
         };
     };
@@ -1360,6 +1588,83 @@ function PendaftaranPage() {
         return result.data;
     };
 
+    const saveRiwayatPekerjaan = async () => {
+        const token = form.token || getInitialTokenFromPage();
+
+        if (!token) {
+            throw new Error("Token pelamar tidak tersedia.");
+        }
+
+        const posisiPekerjaan =
+            form.posisi_pekerjaan_terakhir ||
+            form.posisi_pekerjaan ||
+            "";
+
+        const periodeKerjaAwal = normalizeDateForPayload(
+            form.periode_kerja_awal || form.tahun_mulai_bekerja
+        );
+
+        const periodeKerjaAkhir = normalizeDateForPayload(
+            form.periode_kerja_akhir || form.tahun_selesai_bekerja
+        );
+
+        const payload = {
+            nama_perusahaan: form.nama_perusahaan || "",
+            posisi_pekerjaan_terakhir: posisiPekerjaan,
+            posisi_pekerjaan: posisiPekerjaan,
+
+            periode_kerja_awal: periodeKerjaAwal,
+            periode_kerja_akhir: periodeKerjaAkhir,
+
+            gaji_terakhir: normalizeDecimalForPayload(form.gaji_terakhir),
+
+            refrensi_kerja: form.refrensi_kerja || "",
+            nama_refrensi: form.nama_refrensi || "",
+            telp_refrensi: form.telp_refrensi || "",
+
+            refrensi_rekan_kerja: form.refrensi_rekan_kerja || "",
+            nama_refrensi_rekan: form.nama_refrensi_rekan || "",
+            telp_refrensi_rekan: form.telp_refrensi_rekan || "",
+
+            refrensi_kerabat: form.refrensi_kerabat || "",
+            nama_refrensi_kerabat: form.nama_refrensi_kerabat || "",
+            telp_refrensi_kerabat: form.telp_refrensi_kerabat || "",
+        };
+
+        const response = await fetch(
+            `/pendaftaran/api/token/${encodeURIComponent(token)}/riwayat-pekerjaan`,
+            {
+                method: "PATCH",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const result = await parseResponseJson(response);
+
+        if (!response.ok || !result.success) {
+            if (result.errors) {
+                setErrors(normalizeLaravelErrors(result.errors));
+            }
+
+            throw new Error(
+                result.message || "Gagal menyimpan riwayat pekerjaan."
+            );
+        }
+
+        if (result.data) {
+            applyPelamarToPage(result.data);
+        }
+
+        return result.data;
+    };
+
     const makeHasilCekTahapan = (pelamar) => {
         const status = pelamar?.status_seleksi || "Administrasi";
         const tahapanTerakhir = pelamar?.tahapan_terakhir || status;
@@ -1438,6 +1743,31 @@ function PendaftaranPage() {
                         : `Tahap ${nama} belum dimulai.`,
             };
         });
+    };
+
+    const hitungLamaBekerja = (tahunMulai, tahunSelesai) => {
+        const mulai = parseInt(tahunMulai, 10);
+        const selesai = parseInt(tahunSelesai, 10);
+
+        if (!mulai || !selesai) {
+            return "";
+        }
+
+        if (String(tahunMulai).length !== 4 || String(tahunSelesai).length !== 4) {
+            return "";
+        }
+
+        if (selesai < mulai) {
+            return "";
+        }
+
+        const selisih = selesai - mulai;
+
+        if (selisih === 0) {
+            return "Kurang dari 1 tahun";
+        }
+
+        return `${selisih} tahun`;
     };
 
     const handleChange = (e) => {
@@ -1610,6 +1940,71 @@ function PendaftaranPage() {
 
             if (name === "status_pekerjaan" && value === "Belum Bekerja") {
                 updatedForm.posisi_pekerjaan = "";
+                updatedForm.posisi_pekerjaan_terakhir = "";
+                updatedForm.nama_perusahaan = "";
+                updatedForm.bidang_pekerjaan = "";
+                updatedForm.lokasi_perusahaan = "";
+                updatedForm.tahun_mulai_bekerja = "";
+                updatedForm.tahun_selesai_bekerja = "";
+                updatedForm.periode_kerja_awal = "";
+                updatedForm.periode_kerja_akhir = "";
+                updatedForm.lama_bekerja = "";
+                updatedForm.deskripsi_pekerjaan = "";
+                updatedForm.alasan_berhenti = "";
+                updatedForm.gaji_terakhir = "";
+                updatedForm.keahlian = "";
+                updatedForm.catatan_pekerjaan = "";
+                updatedForm.refrensi_kerja = "";
+                updatedForm.nama_refrensi = "";
+                updatedForm.telp_refrensi = "";
+                updatedForm.refrensi_rekan_kerja = "";
+                updatedForm.nama_refrensi_rekan = "";
+                updatedForm.telp_refrensi_rekan = "";
+                updatedForm.refrensi_kerabat = "";
+                updatedForm.nama_refrensi_kerabat = "";
+                updatedForm.telp_refrensi_kerabat = "";
+            }
+
+            if (name === "posisi_pekerjaan_terakhir") {
+                updatedForm.posisi_pekerjaan = nextValue;
+            }
+
+            if (name === "posisi_pekerjaan") {
+                updatedForm.posisi_pekerjaan_terakhir = nextValue;
+            }
+
+            if (name === "periode_kerja_awal") {
+                updatedForm.tahun_mulai_bekerja = getYearFromDate(nextValue);
+            }
+
+            if (name === "periode_kerja_akhir") {
+                updatedForm.tahun_selesai_bekerja = getYearFromDate(nextValue);
+            }
+
+            if (
+                name === "tahun_mulai_bekerja" ||
+                name === "tahun_selesai_bekerja" ||
+                name === "periode_kerja_awal" ||
+                name === "periode_kerja_akhir"
+            ) {
+                const tahunMulai =
+                    name === "tahun_mulai_bekerja"
+                        ? nextValue
+                        : name === "periode_kerja_awal"
+                        ? getYearFromDate(nextValue)
+                        : updatedForm.tahun_mulai_bekerja;
+
+                const tahunSelesai =
+                    name === "tahun_selesai_bekerja"
+                        ? nextValue
+                        : name === "periode_kerja_akhir"
+                        ? getYearFromDate(nextValue)
+                        : updatedForm.tahun_selesai_bekerja;
+
+                updatedForm.lama_bekerja = hitungLamaBekerja(
+                    tahunMulai,
+                    tahunSelesai
+                );
             }
 
             return updatedForm;
@@ -1674,7 +2069,31 @@ function PendaftaranPage() {
             }
 
             if (name === "status_pekerjaan" && value === "Belum Bekerja") {
+                delete updatedErrors.nama_perusahaan;
                 delete updatedErrors.posisi_pekerjaan;
+                delete updatedErrors.bidang_pekerjaan;
+                delete updatedErrors.lokasi_perusahaan;
+                delete updatedErrors.tahun_mulai_bekerja;
+                delete updatedErrors.tahun_selesai_bekerja;
+                delete updatedErrors.lama_bekerja;
+                delete updatedErrors.deskripsi_pekerjaan;
+                delete updatedErrors.alasan_berhenti;
+                delete updatedErrors.gaji_terakhir;
+                delete updatedErrors.keahlian;
+                delete updatedErrors.catatan_pekerjaan;
+            }
+
+            if (
+                name === "tahun_mulai_bekerja" ||
+                name === "tahun_selesai_bekerja" ||
+                name === "periode_kerja_awal" ||
+                name === "periode_kerja_akhir"
+            ) {
+                delete updatedErrors.lama_bekerja;
+                delete updatedErrors.tahun_mulai_bekerja;
+                delete updatedErrors.tahun_selesai_bekerja;
+                delete updatedErrors.periode_kerja_awal;
+                delete updatedErrors.periode_kerja_akhir;
             }
 
             return updatedErrors;
@@ -1857,6 +2276,11 @@ function PendaftaranPage() {
 
         if (step === 3) {
             await saveRiwayatKesehatan();
+            return;
+        }
+
+        if (step === 4) {
+            await saveRiwayatPekerjaan();
             return;
         }
     };

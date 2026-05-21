@@ -114,22 +114,29 @@ class DataRiwayatDiri extends Model
     {
         return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id');
     }
+
     public function riwayatKeluarga()
-{
-    return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id');
-}
+    {
+        return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id');
+    }
 
-public function saudaraKandung()
-{
-    return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id');
-}
+    public function saudaraKandung()
+    {
+        return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id');
+    }
 
-public function saudaraIpar()
-{
-    return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id');
-}
-public function riwayatKesehatan()
-{
-    return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id');
-}
+    public function saudaraIpar()
+    {
+        return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function riwayatKesehatan()
+    {
+        return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function riwayatPekerjaan()
+    {
+        return $this->hasOne(DataRiwayatPekerjaan::class, 'data_riwayat_diri_id', 'id');
+    }
 }

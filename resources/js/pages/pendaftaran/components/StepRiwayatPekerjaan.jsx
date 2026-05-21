@@ -5,8 +5,50 @@ export default function StepRiwayatPekerjaan({
     handleChange,
     errors = {},
 }) {
-    const statusPekerjaan = form.status_pekerjaan ?? "";
-    const isBelumBekerja = statusPekerjaan === "Belum Bekerja";
+    const maxGajiTerakhir = 999999999999999999;
+
+    const handlePosisiChange = (e) => {
+        const value = e.target.value;
+
+        handleChange({
+            target: {
+                name: "posisi_pekerjaan_terakhir",
+                value,
+            },
+        });
+
+        handleChange({
+            target: {
+                name: "posisi_pekerjaan",
+                value,
+            },
+        });
+    };
+
+    const handleGajiChange = (e) => {
+        const rawValue = e.target.value;
+        const numericOnly = rawValue.replace(/[^\d]/g, "");
+
+        if (numericOnly === "") {
+            handleChange({
+                target: {
+                    name: "gaji_terakhir",
+                    value: "",
+                },
+            });
+            return;
+        }
+
+        const numericValue = Number(numericOnly);
+        const safeValue = Math.min(numericValue, maxGajiTerakhir);
+
+        handleChange({
+            target: {
+                name: "gaji_terakhir",
+                value: String(safeValue),
+            },
+        });
+    };
 
     return (
         <div className="space-y-6">
@@ -14,170 +56,213 @@ export default function StepRiwayatPekerjaan({
                 <h3 className="text-base font-bold text-orange-800">
                     Riwayat Pekerjaan
                 </h3>
+
                 <p className="mt-1 text-sm text-orange-600">
-                    Lengkapi pengalaman kerja terakhir atau pengalaman yang relevan.
+                    Lengkapi pengalaman kerja terakhir dan data referensi kerja.
                 </p>
             </div>
 
-            <div>
-                <FieldLabel label="Status Pekerjaan Saat Ini" />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Pengalaman Kerja Terakhir
+                </h4>
 
-                <select
-                    name="status_pekerjaan"
-                    value={form.status_pekerjaan ?? ""}
-                    onChange={handleChange}
-                    className={fieldClass(errors.status_pekerjaan)}
-                >
-                    <option value="">Pilih status pekerjaan</option>
-                    <option value="Belum Bekerja">Belum Bekerja</option>
-                    <option value="Sedang Bekerja">Sedang Bekerja</option>
-                    <option value="Pernah Bekerja">Pernah Bekerja</option>
-                    <option value="Fresh Graduate">Fresh Graduate</option>
-                </select>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Nama Perusahaan"
+                        name="nama_perusahaan"
+                        value={form.nama_perusahaan}
+                        onChange={handleChange}
+                        placeholder="Contoh: PT Maju Bersama"
+                        error={errors.nama_perusahaan}
+                    />
 
-                <ErrorMessage message={errors.status_pekerjaan} />
-            </div>
+                    <Input
+                        label="Posisi Pekerjaan Terakhir"
+                        name="posisi_pekerjaan_terakhir"
+                        value={
+                            form.posisi_pekerjaan_terakhir ||
+                            form.posisi_pekerjaan ||
+                            ""
+                        }
+                        onChange={handlePosisiChange}
+                        placeholder="Contoh: Staff Administrasi"
+                        error={
+                            errors.posisi_pekerjaan_terakhir ||
+                            errors.posisi_pekerjaan
+                        }
+                    />
+                </div>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input
-                    label="Nama Perusahaan"
-                    name="nama_perusahaan"
-                    value={form.nama_perusahaan}
-                    onChange={handleChange}
-                    placeholder="Contoh: PT Maju Bersama"
-                    error={errors.nama_perusahaan}
-                />
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Periode Kerja Awal"
+                        type="date"
+                        name="periode_kerja_awal"
+                        value={normalizeDateValue(form.periode_kerja_awal)}
+                        onChange={handleChange}
+                        error={errors.periode_kerja_awal}
+                    />
 
-                <Input
-                    label="Posisi / Jabatan"
-                    name="posisi_pekerjaan"
-                    value={form.posisi_pekerjaan}
-                    onChange={handleChange}
-                    placeholder={
-                        isBelumBekerja
-                            ? "Tidak wajib diisi jika belum bekerja"
-                            : "Contoh: Staff Administrasi"
-                    }
-                    error={errors.posisi_pekerjaan}
-                    disabled={isBelumBekerja}
-                />
-            </div>
+                    <Input
+                        label="Periode Kerja Akhir"
+                        type="date"
+                        name="periode_kerja_akhir"
+                        value={normalizeDateValue(form.periode_kerja_akhir)}
+                        onChange={handleChange}
+                        error={errors.periode_kerja_akhir}
+                    />
+                </div>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input
-                    label="Bidang Pekerjaan"
-                    name="bidang_pekerjaan"
-                    value={form.bidang_pekerjaan}
-                    onChange={handleChange}
-                    placeholder="Contoh: Administrasi, IT, Marketing"
-                    error={errors.bidang_pekerjaan}
-                />
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Gaji Terakhir"
+                        type="number"
+                        name="gaji_terakhir"
+                        value={form.gaji_terakhir}
+                        onChange={handleGajiChange}
+                        placeholder="Contoh: 4000000"
+                        error={errors.gaji_terakhir}
+                        min="0"
+                        max={String(maxGajiTerakhir)}
+                        step="1000"
+                    />
 
-                <Input
-                    label="Lokasi Perusahaan"
-                    name="lokasi_perusahaan"
-                    value={form.lokasi_perusahaan}
-                    onChange={handleChange}
-                    placeholder="Contoh: Jakarta"
-                    error={errors.lokasi_perusahaan}
-                />
-            </div>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
+                        Maksimal gaji yang dapat diinput adalah{" "}
+                        <span className="font-black">
+                            Rp {formatRupiah(maxGajiTerakhir)}
+                        </span>
+                        .
+                    </div>
+                </div>
+            </section>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                <Input
-                    label="Tahun Mulai"
-                    name="tahun_mulai_bekerja"
-                    value={form.tahun_mulai_bekerja}
-                    onChange={handleChange}
-                    placeholder="Contoh: 2020"
-                    error={errors.tahun_mulai_bekerja}
-                />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Referensi Kerja
+                </h4>
 
-                <Input
-                    label="Tahun Selesai"
-                    name="tahun_selesai_bekerja"
-                    value={form.tahun_selesai_bekerja}
-                    onChange={handleChange}
-                    placeholder="Contoh: 2023 / Sekarang"
-                    error={errors.tahun_selesai_bekerja}
-                />
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <SelectYaTidak
+                        label="Ada Referensi Kerja?"
+                        name="refrensi_kerja"
+                        value={form.refrensi_kerja}
+                        onChange={handleChange}
+                        error={errors.refrensi_kerja}
+                    />
 
-                <Input
-                    label="Lama Bekerja"
-                    name="lama_bekerja"
-                    value={form.lama_bekerja}
-                    onChange={handleChange}
-                    placeholder="Contoh: 2 tahun"
-                    error={errors.lama_bekerja}
-                />
-            </div>
+                    <Input
+                        label="Nama Referensi"
+                        name="nama_refrensi"
+                        value={form.nama_refrensi}
+                        onChange={handleChange}
+                        placeholder="Nama referensi"
+                        error={errors.nama_refrensi}
+                    />
 
-            <div>
-                <FieldLabel label="Deskripsi Pekerjaan" />
+                    <Input
+                        label="Telepon Referensi"
+                        name="telp_refrensi"
+                        value={form.telp_refrensi}
+                        onChange={handleChange}
+                        placeholder="Nomor telepon"
+                        error={errors.telp_refrensi}
+                    />
+                </div>
+            </section>
 
-                <textarea
-                    name="deskripsi_pekerjaan"
-                    value={form.deskripsi_pekerjaan ?? ""}
-                    onChange={handleChange}
-                    rows="4"
-                    placeholder="Jelaskan tugas dan tanggung jawab pada pekerjaan sebelumnya"
-                    className={`${fieldClass(errors.deskripsi_pekerjaan)} resize-none`}
-                />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Referensi Rekan Kerja
+                </h4>
 
-                <ErrorMessage message={errors.deskripsi_pekerjaan} />
-            </div>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <SelectYaTidak
+                        label="Ada Referensi Rekan Kerja?"
+                        name="refrensi_rekan_kerja"
+                        value={form.refrensi_rekan_kerja}
+                        onChange={handleChange}
+                        error={errors.refrensi_rekan_kerja}
+                    />
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input
-                    label="Alasan Berhenti"
-                    name="alasan_berhenti"
-                    value={form.alasan_berhenti}
-                    onChange={handleChange}
-                    placeholder="Contoh: Kontrak selesai"
-                    error={errors.alasan_berhenti}
-                />
+                    <Input
+                        label="Nama Referensi Rekan"
+                        name="nama_refrensi_rekan"
+                        value={form.nama_refrensi_rekan}
+                        onChange={handleChange}
+                        placeholder="Nama rekan kerja"
+                        error={errors.nama_refrensi_rekan}
+                    />
 
-                <Input
-                    label="Gaji Terakhir"
-                    name="gaji_terakhir"
-                    value={form.gaji_terakhir}
-                    onChange={handleChange}
-                    placeholder="Contoh: 4000000"
-                    error={errors.gaji_terakhir}
-                />
-            </div>
+                    <Input
+                        label="Telepon Referensi Rekan"
+                        name="telp_refrensi_rekan"
+                        value={form.telp_refrensi_rekan}
+                        onChange={handleChange}
+                        placeholder="Nomor telepon"
+                        error={errors.telp_refrensi_rekan}
+                    />
+                </div>
+            </section>
 
-            <div>
-                <FieldLabel label="Keahlian / Skill" />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Referensi Kerabat
+                </h4>
 
-                <textarea
-                    name="keahlian"
-                    value={form.keahlian ?? ""}
-                    onChange={handleChange}
-                    rows="3"
-                    placeholder="Contoh: Microsoft Office, Komunikasi, Administrasi, Laravel, React"
-                    className={`${fieldClass(errors.keahlian)} resize-none`}
-                />
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                    <SelectYaTidak
+                        label="Ada Referensi Kerabat?"
+                        name="refrensi_kerabat"
+                        value={form.refrensi_kerabat}
+                        onChange={handleChange}
+                        error={errors.refrensi_kerabat}
+                    />
 
-                <ErrorMessage message={errors.keahlian} />
-            </div>
+                    <Input
+                        label="Nama Referensi Kerabat"
+                        name="nama_refrensi_kerabat"
+                        value={form.nama_refrensi_kerabat}
+                        onChange={handleChange}
+                        placeholder="Nama kerabat"
+                        error={errors.nama_refrensi_kerabat}
+                    />
 
-            <div>
-                <FieldLabel label="Catatan Pengalaman Kerja" />
-
-                <textarea
-                    name="catatan_pekerjaan"
-                    value={form.catatan_pekerjaan ?? ""}
-                    onChange={handleChange}
-                    rows="3"
-                    placeholder="Tulis catatan tambahan jika ada"
-                    className={`${fieldClass(errors.catatan_pekerjaan)} resize-none`}
-                />
-
-                <ErrorMessage message={errors.catatan_pekerjaan} />
-            </div>
+                    <Input
+                        label="Telepon Referensi Kerabat"
+                        name="telp_refrensi_kerabat"
+                        value={form.telp_refrensi_kerabat}
+                        onChange={handleChange}
+                        placeholder="Nomor telepon"
+                        error={errors.telp_refrensi_kerabat}
+                    />
+                </div>
+            </section>
         </div>
     );
+}
+
+function normalizeDateValue(value) {
+    if (!value) {
+        return "";
+    }
+
+    const stringValue = String(value);
+
+    if (/^\d{4}$/.test(stringValue)) {
+        return `${stringValue}-01-01`;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}/.test(stringValue)) {
+        return stringValue.slice(0, 10);
+    }
+
+    return "";
+}
+
+function formatRupiah(value) {
+    return new Intl.NumberFormat("id-ID").format(value);
 }
 
 function FieldLabel({ label }) {
@@ -189,7 +274,9 @@ function FieldLabel({ label }) {
 }
 
 function ErrorMessage({ message }) {
-    if (!message) return null;
+    if (!message) {
+        return null;
+    }
 
     return (
         <p className="mt-2 text-xs font-semibold text-red-500">
@@ -217,6 +304,9 @@ function Input({
     placeholder,
     error,
     disabled = false,
+    min,
+    max,
+    step,
 }) {
     return (
         <div>
@@ -230,7 +320,38 @@ function Input({
                 placeholder={placeholder || `Masukkan ${label.toLowerCase()}`}
                 className={fieldClass(error, disabled)}
                 disabled={disabled}
+                min={min}
+                max={max}
+                step={step}
+                autoComplete="off"
             />
+
+            <ErrorMessage message={error} />
+        </div>
+    );
+}
+
+function SelectYaTidak({
+    label,
+    name,
+    value,
+    onChange,
+    error,
+}) {
+    return (
+        <div>
+            <FieldLabel label={label} />
+
+            <select
+                name={name}
+                value={value ?? ""}
+                onChange={onChange}
+                className={fieldClass(error)}
+            >
+                <option value="">Pilih</option>
+                <option value="Ya">Ya</option>
+                <option value="Tidak">Tidak</option>
+            </select>
 
             <ErrorMessage message={error} />
         </div>
