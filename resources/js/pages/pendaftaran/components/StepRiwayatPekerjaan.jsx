@@ -1,11 +1,15 @@
 import React from "react";
 
 export default function StepRiwayatPekerjaan({
-    form,
+    form = {},
     handleChange,
     errors = {},
 }) {
     const maxGajiTerakhir = 999999999999999999;
+
+    const statusPekerjaan = String(form.status_pekerjaan || "").trim();
+    const isBelumBekerja =
+        statusPekerjaan.toLowerCase() === "belum bekerja";
 
     const handlePosisiChange = (e) => {
         const value = e.target.value;
@@ -14,6 +18,8 @@ export default function StepRiwayatPekerjaan({
             target: {
                 name: "posisi_pekerjaan_terakhir",
                 value,
+                type: "text",
+                checked: false,
             },
         });
 
@@ -21,6 +27,8 @@ export default function StepRiwayatPekerjaan({
             target: {
                 name: "posisi_pekerjaan",
                 value,
+                type: "text",
+                checked: false,
             },
         });
     };
@@ -34,6 +42,8 @@ export default function StepRiwayatPekerjaan({
                 target: {
                     name: "gaji_terakhir",
                     value: "",
+                    type: "text",
+                    checked: false,
                 },
             });
             return;
@@ -46,6 +56,24 @@ export default function StepRiwayatPekerjaan({
             target: {
                 name: "gaji_terakhir",
                 value: String(safeValue),
+                type: "text",
+                checked: false,
+            },
+        });
+    };
+
+    const handleTahunChange = (e) => {
+        const { name, value } = e.target;
+        const numericOnly = String(value || "")
+            .replace(/[^\d]/g, "")
+            .slice(0, 4);
+
+        handleChange({
+            target: {
+                name,
+                value: numericOnly,
+                type: "text",
+                checked: false,
             },
         });
     };
@@ -140,16 +168,147 @@ export default function StepRiwayatPekerjaan({
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Tambahan Detail Pekerjaan
+                </h4>
+
+                {isBelumBekerja && (
+                    <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                        Status pekerjaan dipilih{" "}
+                        <span className="font-black">Belum Bekerja</span>,
+                        sehingga detail pekerjaan tidak perlu diisi.
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Select
+                        label="Status Pekerjaan"
+                        name="status_pekerjaan"
+                        value={form.status_pekerjaan}
+                        onChange={handleChange}
+                        error={errors.status_pekerjaan}
+                        options={[
+                            "Belum Bekerja",
+                            "Sedang Bekerja",
+                            "Pernah Bekerja",
+                            "Freelance",
+                            "Wiraswasta",
+                        ]}
+                    />
+
+                    <Input
+                        label="Bidang Pekerjaan"
+                        name="bidang_pekerjaan"
+                        value={form.bidang_pekerjaan}
+                        onChange={handleChange}
+                        placeholder="Contoh: Administrasi, IT, Marketing"
+                        error={errors.bidang_pekerjaan}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Input
+                        label="Lokasi Perusahaan"
+                        name="lokasi_perusahaan"
+                        value={form.lokasi_perusahaan}
+                        onChange={handleChange}
+                        placeholder="Contoh: Jakarta"
+                        error={errors.lokasi_perusahaan}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Input
+                        label="Tahun Mulai Bekerja"
+                        name="tahun_mulai_bekerja"
+                        value={form.tahun_mulai_bekerja}
+                        onChange={handleTahunChange}
+                        placeholder="Contoh: 2020"
+                        error={errors.tahun_mulai_bekerja}
+                        inputMode="numeric"
+                        maxLength={4}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Input
+                        label="Tahun Selesai Bekerja"
+                        name="tahun_selesai_bekerja"
+                        value={form.tahun_selesai_bekerja}
+                        onChange={handleTahunChange}
+                        placeholder="Contoh: 2024"
+                        error={errors.tahun_selesai_bekerja}
+                        inputMode="numeric"
+                        maxLength={4}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Input
+                        label="Lama Bekerja"
+                        name="lama_bekerja"
+                        value={
+                            form.lama_bekerja
+                                ? `${String(form.lama_bekerja).replace(/ tahun$/i, "")} tahun`
+                                : ""
+                        }
+                        onChange={handleChange}
+                        placeholder="Otomatis dari tahun mulai dan selesai"
+                        error={errors.lama_bekerja}
+                        disabled
+                    />
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-5">
+                    <Textarea
+                        label="Deskripsi Pekerjaan"
+                        name="deskripsi_pekerjaan"
+                        value={form.deskripsi_pekerjaan}
+                        onChange={handleChange}
+                        placeholder="Jelaskan tugas dan tanggung jawab pekerjaan"
+                        error={errors.deskripsi_pekerjaan}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Textarea
+                        label="Alasan Berhenti"
+                        name="alasan_berhenti"
+                        value={form.alasan_berhenti}
+                        onChange={handleChange}
+                        placeholder="Contoh: Kontrak selesai, ingin mencari pengalaman baru"
+                        error={errors.alasan_berhenti}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Textarea
+                        label="Keahlian"
+                        name="keahlian"
+                        value={form.keahlian}
+                        onChange={handleChange}
+                        placeholder="Contoh: Microsoft Office, komunikasi, administrasi"
+                        error={errors.keahlian}
+                        disabled={isBelumBekerja}
+                    />
+
+                    <Textarea
+                        label="Catatan Pekerjaan"
+                        name="catatan_pekerjaan"
+                        value={form.catatan_pekerjaan}
+                        onChange={handleChange}
+                        placeholder="Catatan tambahan terkait pekerjaan"
+                        error={errors.catatan_pekerjaan}
+                        disabled={isBelumBekerja}
+                    />
+                </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
                     Referensi Kerja
                 </h4>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                     <SelectYaTidak
                         label="Ada Referensi Kerja?"
-                        name="refrensi_kerja"
-                        value={form.refrensi_kerja}
+                        name="referensi_kerja"
+                        value={form.referensi_kerja}
                         onChange={handleChange}
-                        error={errors.refrensi_kerja}
+                        error={errors.referensi_kerja}
                     />
 
                     <Input
@@ -288,7 +447,7 @@ function ErrorMessage({ message }) {
 function fieldClass(error, disabled = false) {
     return `w-full rounded-2xl border px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 ${
         disabled
-            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 placeholder:text-slate-400"
             : error
             ? "border-red-300 bg-red-50 focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-100"
             : "border-slate-200 bg-slate-50 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
@@ -307,6 +466,8 @@ function Input({
     min,
     max,
     step,
+    inputMode,
+    maxLength,
 }) {
     return (
         <div>
@@ -323,8 +484,74 @@ function Input({
                 min={min}
                 max={max}
                 step={step}
+                inputMode={inputMode}
+                maxLength={maxLength}
                 autoComplete="off"
             />
+
+            <ErrorMessage message={error} />
+        </div>
+    );
+}
+
+function Textarea({
+    label,
+    name,
+    value,
+    onChange,
+    placeholder,
+    error,
+    disabled = false,
+    rows = 4,
+}) {
+    return (
+        <div>
+            <FieldLabel label={label} />
+
+            <textarea
+                name={name}
+                value={value ?? ""}
+                onChange={onChange}
+                placeholder={placeholder || `Masukkan ${label.toLowerCase()}`}
+                className={`${fieldClass(error, disabled)} resize-none`}
+                disabled={disabled}
+                rows={rows}
+                autoComplete="off"
+            />
+
+            <ErrorMessage message={error} />
+        </div>
+    );
+}
+
+function Select({
+    label,
+    name,
+    value,
+    onChange,
+    error,
+    options = [],
+    disabled = false,
+}) {
+    return (
+        <div>
+            <FieldLabel label={label} />
+
+            <select
+                name={name}
+                value={value ?? ""}
+                onChange={onChange}
+                className={fieldClass(error, disabled)}
+                disabled={disabled}
+            >
+                <option value="">Pilih {label}</option>
+
+                {options.map((option) => (
+                    <option key={option} value={option}>
+                        {option}
+                    </option>
+                ))}
+            </select>
 
             <ErrorMessage message={error} />
         </div>

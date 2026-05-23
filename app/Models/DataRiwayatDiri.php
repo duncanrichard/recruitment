@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class DataRiwayatDiri extends Model
@@ -75,68 +78,85 @@ class DataRiwayatDiri extends Model
         return $token;
     }
 
-    public function posisi()
+    public function posisi(): BelongsTo
     {
         return $this->belongsTo(Posisi::class, 'posisi_yang_dilamar', 'id');
     }
 
-    public function perusahaan()
+    public function perusahaan(): BelongsTo
     {
         return $this->belongsTo(DataPerusahaan::class, 'perusahaan_dilamar', 'id');
     }
 
-    public function pendidikan()
+    public function pendidikan(): BelongsTo
     {
         return $this->belongsTo(Pendidikan::class, 'pendidikan_id', 'id');
     }
 
-    public function agama()
+    public function agama(): BelongsTo
     {
         return $this->belongsTo(Agama::class, 'agama_id', 'id');
     }
 
-    public function kewarganegaraan()
+    public function kewarganegaraan(): BelongsTo
     {
         return $this->belongsTo(Kewarganegaraan::class, 'kewarganegaraan_id', 'id');
     }
 
-    public function statusPernikahan()
+    public function statusPernikahan(): BelongsTo
     {
         return $this->belongsTo(StatusPernikahan::class, 'status_pernikahan_id', 'id');
     }
 
-    public function sosialMedia()
+    public function sosialMedia(): HasMany
     {
         return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id');
     }
 
-    public function sumberInformasi()
+    public function sumberInformasi(): BelongsTo
     {
         return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id');
     }
 
-    public function riwayatKeluarga()
+    public function riwayatKeluarga(): HasOne
     {
         return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id');
     }
 
-    public function saudaraKandung()
+    public function saudaraKandung(): HasMany
     {
         return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id');
     }
 
-    public function saudaraIpar()
+    public function saudaraIpar(): HasMany
     {
         return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id');
     }
 
-    public function riwayatKesehatan()
+    public function riwayatKesehatan(): HasOne
     {
         return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id');
     }
 
-    public function riwayatPekerjaan()
+    public function riwayatPekerjaan(): HasOne
     {
         return $this->hasOne(DataRiwayatPekerjaan::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function kesiapanBekerja(): HasOne
+    {
+        return $this->hasOne(DataKesiapanBekerja::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function jadwalTestZoom(): HasOne
+    {
+        return $this->hasOne(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')
+            ->orderByDesc('jadwal');
+    }
+
+    public function jadwalTestZooms(): HasMany
+    {
+        return $this->hasMany(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')
+            ->orderByDesc('jadwal');
     }
 }

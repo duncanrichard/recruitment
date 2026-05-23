@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-export default function DataPelamarPage({ actionSignals }) {
+export default function DataPelamarPage({
+    actionSignals,
+    onOpenDetailPelamar,
+}) {
     const [dataPelamar, setDataPelamar] = useState([]);
     const [dataPosisi, setDataPosisi] = useState([]);
     const [dataPerusahaan, setDataPerusahaan] = useState([]);
@@ -14,7 +17,6 @@ export default function DataPelamarPage({ actionSignals }) {
     const [loading, setLoading] = useState(false);
     const [alamatSama, setAlamatSama] = useState(false);
 
-    // Mencegah modal langsung terbuka saat pertama kali menu/page dibuka.
     const isFirstActionSignalRender = useRef(true);
 
     const [form, setForm] = useState({
@@ -482,7 +484,7 @@ export default function DataPelamarPage({ actionSignals }) {
                                 onClick={() => handleCopyPendaftaranUrl(item)}
                                 className="block rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700 transition hover:bg-teal-100"
                             >
-                                Copy URL
+                               {/*  Copy URL */}
                             </button>
                         )}
                     </div>
@@ -610,23 +612,45 @@ export default function DataPelamarPage({ actionSignals }) {
                 sortable: false,
                 searchable: false,
                 render: (item) => (
-                    <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
-                    >
-                        Hapus
-                    </button>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => onOpenDetailPelamar?.(item.id)}
+                            className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 shadow-sm transition hover:bg-cyan-100"
+                        >
+                            Detail
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(item.id)}
+                            className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
+                        >
+                            Hapus
+                        </button>
+                    </div>
                 ),
             },
         ];
-    }, [dataPosisi, dataPerusahaan, dataSumberInformasi]);
+    }, [
+        dataPosisi,
+        dataPerusahaan,
+        dataSumberInformasi,
+        onOpenDetailPelamar,
+    ]);
 
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                    
+                    <div>
+                        <h3 className="text-lg font-black text-slate-950">
+                            Data Pelamar
+                        </h3>
+                        <p className="mt-1 text-sm font-medium text-slate-500">
+                            Daftar data pelamar yang sudah dibuat oleh admin.
+                        </p>
+                    </div>
                 </div>
 
                 <DataTable

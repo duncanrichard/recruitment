@@ -233,6 +233,14 @@ function PendaftaranPage() {
         status_ikatan_kerja: "",
         alasan_melamar: "",
         catatan_kesiapan: "",
+
+        // Field utama tabel data_kesiapan_bekerja sesuai Google Form
+        kapan_siap_bekerja: "",
+        ekpetasi_gaji: "",
+        penempatan: [],
+        proses_bkhang: [],
+        dapat_dipertanggung_jawabkan: [],
+        bersedia_training: "",
     });
 
     const steps = [
@@ -490,6 +498,16 @@ function PendaftaranPage() {
         return normalized.slice(0, 4);
     };
 
+    const normalizeYearForPayload = (value) => {
+        if (value === undefined || value === null || value === "") {
+            return "";
+        }
+
+        const year = String(value).replace(/\D/g, "").slice(0, 4);
+
+        return year.length === 4 ? year : "";
+    };
+
     const normalizeDecimalForPayload = (value) => {
         if (value === undefined || value === null || value === "") {
             return "";
@@ -721,6 +739,12 @@ function PendaftaranPage() {
         const pekerjaan =
             pelamar?.riwayatPekerjaan ||
             pelamar?.riwayat_pekerjaan ||
+            {};
+
+        const kesiapan =
+            pelamar?.kesiapanBekerja ||
+            pelamar?.kesiapan_bekerja ||
+            pelamar?.dataKesiapanBekerja ||
             {};
 
         const alamatDomisili = pelamar?.alamat_domisili || pelamar?.alamat || "";
@@ -1170,6 +1194,122 @@ function PendaftaranPage() {
                 pelamar?.telp_refrensi_kerabat ||
                 pekerjaan?.telp_refrensi_kerabat ||
                 "",
+
+            bersedia_ditempatkan:
+                pelamar?.bersedia_ditempatkan ||
+                kesiapan?.bersedia_ditempatkan ||
+                "",
+
+            bersedia_shift:
+                pelamar?.bersedia_shift ||
+                kesiapan?.bersedia_shift ||
+                "",
+
+            bersedia_lembur:
+                pelamar?.bersedia_lembur ||
+                kesiapan?.bersedia_lembur ||
+                "",
+
+            bersedia_hari_libur:
+                pelamar?.bersedia_hari_libur ||
+                kesiapan?.bersedia_hari_libur ||
+                "",
+
+            tanggal_siap_kerja:
+                pelamar?.tanggal_siap_kerja ||
+                kesiapan?.tanggal_siap_kerja ||
+                pelamar?.kapan_siap_bekerja ||
+                kesiapan?.kapan_siap_bekerja ||
+                "",
+
+            gaji_diharapkan:
+                pelamar?.gaji_diharapkan ||
+                kesiapan?.gaji_diharapkan ||
+                pelamar?.ekpetasi_gaji ||
+                kesiapan?.ekpetasi_gaji ||
+                "",
+
+            lokasi_kerja_diinginkan:
+                pelamar?.lokasi_kerja_diinginkan ||
+                kesiapan?.lokasi_kerja_diinginkan ||
+                pelamar?.penempatan ||
+                kesiapan?.penempatan ||
+                "",
+
+            memiliki_kendaraan:
+                pelamar?.memiliki_kendaraan ||
+                kesiapan?.memiliki_kendaraan ||
+                "",
+
+            memiliki_sim:
+                pelamar?.memiliki_sim ||
+                kesiapan?.memiliki_sim ||
+                "",
+
+            bersedia_pelatihan:
+                pelamar?.bersedia_pelatihan ||
+                kesiapan?.bersedia_pelatihan ||
+                pelamar?.bersedia_training ||
+                kesiapan?.bersedia_training ||
+                "",
+
+            status_ikatan_kerja:
+                pelamar?.status_ikatan_kerja ||
+                kesiapan?.status_ikatan_kerja ||
+                "",
+
+            alasan_melamar:
+                pelamar?.alasan_melamar ||
+                kesiapan?.alasan_melamar ||
+                "",
+
+            catatan_kesiapan:
+                pelamar?.catatan_kesiapan ||
+                kesiapan?.catatan_kesiapan ||
+                "",
+
+            kapan_siap_bekerja:
+                pelamar?.kapan_siap_bekerja ||
+                kesiapan?.kapan_siap_bekerja ||
+                pelamar?.tanggal_siap_kerja ||
+                kesiapan?.tanggal_siap_kerja ||
+                "",
+
+            ekpetasi_gaji:
+                pelamar?.ekpetasi_gaji ||
+                kesiapan?.ekpetasi_gaji ||
+                pelamar?.gaji_diharapkan ||
+                kesiapan?.gaji_diharapkan ||
+                "",
+
+            penempatan: normalizeArrayValue(
+                pelamar?.penempatan ||
+                    kesiapan?.penempatan ||
+                    pelamar?.penempatan_luar_jawa_tengah ||
+                    kesiapan?.penempatan_luar_jawa_tengah
+            ),
+
+            proses_bkhang: normalizeArrayValue(
+                pelamar?.proses_bkhang ||
+                    kesiapan?.proses_bkhang ||
+                    pelamar?.background_checking ||
+                    kesiapan?.background_checking
+            ),
+
+            dapat_dipertanggung_jawabkan: normalizeArrayValue(
+                pelamar?.dapat_dipertanggung_jawabkan ||
+                    kesiapan?.dapat_dipertanggung_jawabkan ||
+                    pelamar?.pernyataan_data_benar ||
+                    kesiapan?.pernyataan_data_benar
+            ),
+
+            bersedia_training:
+                pelamar?.bersedia_training ||
+                kesiapan?.bersedia_training ||
+                pelamar?.bersedia_pelatihan ||
+                kesiapan?.bersedia_pelatihan ||
+                "",
+
         };
     };
 
@@ -1596,27 +1736,52 @@ function PendaftaranPage() {
         }
 
         const posisiPekerjaan =
-            form.posisi_pekerjaan_terakhir ||
             form.posisi_pekerjaan ||
+            form.posisi_pekerjaan_terakhir ||
             "";
 
-        const periodeKerjaAwal = normalizeDateForPayload(
-            form.periode_kerja_awal || form.tahun_mulai_bekerja
+        const tahunMulaiBekerja = normalizeYearForPayload(
+            form.tahun_mulai_bekerja || getYearFromDate(form.periode_kerja_awal)
         );
 
-        const periodeKerjaAkhir = normalizeDateForPayload(
-            form.periode_kerja_akhir || form.tahun_selesai_bekerja
+        const tahunSelesaiBekerja = normalizeYearForPayload(
+            form.tahun_selesai_bekerja || getYearFromDate(form.periode_kerja_akhir)
+        );
+
+        const periodeKerjaAwal =
+            normalizeDateForPayload(form.periode_kerja_awal) ||
+            normalizeDateForPayload(tahunMulaiBekerja);
+
+        const periodeKerjaAkhir =
+            normalizeDateForPayload(form.periode_kerja_akhir) ||
+            normalizeDateForPayload(tahunSelesaiBekerja);
+
+        const lamaBekerja = hitungLamaBekerja(
+            tahunMulaiBekerja,
+            tahunSelesaiBekerja
         );
 
         const payload = {
+            status_pekerjaan: form.status_pekerjaan || "",
+
             nama_perusahaan: form.nama_perusahaan || "",
-            posisi_pekerjaan_terakhir: posisiPekerjaan,
             posisi_pekerjaan: posisiPekerjaan,
+            posisi_pekerjaan_terakhir: posisiPekerjaan,
+            bidang_pekerjaan: form.bidang_pekerjaan || "",
+            lokasi_perusahaan: form.lokasi_perusahaan || "",
+
+            tahun_mulai_bekerja: tahunMulaiBekerja,
+            tahun_selesai_bekerja: tahunSelesaiBekerja,
+            lama_bekerja: lamaBekerja,
 
             periode_kerja_awal: periodeKerjaAwal,
             periode_kerja_akhir: periodeKerjaAkhir,
 
+            deskripsi_pekerjaan: form.deskripsi_pekerjaan || "",
+            alasan_berhenti: form.alasan_berhenti || "",
             gaji_terakhir: normalizeDecimalForPayload(form.gaji_terakhir),
+            keahlian: form.keahlian || "",
+            catatan_pekerjaan: form.catatan_pekerjaan || "",
 
             refrensi_kerja: form.refrensi_kerja || "",
             nama_refrensi: form.nama_refrensi || "",
@@ -1655,6 +1820,81 @@ function PendaftaranPage() {
 
             throw new Error(
                 result.message || "Gagal menyimpan riwayat pekerjaan."
+            );
+        }
+
+        if (result.data) {
+            applyPelamarToPage(result.data);
+        }
+
+        return result.data;
+    };
+
+    const saveKesiapanBekerja = async () => {
+        const token = form.token || getInitialTokenFromPage();
+
+        if (!token) {
+            throw new Error("Token pelamar tidak tersedia.");
+        }
+
+        const penempatanValues = normalizeArrayValue(form.penempatan);
+        const prosesBkhangValues = normalizeArrayValue(form.proses_bkhang);
+        const pernyataanValues = normalizeArrayValue(
+            form.dapat_dipertanggung_jawabkan
+        );
+
+        const payload = {
+            kapan_siap_bekerja:
+                form.kapan_siap_bekerja || form.tanggal_siap_kerja || "",
+
+            ekpetasi_gaji: normalizeDecimalForPayload(
+                form.ekpetasi_gaji || form.gaji_diharapkan
+            ),
+
+            penempatan: penempatanValues.join(", "),
+
+            proses_bkhang:
+                prosesBkhangValues[0] ||
+                form.proses_bkhang ||
+                form.background_checking ||
+                "",
+
+            dapat_dipertanggung_jawabkan:
+                pernyataanValues[0] ||
+                form.dapat_dipertanggung_jawabkan ||
+                form.pernyataan_data_benar ||
+                "",
+
+            bersedia_training:
+                form.bersedia_training ||
+                form.bersedia_pelatihan ||
+                "",
+        };
+
+        const response = await fetch(
+            `/pendaftaran/api/token/${encodeURIComponent(token)}/kesiapan-bekerja`,
+            {
+                method: "PATCH",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const result = await parseResponseJson(response);
+
+        if (!response.ok || !result.success) {
+            if (result.errors) {
+                setErrors(normalizeLaravelErrors(result.errors));
+            }
+
+            throw new Error(
+                result.message || "Gagal menyimpan kesiapan bekerja."
             );
         }
 
@@ -1746,28 +1986,21 @@ function PendaftaranPage() {
     };
 
     const hitungLamaBekerja = (tahunMulai, tahunSelesai) => {
-        const mulai = parseInt(tahunMulai, 10);
-        const selesai = parseInt(tahunSelesai, 10);
+        const tahunMulaiNormal = normalizeYearForPayload(tahunMulai);
+        const tahunSelesaiNormal = normalizeYearForPayload(tahunSelesai);
 
-        if (!mulai || !selesai) {
+        if (!tahunMulaiNormal || !tahunSelesaiNormal) {
             return "";
         }
 
-        if (String(tahunMulai).length !== 4 || String(tahunSelesai).length !== 4) {
+        const mulai = parseInt(tahunMulaiNormal, 10);
+        const selesai = parseInt(tahunSelesaiNormal, 10);
+
+        if (!mulai || !selesai || selesai < mulai) {
             return "";
         }
 
-        if (selesai < mulai) {
-            return "";
-        }
-
-        const selisih = selesai - mulai;
-
-        if (selisih === 0) {
-            return "Kurang dari 1 tahun";
-        }
-
-        return `${selisih} tahun`;
+        return String(selesai - mulai);
     };
 
     const handleChange = (e) => {
@@ -1782,8 +2015,15 @@ function PendaftaranPage() {
             return;
         }
 
+        const incomingValue =
+            type === "checkbox-group" && Array.isArray(value) ? value : value;
+
         setForm((prevForm) => {
-            let nextValue = value;
+            let nextValue = incomingValue;
+
+            if (type === "checkbox-group") {
+                nextValue = Array.isArray(value) ? value : normalizeArrayValue(value);
+            }
 
             if (type === "checkbox") {
                 const currentValues = Array.isArray(prevForm[name])
@@ -1793,6 +2033,13 @@ function PendaftaranPage() {
                 nextValue = checked
                     ? [...currentValues, value]
                     : currentValues.filter((item) => item !== value);
+            }
+
+            if (
+                name === "tahun_mulai_bekerja" ||
+                name === "tahun_selesai_bekerja"
+            ) {
+                nextValue = String(nextValue).replace(/\D/g, "").slice(0, 4);
             }
 
             const updatedForm = {
@@ -1938,7 +2185,7 @@ function PendaftaranPage() {
                 updatedForm.diagnosa_dokter = "";
             }
 
-            if (name === "status_pekerjaan" && value === "Belum Bekerja") {
+            if (name === "status_pekerjaan" && nextValue === "Belum Bekerja") {
                 updatedForm.posisi_pekerjaan = "";
                 updatedForm.posisi_pekerjaan_terakhir = "";
                 updatedForm.nama_perusahaan = "";
@@ -1979,6 +2226,14 @@ function PendaftaranPage() {
 
             if (name === "periode_kerja_akhir") {
                 updatedForm.tahun_selesai_bekerja = getYearFromDate(nextValue);
+            }
+
+            if (name === "tahun_mulai_bekerja") {
+                updatedForm.periode_kerja_awal = normalizeDateForPayload(nextValue);
+            }
+
+            if (name === "tahun_selesai_bekerja") {
+                updatedForm.periode_kerja_akhir = normalizeDateForPayload(nextValue);
             }
 
             if (
@@ -2071,10 +2326,13 @@ function PendaftaranPage() {
             if (name === "status_pekerjaan" && value === "Belum Bekerja") {
                 delete updatedErrors.nama_perusahaan;
                 delete updatedErrors.posisi_pekerjaan;
+                delete updatedErrors.posisi_pekerjaan_terakhir;
                 delete updatedErrors.bidang_pekerjaan;
                 delete updatedErrors.lokasi_perusahaan;
                 delete updatedErrors.tahun_mulai_bekerja;
                 delete updatedErrors.tahun_selesai_bekerja;
+                delete updatedErrors.periode_kerja_awal;
+                delete updatedErrors.periode_kerja_akhir;
                 delete updatedErrors.lama_bekerja;
                 delete updatedErrors.deskripsi_pekerjaan;
                 delete updatedErrors.alasan_berhenti;
@@ -2094,6 +2352,24 @@ function PendaftaranPage() {
                 delete updatedErrors.tahun_selesai_bekerja;
                 delete updatedErrors.periode_kerja_awal;
                 delete updatedErrors.periode_kerja_akhir;
+            }
+
+            if (
+                name === "kapan_siap_bekerja" ||
+                name === "ekpetasi_gaji" ||
+                name === "penempatan" ||
+                name === "proses_bkhang" ||
+                name === "dapat_dipertanggung_jawabkan"
+            ) {
+                delete updatedErrors.kapan_siap_bekerja;
+                delete updatedErrors.tanggal_siap_kerja;
+                delete updatedErrors.ekpetasi_gaji;
+                delete updatedErrors.gaji_diharapkan;
+                delete updatedErrors.penempatan;
+                delete updatedErrors.proses_bkhang;
+                delete updatedErrors.background_checking;
+                delete updatedErrors.dapat_dipertanggung_jawabkan;
+                delete updatedErrors.pernyataan_data_benar;
             }
 
             return updatedErrors;
@@ -2281,6 +2557,11 @@ function PendaftaranPage() {
 
         if (step === 4) {
             await saveRiwayatPekerjaan();
+            return;
+        }
+
+        if (step === 5) {
+            await saveKesiapanBekerja();
             return;
         }
     };

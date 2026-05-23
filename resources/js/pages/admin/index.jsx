@@ -8,7 +8,12 @@ import PendaftarPage from "./pages/PendaftarPage";
 import PendaftarBaruPage from "./pages/PendaftarBaruPage";
 import PendaftarArsipPage from "./pages/PendaftarArsipPage";
 import TahapanSeleksiPage from "./pages/TahapanSeleksiPage";
+
 import DataPelamarPage from "./pages/data-pelamar/Index";
+import DetailDataPelamarPage from "./pages/data-pelamar/Detail";
+
+import JadwalTestZoomPage from "./pages/jadwal-test/zoom/Index";
+
 import PosisiPage from "./pages/master-data/posisi/Index";
 import PendidikanPage from "./pages/master-data/pendidikan/Index";
 import AgamaPage from "./pages/master-data/agama/Index";
@@ -21,6 +26,7 @@ import DataPerusahaanPage from "./pages/master-data/perusahaan/Index";
 function AdminPage() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [activeMenu, setActiveMenu] = useState("dashboard");
+    const [detailPelamarId, setDetailPelamarId] = useState(null);
 
     const [actionSignals, setActionSignals] = useState({
         dataPelamar: 0,
@@ -28,6 +34,7 @@ function AdminPage() {
         pendaftarBaru: 0,
         pendaftarArsip: 0,
         tahapan: 0,
+        jadwalTestZoom: 0,
         masterPosisi: 0,
         masterPendidikan: 0,
         masterAgama: 0,
@@ -155,32 +162,23 @@ function AdminPage() {
                 signalKey: "dataPelamar",
             },
         },
+        
         {
-            key: "pendaftar",
-            label: "Data Pendaftar",
-            description: "Kelola data pendaftar",
-            icon: "◉",
+            key: "jadwal-test",
+            label: "Data Jadwal Test",
+            description: "Kelola jadwal test kandidat",
+            icon: "◷",
             children: [
                 {
-                    key: "pendaftar-semua",
-                    label: "Semua Pendaftar",
-                    description: "Semua data pendaftar",
-                    icon: "●",
-                    component: PendaftarPage,
-                },
-                {
-                    key: "pendaftar-baru",
-                    label: "Pendaftar Baru",
-                    description: "Data pendaftar terbaru",
-                    icon: "✦",
-                    component: PendaftarBaruPage,
-                },
-                {
-                    key: "pendaftar-arsip",
-                    label: "Arsip Pendaftar",
-                    description: "Data pendaftar arsip",
-                    icon: "◌",
-                    component: PendaftarArsipPage,
+                    key: "jadwal-test-zoom",
+                    label: "Zoom",
+                    description: "Kelola jadwal test Zoom",
+                    icon: "◎",
+                    component: JadwalTestZoomPage,
+                    action: {
+                        label: "Tambah Jadwal Zoom",
+                        signalKey: "jadwalTestZoom",
+                    },
                 },
             ],
         },
@@ -205,13 +203,27 @@ function AdminPage() {
         return [menu];
     });
 
-    const activeMenuData =
-        flattenMenus.find((item) => item.key === activeMenu) || menuItems[0];
+    const isDetailPelamarPage = activeMenu === "data-pelamar-detail";
 
-    const ActiveComponent = activeMenuData.component || DashboardPage;
+    const activeMenuData = isDetailPelamarPage
+        ? {
+              key: "data-pelamar-detail",
+              label: "Detail Pelamar",
+              parentLabel: "Data Pelamar",
+              description: "Detail lengkap data pelamar",
+              icon: "▤",
+              component: DetailDataPelamarPage,
+          }
+        : flattenMenus.find((item) => item.key === activeMenu) || menuItems[0];
+
+    const ActiveComponent = isDetailPelamarPage
+        ? DetailDataPelamarPage
+        : activeMenuData.component || DashboardPage;
 
     const handleMenuClick = (menu) => {
         const hasChildren = Array.isArray(menu.children);
+
+        setDetailPelamarId(null);
 
         if (hasChildren) {
             const isCurrentlyOpen = Boolean(openMenus[menu.key]);
@@ -231,6 +243,7 @@ function AdminPage() {
     };
 
     const handleSubMenuClick = (parentKey, childKey) => {
+        setDetailPelamarId(null);
         setActiveMenu(childKey);
 
         setOpenMenus((prev) => ({
@@ -250,6 +263,20 @@ function AdminPage() {
             ...prev,
             [action.signalKey]: (prev[action.signalKey] || 0) + 1,
         }));
+    };
+
+    const handleOpenDetailPelamar = (id) => {
+        setDetailPelamarId(id);
+        setActiveMenu("data-pelamar-detail");
+        setOpenMenus({});
+        setSidebarOpen(false);
+    };
+
+    const handleBackToDataPelamar = () => {
+        setDetailPelamarId(null);
+        setActiveMenu("data-pelamar");
+        setOpenMenus({});
+        setSidebarOpen(false);
     };
 
     return (
@@ -298,7 +325,9 @@ function AdminPage() {
 
                                 const isActive =
                                     activeMenu === menu.key ||
-                                    childKeys.includes(activeMenu);
+                                    childKeys.includes(activeMenu) ||
+                                    (isDetailPelamarPage &&
+                                        menu.key === "data-pelamar");
 
                                 const isOpen = Boolean(openMenus[menu.key]);
 
@@ -458,7 +487,7 @@ function AdminPage() {
                             </div>
 
                             <div className="flex items-center gap-3">
-                                {activeMenuData.action && (
+                                {activeMenuData.action && !isDetailPelamarPage && (
                                     <button
                                         type="button"
                                         onClick={handleHeaderAction}
@@ -472,7 +501,17 @@ function AdminPage() {
                     </header>
 
                     <div className="flex-1 p-5 sm:p-8">
-                        <ActiveComponent actionSignals={actionSignals} />
+                        {isDetailPelamarPage ? (
+                            <ActiveComponent
+                                id={detailPelamarId}
+                                onBack={handleBackToDataPelamar}
+                            />
+                        ) : (
+                            <ActiveComponent
+                                actionSignals={actionSignals}
+                                onOpenDetailPelamar={handleOpenDetailPelamar}
+                            />
+                        )}
                     </div>
                 </section>
             </div>

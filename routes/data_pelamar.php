@@ -34,6 +34,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::post('/data-pelamar', [DataPelamarController::class, 'store'])
         ->name('data-pelamar.store');
 
+    Route::get('/data-pelamar/{id}/detail-data', [DataPelamarController::class, 'detailData'])
+        ->name('data-pelamar.detail-data');
+
+    Route::delete('/data-pelamar/{id}', [DataPelamarController::class, 'destroy'])
+        ->name('data-pelamar.destroy');
+
     Route::delete('/data-pelamar/{id}', [DataPelamarController::class, 'destroy'])
         ->name('data-pelamar.destroy');
 });

@@ -5,14 +5,6 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Pendaftaran Kandidat
-|--------------------------------------------------------------------------
-| Semua route API wajib diletakkan di atas /pendaftaran/{token}
-| agar tidak terbaca sebagai token pendaftaran.
-*/
-
-/*
-|--------------------------------------------------------------------------
 | Master Data
 |--------------------------------------------------------------------------
 */
@@ -49,6 +41,27 @@ Route::get('/pendaftaran/api/wilayah/villages/{district_code}', [PendaftaranCont
 */
 Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'findByToken'])
     ->name('pendaftaran.api.token');
+
+/*
+|--------------------------------------------------------------------------
+| API Tahapan Seleksi
+|--------------------------------------------------------------------------
+*/
+Route::get('/pendaftaran/api/token/{token}/tahapan', [PendaftaranController::class, 'tahapanByToken'])
+    ->name('pendaftaran.api.token.tahapan');
+
+Route::get('/pendaftaran/api/token/{token}/cek-tahapan', [PendaftaranController::class, 'cekTahapanByToken'])
+    ->name('pendaftaran.api.token.cek-tahapan');
+
+/*
+|--------------------------------------------------------------------------
+| API Kehadiran Jadwal Test
+|--------------------------------------------------------------------------
+| WAJIB di atas /pendaftaran/{token}
+|--------------------------------------------------------------------------
+*/
+Route::patch('/pendaftaran/api/token/{token}/jadwal-test/{jadwalTest}/kehadiran', [PendaftaranController::class, 'updateKehadiranJadwalTest'])
+    ->name('pendaftaran.api.token.jadwal-test.kehadiran');
 
 /*
 |--------------------------------------------------------------------------
@@ -102,18 +115,13 @@ Route::get('/pendaftaran/api/token/{token}/riwayat-pekerjaan', function (string 
 |--------------------------------------------------------------------------
 | Step 5 - Kesiapan Bekerja
 |--------------------------------------------------------------------------
-| Aktifkan route ini kalau method updateKesiapanBekerjaByToken sudah dibuat
-| di PendaftaranController.
-|--------------------------------------------------------------------------
 */
-/*
 Route::patch('/pendaftaran/api/token/{token}/kesiapan-bekerja', [PendaftaranController::class, 'updateKesiapanBekerjaByToken'])
     ->name('pendaftaran.api.token.kesiapan-bekerja.update');
 
 Route::get('/pendaftaran/api/token/{token}/kesiapan-bekerja', function (string $token) {
     return redirect()->route('pendaftaran.show', ['token' => $token]);
 })->name('pendaftaran.api.token.kesiapan-bekerja.show');
-*/
 
 /*
 |--------------------------------------------------------------------------
@@ -125,16 +133,20 @@ Route::get('/pendaftaran', [PendaftaranController::class, 'index'])
 
 /*
 |--------------------------------------------------------------------------
+| Halaman Cek Tahapan
+|--------------------------------------------------------------------------
+*/
+Route::get('/pendaftaran/{token}/cek-tahapan', [PendaftaranController::class, 'cekTahapanByToken'])
+    ->name('pendaftaran.cek-tahapan');
+
+Route::get('/pendaftaran/{token}/tahapan', [PendaftaranController::class, 'tahapanByToken'])
+    ->name('pendaftaran.tahapan');
+
+/*
+|--------------------------------------------------------------------------
 | Route Token Pendaftaran
 |--------------------------------------------------------------------------
-| Route ini wajib paling bawah agar route seperti:
-| /pendaftaran/api/master/pendaftaran
-| /pendaftaran/api/token/{token}/data-diri
-| /pendaftaran/api/token/{token}/riwayat-keluarga
-| /pendaftaran/api/token/{token}/riwayat-kesehatan
-| /pendaftaran/api/token/{token}/riwayat-pekerjaan
-| /pendaftaran/api/wilayah/provinces
-| tidak tertangkap sebagai token.
+| Route ini wajib paling bawah.
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/{token}', [PendaftaranController::class, 'show'])

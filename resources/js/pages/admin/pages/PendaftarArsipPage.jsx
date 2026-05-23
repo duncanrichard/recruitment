@@ -1,6 +1,7 @@
 import React from "react";
 
 export default function PendaftarArsipPage() {
+    
     return (
         <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70">
             <span className="inline-flex rounded-full bg-slate-100 px-4 py-1 text-xs font-bold uppercase tracking-wide text-slate-700">

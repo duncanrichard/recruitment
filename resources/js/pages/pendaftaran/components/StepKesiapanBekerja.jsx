@@ -1,159 +1,147 @@
 import React from "react";
 
-export default function StepKesiapanBekerja({ form, handleChange }) {
+export default function StepKesiapanBekerja({
+    form = {},
+    handleChange,
+    errors = {},
+}) {
+    const penempatanValue =
+        form.penempatan || form.penempatan_luar_jawa_tengah || [];
+
+    const backgroundCheckingValue =
+        form.proses_bkhang || form.background_checking || [];
+
+    const pernyataanValue =
+        form.dapat_dipertanggung_jawabkan ||
+        form.pernyataan_data_benar ||
+        [];
+
     return (
         <div className="space-y-6">
             <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
                 <h3 className="text-base font-bold text-cyan-800">
-                    Data Kesiapan Bekerja
+                    Kesiapan Bekerja
                 </h3>
+
                 <p className="mt-1 text-sm text-cyan-600">
-                    Lengkapi informasi kesiapan pelamar untuk mulai bekerja.
+                    Lengkapi informasi kesiapan bekerja sesuai pertanyaan berikut.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Select
-                    label="Bersedia Ditempatkan di Mana Saja"
-                    name="bersedia_ditempatkan"
-                    value={form.bersedia_ditempatkan}
-                    onChange={handleChange}
-                    options={["Ya", "Tidak"]}
-                />
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Informasi Kesiapan
+                </h4>
 
-                <Select
-                    label="Bersedia Bekerja Shift"
-                    name="bersedia_shift"
-                    value={form.bersedia_shift}
-                    onChange={handleChange}
-                    options={["Ya", "Tidak"]}
-                />
-            </div>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Kapan Anda siap bekerja di perusahaan ini jika diterima?"
+                        name="kapan_siap_bekerja"
+                        value={form.kapan_siap_bekerja || form.tanggal_siap_kerja || ""}
+                        onChange={handleChange}
+                        placeholder="Contoh: Secepatnya / 1 minggu setelah diterima"
+                        error={errors.kapan_siap_bekerja || errors.tanggal_siap_kerja}
+                        required
+                    />
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Select
-                    label="Bersedia Lembur"
-                    name="bersedia_lembur"
-                    value={form.bersedia_lembur}
-                    onChange={handleChange}
-                    options={["Ya", "Tidak"]}
-                />
+                    <Input
+                        label="Berapa ekspetasi gaji yang Anda harapkan? Sebutkan dalam bentuk angka"
+                        name="ekpetasi_gaji"
+                        value={form.ekpetasi_gaji || form.gaji_diharapkan || ""}
+                        onChange={handleChange}
+                        placeholder="Contoh: 4000000"
+                        error={errors.ekpetasi_gaji || errors.gaji_diharapkan}
+                        inputMode="numeric"
+                        required
+                    />
+                </div>
+            </section>
 
-                <Select
-                    label="Bersedia Bekerja di Hari Libur"
-                    name="bersedia_hari_libur"
-                    value={form.bersedia_hari_libur}
-                    onChange={handleChange}
-                    options={["Ya", "Tidak"]}
-                />
-            </div>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Penempatan
+                </h4>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input
-                    label="Tanggal Siap Mulai Bekerja"
-                    type="date"
-                    name="tanggal_siap_kerja"
-                    value={form.tanggal_siap_kerja}
+                <CheckboxGroup
+                    label="Bersedia kah penempatan di luar Jawa Tengah?"
+                    name="penempatan"
+                    value={penempatanValue}
                     onChange={handleChange}
+                    error={errors.penempatan || errors.penempatan_luar_jawa_tengah}
+                    options={["JAWA BARAT", "JAWA TIMUR", "TIDAK BERSEDIA"]}
+                    required
                 />
+            </section>
 
-                <Input
-                    label="Gaji yang Diharapkan"
-                    name="gaji_diharapkan"
-                    value={form.gaji_diharapkan}
-                    onChange={handleChange}
-                    placeholder="Contoh: 4000000"
-                />
-            </div>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Background Checking
+                </h4>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Input
-                    label="Posisi yang Dilamar"
-                    name="posisi_dilamar"
-                    value={form.posisi_dilamar}
+                <CheckboxGroup
+                    label="Sebagai bagian dari prosedur rekrutmen perusahaan, kami melakukan proses background checking bagi kandidat yang lolos tahapan seleksi. Apakah Anda bersedia mengikuti proses tersebut?"
+                    name="proses_bkhang"
+                    value={backgroundCheckingValue}
                     onChange={handleChange}
-                    placeholder="Contoh: Staff Administrasi"
+                    error={errors.proses_bkhang || errors.background_checking}
+                    options={["BERSEDIA", "TIDAK BERSEDIA"]}
+                    singleChoice
+                    required
                 />
+            </section>
 
-                <Input
-                    label="Lokasi Kerja yang Diinginkan"
-                    name="lokasi_kerja_diinginkan"
-                    value={form.lokasi_kerja_diinginkan}
-                    onChange={handleChange}
-                    placeholder="Contoh: Jakarta / Bandung"
-                />
-            </div>
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Pernyataan
+                </h4>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Select
-                    label="Memiliki Kendaraan Pribadi"
-                    name="memiliki_kendaraan"
-                    value={form.memiliki_kendaraan}
+                <CheckboxGroup
+                    label="Saya menyatakan bahwa data yang saya isi adalah benar adanya dan dapat dipertanggung jawabkan"
+                    name="dapat_dipertanggung_jawabkan"
+                    value={pernyataanValue}
                     onChange={handleChange}
-                    options={["Ya", "Tidak"]}
+                    error={
+                        errors.dapat_dipertanggung_jawabkan ||
+                        errors.pernyataan_data_benar
+                    }
+                    options={["YA"]}
+                    singleChoice
+                    required
                 />
-
-                <Select
-                    label="Memiliki SIM"
-                    name="memiliki_sim"
-                    value={form.memiliki_sim}
-                    onChange={handleChange}
-                    options={["Tidak Ada", "SIM A", "SIM C", "SIM A dan C"]}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <Select
-                    label="Bersedia Mengikuti Pelatihan"
-                    name="bersedia_pelatihan"
-                    value={form.bersedia_pelatihan}
-                    onChange={handleChange}
-                    options={["Ya", "Tidak"]}
-                />
-
-                <Select
-                    label="Status Ikatan Kerja Saat Ini"
-                    name="status_ikatan_kerja"
-                    value={form.status_ikatan_kerja}
-                    onChange={handleChange}
-                    options={[
-                        "Tidak Ada",
-                        "Masih Bekerja",
-                        "Kontrak Berjalan",
-                        "Menunggu Resign",
-                    ]}
-                />
-            </div>
-
-            <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Alasan Melamar
-                </label>
-                <textarea
-                    name="alasan_melamar"
-                    value={form.alasan_melamar}
-                    onChange={handleChange}
-                    rows="4"
-                    placeholder="Jelaskan alasan Anda melamar pekerjaan ini"
-                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                />
-            </div>
-
-            <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Catatan Kesiapan Bekerja
-                </label>
-                <textarea
-                    name="catatan_kesiapan"
-                    value={form.catatan_kesiapan}
-                    onChange={handleChange}
-                    rows="3"
-                    placeholder="Tulis catatan tambahan jika ada"
-                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-                />
-            </div>
+            </section>
         </div>
     );
+}
+
+function FieldLabel({ label, required = false }) {
+    return (
+        <label className="mb-2 block text-sm font-semibold text-slate-700">
+            {label}
+            {required && <span className="ml-1 text-red-500">*</span>}
+        </label>
+    );
+}
+
+function ErrorMessage({ message }) {
+    if (!message) {
+        return null;
+    }
+
+    return (
+        <p className="mt-2 text-xs font-semibold text-red-500">
+            {message}
+        </p>
+    );
+}
+
+function fieldClass(error, disabled = false) {
+    return `w-full rounded-2xl border px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 ${
+        disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 placeholder:text-slate-400"
+            : error
+            ? "border-red-300 bg-red-50 focus:border-red-500 focus:bg-white focus:ring-4 focus:ring-red-100"
+            : "border-slate-200 bg-slate-50 focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+    }`;
 }
 
 function Input({
@@ -163,12 +151,14 @@ function Input({
     value,
     onChange,
     placeholder,
+    error,
+    disabled = false,
+    inputMode,
+    required = false,
 }) {
     return (
         <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-                {label}
-            </label>
+            <FieldLabel label={label} required={required} />
 
             <input
                 type={type}
@@ -176,38 +166,108 @@ function Input({
                 value={value ?? ""}
                 onChange={onChange}
                 placeholder={placeholder || `Masukkan ${label.toLowerCase()}`}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
+                className={fieldClass(error, disabled)}
+                disabled={disabled}
+                inputMode={inputMode}
+                autoComplete="off"
             />
+
+            <ErrorMessage message={error} />
         </div>
     );
 }
 
-function Select({
+function CheckboxGroup({
     label,
     name,
     value,
     onChange,
     options = [],
+    error,
+    required = false,
+    singleChoice = false,
 }) {
+    const selectedValues = normalizeCheckboxValue(value);
+
+    const handleCheckboxChange = (option) => (event) => {
+        const checked = event.target.checked;
+
+        let nextValues = checked
+            ? [...selectedValues, option]
+            : selectedValues.filter((item) => item !== option);
+
+        if (singleChoice && checked) {
+            nextValues = [option];
+        }
+
+        if (option === "TIDAK BERSEDIA" && checked) {
+            nextValues = ["TIDAK BERSEDIA"];
+        }
+
+        if (option !== "TIDAK BERSEDIA" && checked) {
+            nextValues = nextValues.filter((item) => item !== "TIDAK BERSEDIA");
+        }
+
+        onChange({
+            target: {
+                name,
+                value: nextValues,
+                type: "checkbox-group",
+                checked,
+            },
+        });
+    };
+
     return (
         <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-                {label}
-            </label>
+            <FieldLabel label={label} required={required} />
 
-            <select
-                name={name}
-                value={value ?? ""}
-                onChange={onChange}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100"
-            >
-                <option value="">Pilih {label.toLowerCase()}</option>
-                {options.map((item) => (
-                    <option key={item} value={item}>
-                        {item}
-                    </option>
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                {options.map((option) => (
+                    <label
+                        key={option}
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-semibold transition ${
+                            selectedValues.includes(option)
+                                ? "border-cyan-400 bg-cyan-50 text-cyan-800"
+                                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-cyan-200 hover:bg-cyan-50"
+                        }`}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={selectedValues.includes(option)}
+                            onChange={handleCheckboxChange(option)}
+                            className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                        />
+
+                        <span>{option}</span>
+                    </label>
                 ))}
-            </select>
+            </div>
+
+            <ErrorMessage message={error} />
         </div>
     );
+}
+
+function normalizeCheckboxValue(value) {
+    if (Array.isArray(value)) {
+        return value.filter(Boolean);
+    }
+
+    if (typeof value === "string" && value.trim() !== "") {
+        try {
+            const parsed = JSON.parse(value);
+
+            if (Array.isArray(parsed)) {
+                return parsed.filter(Boolean);
+            }
+        } catch (error) {
+            return value
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+    }
+
+    return [];
 }

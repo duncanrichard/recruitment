@@ -12,6 +12,7 @@ use App\Models\Posisi;
 use App\Models\SumberInformasi;
 use App\Models\StatusPernikahan;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -26,6 +27,13 @@ class DataPelamarController extends Controller
         'perusahaan',
         'sosialMedia',
         'sumberInformasi',
+        'riwayatKeluarga',
+        'saudaraKandung',
+        'saudaraIpar',
+        'riwayatKesehatan',
+        'riwayatKesehatan.opsiKacamata',
+        'riwayatPekerjaan',
+        'kesiapanBekerja',
     ];
 
     public function index()
@@ -35,10 +43,10 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function list()
+    public function list(): JsonResponse
     {
         $data = DataRiwayatDiri::query()
-            ->with($this->relations)
+            ->with($this->safeRelations())
             ->latest()
             ->get()
             ->map(function ($item) {
@@ -53,7 +61,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function posisiList()
+    public function posisiList(): JsonResponse
     {
         $data = Posisi::query()
             ->orderBy('nama_posisi')
@@ -69,7 +77,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function perusahaanList()
+    public function perusahaanList(): JsonResponse
     {
         $data = DataPerusahaan::query()
             ->orderBy('nama_perusahaan')
@@ -85,7 +93,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function sumberInformasiList()
+    public function sumberInformasiList(): JsonResponse
     {
         $data = SumberInformasi::query()
             ->orderBy('informasi')
@@ -100,7 +108,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function pendidikanList()
+    public function pendidikanList(): JsonResponse
     {
         $data = Pendidikan::query()
             ->orderBy('pendidikan')
@@ -112,7 +120,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function agamaList()
+    public function agamaList(): JsonResponse
     {
         $data = Agama::query()
             ->orderBy('agama')
@@ -124,7 +132,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function kewarganegaraanList()
+    public function kewarganegaraanList(): JsonResponse
     {
         $data = Kewarganegaraan::query()
             ->orderBy('kewarganegaraan')
@@ -136,7 +144,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function statusPernikahanList()
+    public function statusPernikahanList(): JsonResponse
     {
         $data = StatusPernikahan::query()
             ->orderBy('status_pernikahan')
@@ -148,13 +156,13 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $this->validatePelamar($request);
 
-        $data = DataRiwayatDiri::create($validated);
+        $data = DataRiwayatDiri::query()->create($validated);
 
-        $freshData = $data->fresh($this->relations);
+        $freshData = $data->fresh($this->safeRelations());
         $freshData->pendaftaran_url = $this->makePendaftaranUrl($freshData->token);
 
         return response()->json([
@@ -166,13 +174,35 @@ class DataPelamarController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(string $id): JsonResponse
     {
         $data = DataRiwayatDiri::query()
-            ->with($this->relations)
+            ->with($this->safeRelations())
             ->findOrFail($id);
 
-        $data->pendaftaran_url = $this->makePendaftaranUrl($data->token);
+        $data = $this->appendExtraData($data);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function detail(string $id)
+    {
+        return view('pages.admin.data-pelamar.detail', [
+            'title' => 'Detail Data Pelamar',
+            'id' => $id,
+        ]);
+    }
+
+    public function detailData(string $id): JsonResponse
+    {
+        $data = DataRiwayatDiri::query()
+            ->with($this->safeRelations())
+            ->findOrFail($id);
+
+        $data = $this->appendExtraData($data);
 
         return response()->json([
             'success' => true,
@@ -183,11 +213,11 @@ class DataPelamarController extends Controller
     public function showByToken(string $token)
     {
         $data = DataRiwayatDiri::query()
-            ->with($this->relations)
+            ->with($this->safeRelations())
             ->where('token', $token)
             ->firstOrFail();
 
-        $data->pendaftaran_url = $this->makePendaftaranUrl($data->token);
+        $data = $this->appendExtraData($data);
 
         return view('pages.pendaftaran.index', [
             'title' => 'Pendaftaran',
@@ -196,7 +226,31 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function update(Request $request, $id)
+    public function findByToken(string $token): JsonResponse
+    {
+        $pelamar = DataRiwayatDiri::query()
+            ->with($this->safeRelations())
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+                'data' => null,
+            ], 404);
+        }
+
+        $pelamar = $this->appendExtraData($pelamar);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data pelamar ditemukan.',
+            'data' => $pelamar,
+        ]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
     {
         $data = DataRiwayatDiri::query()->findOrFail($id);
 
@@ -208,8 +262,8 @@ class DataPelamarController extends Controller
 
         $data->update($validated);
 
-        $freshData = $data->fresh($this->relations);
-        $freshData->pendaftaran_url = $this->makePendaftaranUrl($freshData->token);
+        $freshData = $data->fresh($this->safeRelations());
+        $freshData = $this->appendExtraData($freshData);
 
         return response()->json([
             'success' => true,
@@ -218,7 +272,7 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(string $id): JsonResponse
     {
         $data = DataRiwayatDiri::query()->findOrFail($id);
 
@@ -338,6 +392,18 @@ class DataPelamarController extends Controller
                 'nullable',
                 Rule::in(['active', 'non_active']),
             ],
+        ], [
+            'posisi_yang_dilamar.required' => 'Posisi yang dilamar wajib diisi.',
+            'posisi_yang_dilamar.uuid' => 'Posisi yang dilamar tidak valid.',
+            'posisi_yang_dilamar.exists' => 'Posisi yang dilamar tidak ditemukan.',
+            'perusahaan_dilamar.required' => 'Perusahaan dilamar wajib diisi.',
+            'perusahaan_dilamar.uuid' => 'Perusahaan dilamar tidak valid.',
+            'perusahaan_dilamar.exists' => 'Perusahaan dilamar tidak ditemukan.',
+            'sumber_informasi_id.required' => 'Sumber informasi wajib diisi.',
+            'sumber_informasi_id.uuid' => 'Sumber informasi tidak valid.',
+            'sumber_informasi_id.exists' => 'Sumber informasi tidak ditemukan.',
+            'nama_lengkap.required' => 'Nama lengkap wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
         ]);
     }
 
@@ -351,66 +417,76 @@ class DataPelamarController extends Controller
             'token' => $token,
         ]);
     }
-    public function pendaftaranIndex()
-{
-    return view('pages.pendaftaran.index', [
-        'title' => 'Pendaftaran',
-        'token' => null,
-        'pelamar' => null,
-    ]);
-}
 
-public function pendaftaranShow(string $token)
-{
-    $pelamar = DataRiwayatDiri::query()
-        ->with([
-            'pendidikan',
-            'agama',
-            'kewarganegaraan',
-            'statusPernikahan',
+    private function appendExtraData(DataRiwayatDiri $data): DataRiwayatDiri
+    {
+        $data->pendaftaran_url = $this->makePendaftaranUrl($data->token);
+
+        $data->posisi_label = $this->relationValue($data->posisi, [
+            'nama_posisi',
             'posisi',
+            'nama',
+            'jabatan',
+            'nama_jabatan',
+        ]);
+
+        $data->perusahaan_label = $this->relationValue($data->perusahaan, [
+            'nama_perusahaan',
             'perusahaan',
-            'sosialMedia',
-            'sumberInformasi',
-        ])
-        ->where('token', $token)
-        ->firstOrFail();
+            'nama',
+        ]);
 
-    return view('pages.pendaftaran.index', [
-        'title' => 'Pendaftaran',
-        'token' => $token,
-        'pelamar' => $pelamar,
-    ]);
-}
-
-public function findByToken(string $token)
-{
-    $pelamar = DataRiwayatDiri::query()
-        ->with([
+        $data->pendidikan_label = $this->relationValue($data->pendidikan, [
             'pendidikan',
-            'agama',
-            'kewarganegaraan',
-            'statusPernikahan',
-            'posisi',
-            'perusahaan',
-            'sosialMedia',
-            'sumberInformasi',
-        ])
-        ->where('token', $token)
-        ->first();
+            'nama',
+        ]);
 
-    if (!$pelamar) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Token pelamar tidak ditemukan.',
-            'data' => null,
-        ], 404);
+        $data->agama_label = $this->relationValue($data->agama, [
+            'agama',
+            'nama',
+        ]);
+
+        $data->kewarganegaraan_label = $this->relationValue($data->kewarganegaraan, [
+            'kewarganegaraan',
+            'nama',
+        ]);
+
+        $data->status_pernikahan_label = $this->relationValue($data->statusPernikahan, [
+            'status_pernikahan',
+            'status',
+            'nama',
+        ]);
+
+        $data->sumber_informasi_label = $this->relationValue($data->sumberInformasi, [
+            'informasi',
+            'nama',
+        ]);
+
+        return $data;
     }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Data pelamar ditemukan.',
-        'data' => $pelamar,
-    ]);
-}
+    private function relationValue($relation, array $columns): ?string
+    {
+        if (!$relation) {
+            return null;
+        }
+
+        foreach ($columns as $column) {
+            if (!empty($relation->{$column})) {
+                return (string) $relation->{$column};
+            }
+        }
+
+        return null;
+    }
+
+    private function safeRelations(): array
+    {
+        /*
+         * Jika salah satu relasi belum dibuat di model DataRiwayatDiri,
+         * hapus nama relasinya dari array $relations di atas.
+         * Method ini tetap mengembalikan array relasi utama agar controller rapi.
+         */
+        return $this->relations;
+    }
 }

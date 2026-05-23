@@ -17,3 +17,4 @@ require __DIR__ . '/master_data_status_pernikahan.php';
 require __DIR__ . '/master_data_opsi_kacamata.php';
 require __DIR__ . '/master_data_sumber_informasi.php';
 require __DIR__ . '/master_data_perusahaan.php';
+require __DIR__ . '/jadwal_test_zoom.php';

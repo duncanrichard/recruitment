@@ -6,14 +6,17 @@ use App\Models\DataRiwayatDiri;
 use App\Models\DataRiwayatKeluarga;
 use App\Models\DataRiwayatKesehatan;
 use App\Models\DataRiwayatPekerjaan;
+use App\Models\DataKesiapanBekerja;
 use App\Models\DataSaudaraIpar;
 use App\Models\DataSaudaraKandung;
 use App\Models\OpsiKacamata;
 use App\Models\SosialMedia;
+use App\Models\JadwalTestZoom;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class PendaftaranController extends Controller
@@ -36,6 +39,8 @@ class PendaftaranController extends Controller
                 'riwayatKesehatan',
                 'riwayatKesehatan.opsiKacamata',
                 'riwayatPekerjaan',
+                'kesiapanBekerja',
+                'jadwalTestZoom',
             ]);
     }
 
@@ -79,6 +84,40 @@ class PendaftaranController extends Controller
             'message' => 'Data pelamar ditemukan.',
             'data' => $this->appendPelamarExtraData($pelamar),
         ]);
+    }
+
+
+    public function tahapanByToken(string $token): JsonResponse
+    {
+        $pelamar = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+                'errors' => [
+                    'token' => 'Token pelamar tidak ditemukan.',
+                ],
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tahapan seleksi berhasil ditampilkan.',
+            'data' => $this->buildTahapanPelamar($pelamar),
+        ]);
+    }
+
+    public function cekTahapanByToken(string $token): JsonResponse
+    {
+        return $this->tahapanByToken($token);
+    }
+
+    public function findTahapanByToken(string $token): JsonResponse
+    {
+        return $this->tahapanByToken($token);
     }
 
     public function masterPendidikan(): JsonResponse
@@ -886,18 +925,28 @@ class PendaftaranController extends Controller
             ], 404);
         }
 
+        $tahunMulai = $this->normalizeYearValue($request->input('tahun_mulai_bekerja'));
+        $tahunSelesai = $this->normalizeYearValue($request->input('tahun_selesai_bekerja'));
+
+        $periodeKerjaAwal = $request->input('periode_kerja_awal')
+            ?: $this->yearToDate($tahunMulai);
+
+        $periodeKerjaAkhir = $request->input('periode_kerja_akhir')
+            ?: $this->yearToDate($tahunSelesai);
+
+        $posisiPekerjaan = $request->input('posisi_pekerjaan')
+            ?: $request->input('posisi_pekerjaan_terakhir')
+            ?: null;
+
         $request->merge([
+            'posisi_pekerjaan' => $posisiPekerjaan,
             'posisi_pekerjaan_terakhir' => $request->input('posisi_pekerjaan_terakhir')
-                ?: $request->input('posisi_pekerjaan')
-                ?: null,
-
-            'periode_kerja_awal' => $request->input('periode_kerja_awal')
-                ?: $request->input('tahun_mulai_bekerja')
-                ?: null,
-
-            'periode_kerja_akhir' => $request->input('periode_kerja_akhir')
-                ?: $request->input('tahun_selesai_bekerja')
-                ?: null,
+                ?: $posisiPekerjaan,
+            'tahun_mulai_bekerja' => $tahunMulai,
+            'tahun_selesai_bekerja' => $tahunSelesai,
+            'periode_kerja_awal' => $periodeKerjaAwal,
+            'periode_kerja_akhir' => $periodeKerjaAkhir,
+            'lama_bekerja' => $this->calculateLamaBekerjaFromYear($tahunMulai, $tahunSelesai),
         ]);
 
         $validated = $request->validate([
@@ -906,6 +955,18 @@ class PendaftaranController extends Controller
             'periode_kerja_awal' => ['nullable', 'date'],
             'periode_kerja_akhir' => ['nullable', 'date', 'after_or_equal:periode_kerja_awal'],
             'gaji_terakhir' => ['nullable', 'numeric', 'min:0', 'max:999999999999999999.99'],
+
+            'status_pekerjaan' => ['nullable', 'string', 'max:100'],
+            'posisi_pekerjaan' => ['nullable', 'string', 'max:255'],
+            'bidang_pekerjaan' => ['nullable', 'string', 'max:255'],
+            'lokasi_perusahaan' => ['nullable', 'string', 'max:255'],
+            'tahun_mulai_bekerja' => ['nullable', 'digits:4'],
+            'tahun_selesai_bekerja' => ['nullable', 'digits:4'],
+            'lama_bekerja' => ['nullable', 'string', 'max:100'],
+            'deskripsi_pekerjaan' => ['nullable', 'string'],
+            'alasan_berhenti' => ['nullable', 'string'],
+            'keahlian' => ['nullable', 'string'],
+            'catatan_pekerjaan' => ['nullable', 'string'],
 
             'refrensi_kerja' => ['nullable', 'string', 'max:255'],
             'nama_refrensi' => ['nullable', 'string', 'max:255'],
@@ -918,17 +979,14 @@ class PendaftaranController extends Controller
             'refrensi_kerabat' => ['nullable', 'string', 'max:255'],
             'nama_refrensi_kerabat' => ['nullable', 'string', 'max:255'],
             'telp_refrensi_kerabat' => ['nullable', 'string', 'max:50'],
-
-            // Alias lama dari form sebelumnya. Tetap diterima agar data lama tidak error.
-            'posisi_pekerjaan' => ['nullable', 'string', 'max:255'],
-            'tahun_mulai_bekerja' => ['nullable', 'string', 'max:50'],
-            'tahun_selesai_bekerja' => ['nullable', 'string', 'max:50'],
         ], [
             'periode_kerja_awal.date' => 'Periode kerja awal harus berupa tanggal yang valid.',
             'periode_kerja_akhir.date' => 'Periode kerja akhir harus berupa tanggal yang valid.',
             'periode_kerja_akhir.after_or_equal' => 'Periode kerja akhir tidak boleh lebih kecil dari periode kerja awal.',
             'gaji_terakhir.numeric' => 'Gaji terakhir harus berupa angka.',
             'gaji_terakhir.max' => 'Gaji terakhir terlalu besar.',
+            'tahun_mulai_bekerja.digits' => 'Tahun mulai bekerja harus 4 digit.',
+            'tahun_selesai_bekerja.digits' => 'Tahun selesai bekerja harus 4 digit.',
         ]);
 
         DB::transaction(function () use ($pelamar, $validated) {
@@ -943,29 +1001,40 @@ class PendaftaranController extends Controller
 
             $table = $riwayatPekerjaan->getTable();
 
-            $posisiPekerjaanTerakhir = $validated['posisi_pekerjaan_terakhir']
-                ?? $validated['posisi_pekerjaan']
+            $posisiPekerjaan = $validated['posisi_pekerjaan']
+                ?? $validated['posisi_pekerjaan_terakhir']
                 ?? null;
 
+            $tahunMulai = $validated['tahun_mulai_bekerja'] ?? null;
+            $tahunSelesai = $validated['tahun_selesai_bekerja'] ?? null;
+
             $periodeKerjaAwal = $this->normalizeRiwayatPekerjaanDate(
-                $validated['periode_kerja_awal']
-                    ?? $validated['tahun_mulai_bekerja']
-                    ?? null
+                $validated['periode_kerja_awal'] ?? $this->yearToDate($tahunMulai)
             );
 
             $periodeKerjaAkhir = $this->normalizeRiwayatPekerjaanDate(
-                $validated['periode_kerja_akhir']
-                    ?? $validated['tahun_selesai_bekerja']
-                    ?? null
+                $validated['periode_kerja_akhir'] ?? $this->yearToDate($tahunSelesai)
             );
 
             $data = [
                 'data_riwayat_diri_id' => $pelamar->id,
                 'nama_perusahaan' => $validated['nama_perusahaan'] ?? null,
-                'posisi_pekerjaan_terakhir' => $posisiPekerjaanTerakhir,
+                'posisi_pekerjaan_terakhir' => $posisiPekerjaan,
                 'periode_kerja_awal' => $periodeKerjaAwal,
                 'periode_kerja_akhir' => $periodeKerjaAkhir,
                 'gaji_terakhir' => $this->normalizeDecimalValue($validated['gaji_terakhir'] ?? null),
+
+                'status_pekerjaan' => $validated['status_pekerjaan'] ?? null,
+                'posisi_pekerjaan' => $posisiPekerjaan,
+                'bidang_pekerjaan' => $validated['bidang_pekerjaan'] ?? null,
+                'lokasi_perusahaan' => $validated['lokasi_perusahaan'] ?? null,
+                'tahun_mulai_bekerja' => $tahunMulai,
+                'tahun_selesai_bekerja' => $tahunSelesai,
+                'lama_bekerja' => $this->calculateLamaBekerjaFromYear($tahunMulai, $tahunSelesai),
+                'deskripsi_pekerjaan' => $validated['deskripsi_pekerjaan'] ?? null,
+                'alasan_berhenti' => $validated['alasan_berhenti'] ?? null,
+                'keahlian' => $validated['keahlian'] ?? null,
+                'catatan_pekerjaan' => $validated['catatan_pekerjaan'] ?? null,
 
                 'refrensi_kerja' => $validated['refrensi_kerja'] ?? null,
                 'nama_refrensi' => $validated['nama_refrensi'] ?? null,
@@ -995,6 +1064,167 @@ class PendaftaranController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Riwayat pekerjaan berhasil diperbarui.',
+            'data' => $this->appendPelamarExtraData($pelamar),
+        ]);
+    }
+
+
+    public function updateKesiapanBekerjaByToken(Request $request, string $token): JsonResponse
+    {
+        $pelamar = DataRiwayatDiri::query()
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+            ], 404);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Kesiapan Bekerja - sesuai field tabel terbaru
+        |--------------------------------------------------------------------------
+        | Field yang dipakai:
+        | - kapan_siap_bekerja
+        | - ekpetasi_gaji
+        | - penempatan
+        | - proses_bkhang
+        | - dapat_dipertanggung_jawabkan
+        | - bersedia_training
+        |
+        | Alias dari form lama/React tetap diterima agar tidak memutus frontend.
+        */
+        $kapanSiapBekerja = $this->normalizeKesiapanText(
+            $request->input('kapan_siap_bekerja')
+                ?: $request->input('tanggal_siap_kerja')
+        );
+
+        $expetasiGaji = $this->normalizeKesiapanDecimal(
+            $request->input('ekpetasi_gaji')
+                ?: $request->input('gaji_diharapkan')
+        );
+
+        $penempatan = $this->normalizeKesiapanText(
+            $request->input('penempatan')
+                ?: $request->input('penempatan_luar_jawa_tengah')
+                ?: $request->input('bersedia_ditempatkan')
+        );
+
+        $prosesBkhang = $this->normalizeKesiapanText(
+            $request->input('proses_bkhang')
+                ?: $request->input('background_checking')
+                ?: $request->input('bersedia_shift')
+        );
+
+        $dapatDipertanggungJawabkan = $this->normalizeKesiapanText(
+            $request->input('dapat_dipertanggung_jawabkan')
+                ?: $request->input('pernyataan_data_benar')
+                ?: $request->input('bersedia_lembur')
+        );
+
+        $bersediaTraining = $this->normalizeKesiapanText(
+            $request->input('bersedia_training')
+                ?: $request->input('bersedia_pelatihan')
+        );
+
+        $request->merge([
+            'kapan_siap_bekerja' => $kapanSiapBekerja,
+            'tanggal_siap_kerja' => $kapanSiapBekerja,
+
+            'ekpetasi_gaji' => $expetasiGaji,
+            'gaji_diharapkan' => $expetasiGaji,
+
+            'penempatan' => $penempatan,
+            'penempatan_luar_jawa_tengah' => $penempatan,
+
+            'proses_bkhang' => $prosesBkhang,
+            'background_checking' => $prosesBkhang,
+
+            'dapat_dipertanggung_jawabkan' => $dapatDipertanggungJawabkan,
+            'pernyataan_data_benar' => $dapatDipertanggungJawabkan,
+
+            'bersedia_training' => $bersediaTraining,
+            'bersedia_pelatihan' => $bersediaTraining,
+        ]);
+
+        $validated = $request->validate([
+            'kapan_siap_bekerja' => ['nullable', 'string', 'max:255'],
+            'tanggal_siap_kerja' => ['nullable', 'string', 'max:255'],
+
+            'ekpetasi_gaji' => ['nullable', 'numeric', 'min:0', 'max:999999999999999999.99'],
+            'gaji_diharapkan' => ['nullable', 'numeric', 'min:0', 'max:999999999999999999.99'],
+
+            'penempatan' => ['nullable', 'string'],
+            'penempatan_luar_jawa_tengah' => ['nullable', 'string'],
+
+            'proses_bkhang' => ['nullable', 'string', 'max:255'],
+            'background_checking' => ['nullable', 'string', 'max:255'],
+
+            'dapat_dipertanggung_jawabkan' => ['nullable', 'string', 'max:255'],
+            'pernyataan_data_benar' => ['nullable', 'string', 'max:255'],
+
+            'bersedia_training' => ['nullable', 'string', 'max:255'],
+            'bersedia_pelatihan' => ['nullable', 'string', 'max:255'],
+        ], [
+            'ekpetasi_gaji.numeric' => 'Ekspetasi gaji harus berupa angka.',
+            'gaji_diharapkan.numeric' => 'Ekspetasi gaji harus berupa angka.',
+            'ekpetasi_gaji.max' => 'Ekspetasi gaji terlalu besar.',
+            'gaji_diharapkan.max' => 'Ekspetasi gaji terlalu besar.',
+        ]);
+
+        DB::transaction(function () use ($pelamar, $validated) {
+            $kesiapanBekerja = DataKesiapanBekerja::query()
+                ->where('data_riwayat_diri_id', $pelamar->id)
+                ->first();
+
+            if (!$kesiapanBekerja) {
+                $kesiapanBekerja = new DataKesiapanBekerja();
+                $kesiapanBekerja->data_riwayat_diri_id = $pelamar->id;
+            }
+
+            $table = $kesiapanBekerja->getTable();
+
+            $data = [
+                'data_riwayat_diri_id' => $pelamar->id,
+                'kapan_siap_bekerja' => $validated['kapan_siap_bekerja']
+                    ?? $validated['tanggal_siap_kerja']
+                    ?? null,
+                'ekpetasi_gaji' => $this->normalizeKesiapanDecimal(
+                    $validated['ekpetasi_gaji']
+                        ?? $validated['gaji_diharapkan']
+                        ?? null
+                ),
+                'penempatan' => $validated['penempatan']
+                    ?? $validated['penempatan_luar_jawa_tengah']
+                    ?? null,
+                'proses_bkhang' => $validated['proses_bkhang']
+                    ?? $validated['background_checking']
+                    ?? null,
+                'dapat_dipertanggung_jawabkan' => $validated['dapat_dipertanggung_jawabkan']
+                    ?? $validated['pernyataan_data_benar']
+                    ?? null,
+                'bersedia_training' => $validated['bersedia_training']
+                    ?? $validated['bersedia_pelatihan']
+                    ?? null,
+            ];
+
+            $data = collect($data)
+                ->filter(fn ($value, $column) => Schema::hasColumn($table, $column))
+                ->toArray();
+
+            $kesiapanBekerja->forceFill($data);
+            $kesiapanBekerja->save();
+        });
+
+        $pelamar = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Kesiapan bekerja berhasil diperbarui.',
             'data' => $this->appendPelamarExtraData($pelamar),
         ]);
     }
@@ -1316,6 +1546,183 @@ class PendaftaranController extends Controller
             ->delete();
     }
 
+
+    private function buildTahapanPelamar(DataRiwayatDiri $pelamar): array
+    {
+        $pelamar->loadMissing([
+            'posisi',
+            'perusahaan',
+        ]);
+
+        // Ambil langsung dari tabel jadwal_test_zoom agar halaman tahapan
+        // hanya mengikuti data jadwal test yang benar-benar sudah tersimpan.
+        $jadwalTest = JadwalTestZoom::query()
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->orderByDesc('jadwal')
+            ->first();
+
+        $jadwalTestData = $this->formatJadwalTest($jadwalTest);
+
+        $tahapan = [
+            [
+                'nama' => 'Administrasi',
+                'status' => $jadwalTestData ? 'Lolos' : 'Proses',
+                'keterangan' => $jadwalTestData
+                    ? 'Tahap Administrasi sudah selesai.'
+                    : 'Kandidat sedang berada pada tahap Administrasi.',
+                'saran' => $jadwalTestData
+                    ? null
+                    : 'Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.',
+            ],
+        ];
+
+        if ($jadwalTestData) {
+            $tahapan[] = [
+                'nama' => 'Jadwal Test',
+                'status' => 'Terjadwal',
+                'keterangan' => 'Jadwal test kandidat sudah tersedia.',
+                'saran' => 'Silakan mengikuti test sesuai jadwal yang sudah ditentukan.',
+                'jadwal_test' => $jadwalTestData,
+            ];
+        }
+
+        return [
+            'status' => $jadwalTestData
+                ? 'Jadwal Test Tersedia'
+                : 'Administrasi',
+
+            'keterangan' => $jadwalTestData
+                ? 'Kandidat sudah mendapatkan jadwal test.'
+                : 'Status seleksi kandidat saat ini berada pada tahap Administrasi.',
+
+            'saran' => $jadwalTestData
+                ? 'Silakan mengikuti test sesuai jadwal yang sudah ditentukan.'
+                : 'Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.',
+
+            'tahapan_terakhir' => $jadwalTestData
+                ? 'Jadwal Test'
+                : 'Administrasi',
+
+            'nama_pelamar' => $pelamar->nama_lengkap ?? '-',
+
+            'posisi_dilamar' => $this->getLabelRelasi(
+                $pelamar->posisi,
+                [
+                    'nama_posisi',
+                    'posisi',
+                    'nama_posisi_dilamar',
+                    'posisi_dilamar',
+                    'jabatan',
+                    'nama_jabatan',
+                    'nama',
+                ],
+                $pelamar->posisi_yang_dilamar ?? null
+            ),
+
+            'perusahaan_dilamar' => $this->getLabelRelasi(
+                $pelamar->perusahaan,
+                [
+                    'nama_perusahaan',
+                    'perusahaan',
+                    'nama',
+                ],
+                $pelamar->perusahaan_dilamar ?? null
+            ),
+
+            'token' => $pelamar->token,
+            'jadwal_test' => $jadwalTestData,
+            'tahapan' => $tahapan,
+        ];
+    }
+
+    private function makeTahapanItem(
+        string $nama,
+        bool $selesai,
+        string $keteranganSelesai,
+        string $keteranganBelum,
+        ?string $saranBelum = null
+    ): array {
+        return [
+            'nama' => $nama,
+            'status' => $selesai ? 'Lolos' : 'Menunggu',
+            'keterangan' => $selesai ? $keteranganSelesai : $keteranganBelum,
+            'saran' => $selesai ? null : $saranBelum,
+        ];
+    }
+
+    private function isDataDiriLengkapUntukTahapan(DataRiwayatDiri $pelamar): bool
+    {
+        return !empty($pelamar->nama_lengkap)
+            && !empty($pelamar->nama_panggil)
+            && !empty($pelamar->email)
+            && !empty($pelamar->no_wa)
+            && !empty($pelamar->pendidikan_id)
+            && !empty($pelamar->agama_id)
+            && !empty($pelamar->tanggal_lahir)
+            && !empty($pelamar->alamat_ktp)
+            && !empty($pelamar->alamat_domisili);
+    }
+
+    private function formatJadwalTest($jadwalTest): ?array
+    {
+        if (!$jadwalTest || empty($jadwalTest->jadwal)) {
+            return null;
+        }
+
+        $jadwal = $jadwalTest->jadwal instanceof Carbon
+            ? $jadwalTest->jadwal
+            : Carbon::parse($jadwalTest->jadwal);
+
+        $table = $jadwalTest->getTable();
+        $kehadiran = null;
+
+        if (Schema::hasColumn($table, 'kehadiran')) {
+            $kehadiran = $this->normalizeKehadiranValue($jadwalTest->kehadiran ?? null);
+        }
+
+        return [
+            'id' => $jadwalTest->id ?? null,
+            'jadwal' => $jadwal->toDateTimeString(),
+            'tanggal' => $jadwal->translatedFormat('d F Y'),
+            'jam' => $jadwal->format('H:i'),
+            'kehadiran' => $kehadiran,
+            'sudah_mengisi_kehadiran' => !empty($kehadiran),
+        ];
+    }
+
+    private function normalizeKehadiranValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        if (in_array($normalized, ['hadir', '1', 'true', 'ya', 'yes'], true)) {
+            return 'hadir';
+        }
+
+        if (in_array($normalized, ['tidak_hadir', 'tidakhadir', 'tidak', '0', 'false', 'no'], true)) {
+            return 'tidak_hadir';
+        }
+
+        return null;
+    }
+
+    private function getLabelRelasi($model, array $columns, ?string $fallback = null): string
+    {
+        if ($model) {
+            foreach ($columns as $column) {
+                if (!empty($model->{$column})) {
+                    return (string) $model->{$column};
+                }
+            }
+        }
+
+        return $fallback ?: '-';
+    }
+
     private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
     {
         if (!$pelamar) {
@@ -1326,6 +1733,8 @@ class PendaftaranController extends Controller
         $this->appendRiwayatKeluargaData($pelamar);
         $this->appendRiwayatKesehatanData($pelamar);
         $this->appendRiwayatPekerjaanData($pelamar);
+        $this->appendKesiapanBekerjaData($pelamar);
+        $pelamar->setAttribute('tahapan_seleksi', $this->buildTahapanPelamar($pelamar));
 
         return $pelamar;
     }
@@ -1537,6 +1946,19 @@ class PendaftaranController extends Controller
             'periode_kerja_awal',
             'periode_kerja_akhir',
             'gaji_terakhir',
+
+            'status_pekerjaan',
+            'posisi_pekerjaan',
+            'bidang_pekerjaan',
+            'lokasi_perusahaan',
+            'tahun_mulai_bekerja',
+            'tahun_selesai_bekerja',
+            'lama_bekerja',
+            'deskripsi_pekerjaan',
+            'alasan_berhenti',
+            'keahlian',
+            'catatan_pekerjaan',
+
             'refrensi_kerja',
             'nama_refrensi',
             'telp_refrensi',
@@ -1552,23 +1974,74 @@ class PendaftaranController extends Controller
             }
         }
 
-        // Alias untuk kompatibilitas dengan form lama / state React lama.
-        if (!empty($pekerjaan->posisi_pekerjaan_terakhir)) {
+        if (empty($pelamar->posisi_pekerjaan) && !empty($pekerjaan->posisi_pekerjaan_terakhir)) {
             $pelamar->setAttribute('posisi_pekerjaan', $pekerjaan->posisi_pekerjaan_terakhir);
         }
 
-        if (!empty($pekerjaan->periode_kerja_awal)) {
+        if (empty($pelamar->posisi_pekerjaan_terakhir) && !empty($pekerjaan->posisi_pekerjaan)) {
+            $pelamar->setAttribute('posisi_pekerjaan_terakhir', $pekerjaan->posisi_pekerjaan);
+        }
+
+        if (empty($pelamar->tahun_mulai_bekerja) && !empty($pekerjaan->periode_kerja_awal)) {
             $pelamar->setAttribute('tahun_mulai_bekerja', $this->dateToYear($pekerjaan->periode_kerja_awal));
         }
 
-        if (!empty($pekerjaan->periode_kerja_akhir)) {
+        if (empty($pelamar->tahun_selesai_bekerja) && !empty($pekerjaan->periode_kerja_akhir)) {
             $pelamar->setAttribute('tahun_selesai_bekerja', $this->dateToYear($pekerjaan->periode_kerja_akhir));
         }
 
-        $pelamar->setAttribute(
-            'lama_bekerja',
-            $this->calculateLamaBekerja($pekerjaan->periode_kerja_awal ?? null, $pekerjaan->periode_kerja_akhir ?? null)
-        );
+        if (empty($pelamar->lama_bekerja)) {
+            $pelamar->setAttribute(
+                'lama_bekerja',
+                $this->calculateLamaBekerjaFromYear(
+                    $pelamar->tahun_mulai_bekerja ?? null,
+                    $pelamar->tahun_selesai_bekerja ?? null
+                )
+            );
+        }
+
+        return $pelamar;
+    }
+
+
+    private function appendKesiapanBekerjaData(DataRiwayatDiri $pelamar): DataRiwayatDiri
+    {
+        if (!Schema::hasTable('data_kesiapan_bekerja')) {
+            return $pelamar;
+        }
+
+        $kesiapan = DataKesiapanBekerja::query()
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->first();
+
+        if (!$kesiapan) {
+            return $pelamar;
+        }
+
+        foreach ([
+            'kapan_siap_bekerja',
+            'ekpetasi_gaji',
+            'penempatan',
+            'proses_bkhang',
+            'dapat_dipertanggung_jawabkan',
+            'bersedia_training',
+        ] as $column) {
+            if ($kesiapan->{$column} !== null) {
+                $pelamar->setAttribute($column, $kesiapan->{$column});
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Alias untuk kompatibilitas form React sebelumnya
+        |--------------------------------------------------------------------------
+        */
+        $pelamar->setAttribute('tanggal_siap_kerja', $kesiapan->kapan_siap_bekerja);
+        $pelamar->setAttribute('gaji_diharapkan', $kesiapan->ekpetasi_gaji);
+        $pelamar->setAttribute('penempatan_luar_jawa_tengah', $this->normalizeArrayInput($kesiapan->penempatan));
+        $pelamar->setAttribute('background_checking', $kesiapan->proses_bkhang);
+        $pelamar->setAttribute('pernyataan_data_benar', $kesiapan->dapat_dipertanggung_jawabkan);
+        $pelamar->setAttribute('bersedia_pelatihan', $kesiapan->bersedia_training);
 
         return $pelamar;
     }
@@ -2159,7 +2632,272 @@ class PendaftaranController extends Controller
     }
 
 
-    private function normalizeYearToDate(?string $value): ?string
+
+    private function resolvePosisiDilamarIdForKesiapan(?string $value = null, ?DataRiwayatDiri $pelamar = null): ?string
+    {
+        $value = trim((string) ($value ?: ''));
+
+        if ($value !== '') {
+            foreach ($this->tablesFor([\App\Models\Posisi::class], [
+                'posisi',
+                'data_posisi',
+                'master_data_posisi',
+                'master_posisi',
+            ]) as $table) {
+                if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+                    continue;
+                }
+
+                $query = DB::table($table)
+                    ->where('id', $value);
+
+                if (Schema::hasColumn($table, 'deleted_at')) {
+                    $query->whereNull('deleted_at');
+                }
+
+                if ($query->exists()) {
+                    return $value;
+                }
+            }
+
+            $posisiId = $this->findMasterId(
+                $this->tablesFor([\App\Models\Posisi::class], [
+                    'posisi',
+                    'data_posisi',
+                    'master_data_posisi',
+                    'master_posisi',
+                ]),
+                [
+                    'nama_posisi',
+                    'posisi',
+                    'nama_posisi_dilamar',
+                    'posisi_dilamar',
+                    'jabatan',
+                    'nama_jabatan',
+                    'nama',
+                    'kode_posisi',
+                ],
+                $value
+            );
+
+            if ($posisiId) {
+                return $posisiId;
+            }
+        }
+
+        $fallbackId = $pelamar
+            ? (
+                $pelamar->posisi_dilamar
+                ?? $pelamar->posisi_yang_dilamar
+                ?? null
+            )
+            : null;
+
+        return $fallbackId ? (string) $fallbackId : null;
+    }
+
+    
+    private function resolvePosisiDilamarForKesiapan(?string $value = null, ?DataRiwayatDiri $pelamar = null): ?string
+    {
+        return $this->resolvePosisiDilamarIdForKesiapan($value, $pelamar);
+    }
+
+private function getPosisiLabelById(?string $posisiId): ?string
+    {
+        if (!$posisiId) {
+            return null;
+        }
+
+        foreach ($this->tablesFor([\App\Models\Posisi::class], [
+            'posisi',
+            'data_posisi',
+            'master_data_posisi',
+            'master_posisi',
+        ]) as $table) {
+            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+                continue;
+            }
+
+            foreach ([
+                'nama_posisi',
+                'posisi',
+                'nama_posisi_dilamar',
+                'posisi_dilamar',
+                'jabatan',
+                'nama_jabatan',
+                'nama',
+            ] as $column) {
+                if (!Schema::hasColumn($table, $column)) {
+                    continue;
+                }
+
+                $query = DB::table($table)
+                    ->where('id', $posisiId);
+
+                if (Schema::hasColumn($table, 'deleted_at')) {
+                    $query->whereNull('deleted_at');
+                }
+
+                $label = $query->value($column);
+
+                if ($label !== null && trim((string) $label) !== '') {
+                    return (string) $label;
+                }
+            }
+        }
+
+        return null;
+    }
+
+
+    private function normalizeKesiapanText($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        if (is_array($value)) {
+            $value = collect($value)
+                ->flatten()
+                ->map(fn ($item) => trim((string) $item))
+                ->filter()
+                ->unique()
+                ->values()
+                ->implode(', ');
+
+            return $value !== '' ? $value : null;
+        }
+
+        $stringValue = trim((string) $value);
+
+        if ($stringValue === '') {
+            return null;
+        }
+
+        $decoded = json_decode($stringValue, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $this->normalizeKesiapanText($decoded);
+        }
+
+        return $stringValue;
+    }
+
+    private function normalizeKesiapanDecimal($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $value = preg_replace('/[^0-9,.]/', '', $value);
+
+        if ($value === '' || $value === '.' || $value === ',') {
+            return null;
+        }
+
+        $hasComma = str_contains($value, ',');
+        $hasDot = str_contains($value, '.');
+
+        if ($hasComma && $hasDot) {
+            $lastComma = strrpos($value, ',');
+            $lastDot = strrpos($value, '.');
+
+            if ($lastComma > $lastDot) {
+                $value = str_replace('.', '', $value);
+                $value = str_replace(',', '.', $value);
+            } else {
+                $value = str_replace(',', '', $value);
+            }
+        } elseif ($hasComma) {
+            $parts = explode(',', $value);
+            $lastPart = end($parts);
+
+            if (strlen($lastPart) <= 2 && count($parts) === 2) {
+                $value = str_replace(',', '.', $value);
+            } else {
+                $value = str_replace(',', '', $value);
+            }
+        } elseif ($hasDot) {
+            $parts = explode('.', $value);
+            $lastPart = end($parts);
+
+            if (!(strlen($lastPart) <= 2 && count($parts) === 2)) {
+                $value = str_replace('.', '', $value);
+            }
+        }
+
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $maxValue = 999999999999999999.99;
+        $numericValue = (float) $value;
+
+        if ($numericValue > $maxValue) {
+            $numericValue = $maxValue;
+        }
+
+        return number_format($numericValue, 2, '.', '');
+    }
+
+    private function normalizeKesiapanDate($value): ?string
+    {
+        return $this->normalizeKesiapanText($value);
+    }
+
+    private function normalizeYearValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $year = preg_replace('/\D/', '', (string) $value);
+        $year = substr($year, 0, 4);
+
+        return strlen($year) === 4 ? $year : null;
+    }
+
+    private function yearToDate(?string $year): ?string
+    {
+        if (!$year || !preg_match('/^\d{4}$/', $year)) {
+            return null;
+        }
+
+        return $year . '-01-01';
+    }
+
+    private function calculateLamaBekerjaFromYear(?string $tahunMulai, ?string $tahunSelesai): ?string
+    {
+        if (
+            !$tahunMulai ||
+            !$tahunSelesai ||
+            !preg_match('/^\d{4}$/', $tahunMulai) ||
+            !preg_match('/^\d{4}$/', $tahunSelesai)
+        ) {
+            return null;
+        }
+
+        $mulai = (int) $tahunMulai;
+        $selesai = (int) $tahunSelesai;
+
+        if ($selesai < $mulai) {
+            return null;
+        }
+
+        return (string) ($selesai - $mulai);
+    }
+
+        private function normalizeYearToDate(?string $value): ?string
     {
         return $this->normalizeRiwayatPekerjaanDate($value);
     }
@@ -2238,24 +2976,10 @@ class PendaftaranController extends Controller
 
     private function calculateLamaBekerja($startDate, $endDate): ?string
     {
-        $startYear = $this->dateToYear($startDate);
-        $endYear = $this->dateToYear($endDate);
-
-        if (!$startYear || !$endYear) {
-            return null;
-        }
-
-        $years = (int) $endYear - (int) $startYear;
-
-        if ($years < 0) {
-            return null;
-        }
-
-        if ($years === 0) {
-            return 'Kurang dari 1 tahun';
-        }
-
-        return $years . ' tahun';
+        return $this->calculateLamaBekerjaFromYear(
+            $this->dateToYear($startDate),
+            $this->dateToYear($endDate)
+        );
     }
 
     private function tablesFor(array $modelClasses, array $fallbackTables): array
@@ -2348,5 +3072,96 @@ class PendaftaranController extends Controller
         }
 
         return null;
+    }
+    public function updateKehadiranJadwalTest(Request $request, string $token, string $jadwalTest): JsonResponse
+    {
+        $pelamar = DataRiwayatDiri::query()
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+            ], 404);
+        }
+
+        if (!Schema::hasColumn('jadwal_test_zoom', 'kehadiran')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom kehadiran belum ada di tabel jadwal_test_zoom. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        $validated = $request->validate([
+            'kehadiran' => ['required', 'string', 'in:hadir,tidak_hadir'],
+        ], [
+            'kehadiran.required' => 'Pilihan kehadiran wajib diisi.',
+            'kehadiran.in' => 'Pilihan kehadiran harus Hadir atau Tidak Hadir.',
+        ]);
+
+        $jadwal = JadwalTestZoom::query()
+            ->where('id', $jadwalTest)
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->first();
+
+        if (!$jadwal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal test tidak ditemukan.',
+            ], 404);
+        }
+
+        if (empty($jadwal->jadwal)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tanggal jadwal test belum tersedia.',
+                'data' => $this->buildTahapanPelamar($pelamar),
+            ], 422);
+        }
+
+        $jadwalCarbon = $jadwal->jadwal instanceof Carbon
+            ? $jadwal->jadwal
+            : Carbon::parse($jadwal->jadwal);
+
+        if (!$jadwalCarbon->isToday()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kehadiran hanya dapat diisi pada tanggal jadwal test.',
+                'data' => $this->buildTahapanPelamar($pelamar),
+            ], 422);
+        }
+
+        $kehadiranLama = $this->normalizeKehadiranValue($jadwal->kehadiran ?? null);
+
+        if (!empty($kehadiranLama)) {
+            $pelamarTerbaru = $this->pelamarQuery()
+                ->where('token', $token)
+                ->first();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Status kehadiran sudah tersimpan dan tidak dapat diubah.',
+                'data' => $this->buildTahapanPelamar($pelamarTerbaru),
+            ], 409);
+        }
+
+        $jadwal->forceFill([
+            'kehadiran' => $validated['kehadiran'],
+        ]);
+
+        $jadwal->save();
+
+        $pelamarTerbaru = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => $validated['kehadiran'] === 'hadir'
+                ? 'Kehadiran berhasil disimpan: Hadir.'
+                : 'Kehadiran berhasil disimpan: Tidak Hadir.',
+            'data' => $this->buildTahapanPelamar($pelamarTerbaru),
+        ]);
     }
 }
