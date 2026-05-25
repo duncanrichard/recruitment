@@ -981,47 +981,7 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
                         </div>
                     )}
 
-                    {hasilTestMmpi && (
-                        <div
-                            className={`mt-4 rounded-2xl border p-4 ${
-                                hasilTestMmpi === "lolos"
-                                    ? "border-emerald-200 bg-emerald-50"
-                                    : "border-red-200 bg-red-50"
-                            }`}
-                        >
-                            <p
-                                className={`text-xs font-bold uppercase tracking-wide ${
-                                    hasilTestMmpi === "lolos"
-                                        ? "text-emerald-700"
-                                        : "text-red-700"
-                                }`}
-                            >
-                                Hasil Seleksi Test MMPI
-                            </p>
-
-                            <p
-                                className={`mt-1 text-lg font-black ${
-                                    hasilTestMmpi === "lolos"
-                                        ? "text-emerald-700"
-                                        : "text-red-700"
-                                }`}
-                            >
-                                {hasilTestMmpi === "lolos" ? "Lolos" : "Gagal"}
-                            </p>
-
-                            <p
-                                className={`mt-2 text-sm font-semibold ${
-                                    hasilTestMmpi === "lolos"
-                                        ? "text-emerald-800"
-                                        : "text-red-800"
-                                }`}
-                            >
-                                {hasilTestMmpi === "lolos"
-                                    ? "Selamat, Anda dinyatakan lolos pada seleksi Test MMPI."
-                                    : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi Test MMPI."}
-                            </p>
-                        </div>
-                    )}
+                    
 
                     {!bolehIsiKehadiran && !sudahMengisiKehadiran && (
                         <p className="mt-4 text-sm font-semibold text-indigo-700">
