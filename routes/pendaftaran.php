@@ -1,11 +1,12 @@
 <?php
 
 use App\Http\Controllers\PendaftaranController;
+use App\Http\Controllers\CekTahapanPelamarController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Master Data
+| Master Data Pendaftaran
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/api/master/pendaftaran', [PendaftaranController::class, 'masterPendaftaran'])
@@ -36,7 +37,7 @@ Route::get('/pendaftaran/api/wilayah/villages/{district_code}', [PendaftaranCont
 
 /*
 |--------------------------------------------------------------------------
-| API Token Pelamar
+| API Token Pendaftaran
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'findByToken'])
@@ -44,24 +45,28 @@ Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'fin
 
 /*
 |--------------------------------------------------------------------------
-| API Tahapan Seleksi
+| API Cek Tahapan Pelamar
 |--------------------------------------------------------------------------
 */
-Route::get('/pendaftaran/api/token/{token}/tahapan', [PendaftaranController::class, 'tahapanByToken'])
+Route::get('/pendaftaran/api/token/{token}/tahapan', [CekTahapanPelamarController::class, 'tahapanByToken'])
     ->name('pendaftaran.api.token.tahapan');
 
-Route::get('/pendaftaran/api/token/{token}/cek-tahapan', [PendaftaranController::class, 'cekTahapanByToken'])
+Route::get('/pendaftaran/api/token/{token}/cek-tahapan', [CekTahapanPelamarController::class, 'cekTahapanByToken'])
     ->name('pendaftaran.api.token.cek-tahapan');
 
-/*
-|--------------------------------------------------------------------------
-| API Kehadiran Jadwal Test
-|--------------------------------------------------------------------------
-| WAJIB di atas /pendaftaran/{token}
-|--------------------------------------------------------------------------
-*/
-Route::patch('/pendaftaran/api/token/{token}/jadwal-test/{jadwalTest}/kehadiran', [PendaftaranController::class, 'updateKehadiranJadwalTest'])
+Route::patch(
+    '/pendaftaran/api/token/{token}/jadwal-test/{jadwalTest}/kehadiran',
+    [CekTahapanPelamarController::class, 'updateKehadiranJadwalTest']
+)
+    ->whereUuid('jadwalTest')
     ->name('pendaftaran.api.token.jadwal-test.kehadiran');
+
+Route::patch(
+    '/pendaftaran/api/token/{token}/jadwal-test-mmpi/{jadwalTestMmpi}/kehadiran',
+    [CekTahapanPelamarController::class, 'updateKehadiranJadwalTestMmpi']
+)
+    ->whereUuid('jadwalTestMmpi')
+    ->name('pendaftaran.api.token.jadwal-test-mmpi.kehadiran');
 
 /*
 |--------------------------------------------------------------------------
@@ -133,20 +138,20 @@ Route::get('/pendaftaran', [PendaftaranController::class, 'index'])
 
 /*
 |--------------------------------------------------------------------------
-| Halaman Cek Tahapan
+| Halaman Cek Tahapan Pelamar
 |--------------------------------------------------------------------------
 */
-Route::get('/pendaftaran/{token}/cek-tahapan', [PendaftaranController::class, 'cekTahapanByToken'])
+Route::get('/pendaftaran/{token}/cek-tahapan', [CekTahapanPelamarController::class, 'show'])
     ->name('pendaftaran.cek-tahapan');
 
-Route::get('/pendaftaran/{token}/tahapan', [PendaftaranController::class, 'tahapanByToken'])
+Route::get('/pendaftaran/{token}/tahapan', [CekTahapanPelamarController::class, 'show'])
     ->name('pendaftaran.tahapan');
 
 /*
 |--------------------------------------------------------------------------
 | Route Token Pendaftaran
 |--------------------------------------------------------------------------
-| Route ini wajib paling bawah.
+| Route ini wajib paling bawah supaya tidak menangkap route lain.
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/{token}', [PendaftaranController::class, 'show'])

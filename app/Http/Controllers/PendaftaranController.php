@@ -11,7 +11,6 @@ use App\Models\DataSaudaraIpar;
 use App\Models\DataSaudaraKandung;
 use App\Models\OpsiKacamata;
 use App\Models\SosialMedia;
-use App\Models\JadwalTestZoom;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -87,40 +86,7 @@ class PendaftaranController extends Controller
     }
 
 
-    public function tahapanByToken(string $token): JsonResponse
-    {
-        $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
-            ->first();
-
-        if (!$pelamar) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token pelamar tidak ditemukan.',
-                'errors' => [
-                    'token' => 'Token pelamar tidak ditemukan.',
-                ],
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Tahapan seleksi berhasil ditampilkan.',
-            'data' => $this->buildTahapanPelamar($pelamar),
-        ]);
-    }
-
-    public function cekTahapanByToken(string $token): JsonResponse
-    {
-        return $this->tahapanByToken($token);
-    }
-
-    public function findTahapanByToken(string $token): JsonResponse
-    {
-        return $this->tahapanByToken($token);
-    }
-
-    public function masterPendidikan(): JsonResponse
+public function masterPendidikan(): JsonResponse
     {
         if (!Schema::hasTable('pendidikan')) {
             return response()->json([
@@ -220,11 +186,7 @@ class PendaftaranController extends Controller
                     ['Laki-laki', 'Perempuan']
                 ),
 
-                'str_aktif' => $this->getColumnOptions(
-                    'data_riwayat_diri',
-                    'str_aktif',
-                    ['Ya', 'Tidak']
-                ),
+                'str_aktif' => $this->getStrAktifOptions(),
 
                 'sosial_media' => $this->getHardcodedSosialMediaPlatforms(),
 
@@ -250,6 +212,8 @@ class PendaftaranController extends Controller
         }
 
         $request->merge([
+            'str_aktif' => $this->normalizeStrAktif($request->input('str_aktif')),
+
             'alamat_domisili' => $request->input('alamat_domisili')
                 ?: $request->input('alamat')
                 ?: null,
@@ -313,7 +277,7 @@ class PendaftaranController extends Controller
             'status_perkawinan' => ['nullable', 'string', 'max:255'],
 
             'kewarganegaraan' => ['nullable', 'string', 'max:255'],
-            'str_aktif' => [$wajibStr ? 'required' : 'nullable', 'string', 'max:20'],
+            'str_aktif' => [$wajibStr ? 'required' : 'nullable', 'string', 'max:255'],
 
             'alamat' => ['nullable', 'string'],
             'alamat_ktp' => ['required', 'string'],
@@ -1547,183 +1511,7 @@ class PendaftaranController extends Controller
     }
 
 
-    private function buildTahapanPelamar(DataRiwayatDiri $pelamar): array
-    {
-        $pelamar->loadMissing([
-            'posisi',
-            'perusahaan',
-        ]);
-
-        // Ambil langsung dari tabel jadwal_test_zoom agar halaman tahapan
-        // hanya mengikuti data jadwal test yang benar-benar sudah tersimpan.
-        $jadwalTest = JadwalTestZoom::query()
-            ->where('data_riwayat_diri_id', $pelamar->id)
-            ->orderByDesc('jadwal')
-            ->first();
-
-        $jadwalTestData = $this->formatJadwalTest($jadwalTest);
-
-        $tahapan = [
-            [
-                'nama' => 'Administrasi',
-                'status' => $jadwalTestData ? 'Lolos' : 'Proses',
-                'keterangan' => $jadwalTestData
-                    ? 'Tahap Administrasi sudah selesai.'
-                    : 'Kandidat sedang berada pada tahap Administrasi.',
-                'saran' => $jadwalTestData
-                    ? null
-                    : 'Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.',
-            ],
-        ];
-
-        if ($jadwalTestData) {
-            $tahapan[] = [
-                'nama' => 'Jadwal Test',
-                'status' => 'Terjadwal',
-                'keterangan' => 'Jadwal test kandidat sudah tersedia.',
-                'saran' => 'Silakan mengikuti test sesuai jadwal yang sudah ditentukan.',
-                'jadwal_test' => $jadwalTestData,
-            ];
-        }
-
-        return [
-            'status' => $jadwalTestData
-                ? 'Jadwal Test Tersedia'
-                : 'Administrasi',
-
-            'keterangan' => $jadwalTestData
-                ? 'Kandidat sudah mendapatkan jadwal test.'
-                : 'Status seleksi kandidat saat ini berada pada tahap Administrasi.',
-
-            'saran' => $jadwalTestData
-                ? 'Silakan mengikuti test sesuai jadwal yang sudah ditentukan.'
-                : 'Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.',
-
-            'tahapan_terakhir' => $jadwalTestData
-                ? 'Jadwal Test'
-                : 'Administrasi',
-
-            'nama_pelamar' => $pelamar->nama_lengkap ?? '-',
-
-            'posisi_dilamar' => $this->getLabelRelasi(
-                $pelamar->posisi,
-                [
-                    'nama_posisi',
-                    'posisi',
-                    'nama_posisi_dilamar',
-                    'posisi_dilamar',
-                    'jabatan',
-                    'nama_jabatan',
-                    'nama',
-                ],
-                $pelamar->posisi_yang_dilamar ?? null
-            ),
-
-            'perusahaan_dilamar' => $this->getLabelRelasi(
-                $pelamar->perusahaan,
-                [
-                    'nama_perusahaan',
-                    'perusahaan',
-                    'nama',
-                ],
-                $pelamar->perusahaan_dilamar ?? null
-            ),
-
-            'token' => $pelamar->token,
-            'jadwal_test' => $jadwalTestData,
-            'tahapan' => $tahapan,
-        ];
-    }
-
-    private function makeTahapanItem(
-        string $nama,
-        bool $selesai,
-        string $keteranganSelesai,
-        string $keteranganBelum,
-        ?string $saranBelum = null
-    ): array {
-        return [
-            'nama' => $nama,
-            'status' => $selesai ? 'Lolos' : 'Menunggu',
-            'keterangan' => $selesai ? $keteranganSelesai : $keteranganBelum,
-            'saran' => $selesai ? null : $saranBelum,
-        ];
-    }
-
-    private function isDataDiriLengkapUntukTahapan(DataRiwayatDiri $pelamar): bool
-    {
-        return !empty($pelamar->nama_lengkap)
-            && !empty($pelamar->nama_panggil)
-            && !empty($pelamar->email)
-            && !empty($pelamar->no_wa)
-            && !empty($pelamar->pendidikan_id)
-            && !empty($pelamar->agama_id)
-            && !empty($pelamar->tanggal_lahir)
-            && !empty($pelamar->alamat_ktp)
-            && !empty($pelamar->alamat_domisili);
-    }
-
-    private function formatJadwalTest($jadwalTest): ?array
-    {
-        if (!$jadwalTest || empty($jadwalTest->jadwal)) {
-            return null;
-        }
-
-        $jadwal = $jadwalTest->jadwal instanceof Carbon
-            ? $jadwalTest->jadwal
-            : Carbon::parse($jadwalTest->jadwal);
-
-        $table = $jadwalTest->getTable();
-        $kehadiran = null;
-
-        if (Schema::hasColumn($table, 'kehadiran')) {
-            $kehadiran = $this->normalizeKehadiranValue($jadwalTest->kehadiran ?? null);
-        }
-
-        return [
-            'id' => $jadwalTest->id ?? null,
-            'jadwal' => $jadwal->toDateTimeString(),
-            'tanggal' => $jadwal->translatedFormat('d F Y'),
-            'jam' => $jadwal->format('H:i'),
-            'kehadiran' => $kehadiran,
-            'sudah_mengisi_kehadiran' => !empty($kehadiran),
-        ];
-    }
-
-    private function normalizeKehadiranValue($value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $normalized = strtolower(trim((string) $value));
-        $normalized = str_replace([' ', '-'], '_', $normalized);
-
-        if (in_array($normalized, ['hadir', '1', 'true', 'ya', 'yes'], true)) {
-            return 'hadir';
-        }
-
-        if (in_array($normalized, ['tidak_hadir', 'tidakhadir', 'tidak', '0', 'false', 'no'], true)) {
-            return 'tidak_hadir';
-        }
-
-        return null;
-    }
-
-    private function getLabelRelasi($model, array $columns, ?string $fallback = null): string
-    {
-        if ($model) {
-            foreach ($columns as $column) {
-                if (!empty($model->{$column})) {
-                    return (string) $model->{$column};
-                }
-            }
-        }
-
-        return $fallback ?: '-';
-    }
-
-    private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
+private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
     {
         if (!$pelamar) {
             return null;
@@ -1734,7 +1522,6 @@ class PendaftaranController extends Controller
         $this->appendRiwayatKesehatanData($pelamar);
         $this->appendRiwayatPekerjaanData($pelamar);
         $this->appendKesiapanBekerjaData($pelamar);
-        $pelamar->setAttribute('tahapan_seleksi', $this->buildTahapanPelamar($pelamar));
 
         return $pelamar;
     }
@@ -2044,6 +1831,86 @@ class PendaftaranController extends Controller
         $pelamar->setAttribute('bersedia_pelatihan', $kesiapan->bersedia_training);
 
         return $pelamar;
+    }
+
+    private function normalizeStrAktif($value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $normalized = $this->normalizeForMasterSearch($value);
+
+        return match ($normalized) {
+            'active', 'aktif', 'ya', 'yes', 'y', 'true', '1', 'ada' => 'active',
+            'nonactive', 'inactive', 'nonaktif', 'tidak', 'no', 'n', 'false', '0', 'tidakada', 'none' => 'non_active',
+            default => null,
+        };
+    }
+
+    private function getStrAktifOptions(): array
+    {
+        return [
+            [
+                'id' => 'active',
+                'value' => 'active',
+                'label' => 'Ya',
+            ],
+            [
+                'id' => 'non_active',
+                'value' => 'non_active',
+                'label' => 'Tidak',
+            ],
+        ];
+    }
+
+    private function getStrAktifAllowedValues(): array
+    {
+        if (config('database.default') !== 'pgsql') {
+            return [];
+        }
+
+        try {
+            $row = DB::selectOne(
+                "SELECT pg_get_constraintdef(oid) AS definition
+                 FROM pg_constraint
+                 WHERE conname = ?
+                 LIMIT 1",
+                ['data_riwayat_diri_str_aktif_check']
+            );
+
+            $definition = (string) ($row->definition ?? '');
+
+            if ($definition === '') {
+                return [];
+            }
+
+            preg_match_all("/'((?:[^']|'')+)'(?:::|,|\)|\])?/", $definition, $matches);
+
+            return collect($matches[1] ?? [])
+                ->map(fn ($value) => str_replace("''", "'", trim((string) $value)))
+                ->filter(fn ($value) => $value !== '')
+                ->unique()
+                ->values()
+                ->all();
+        } catch (\Throwable $error) {
+            return [];
+        }
+    }
+
+    private function findAllowedStrAktifValue(string $value, array $allowedValues): ?string
+    {
+        $normalizedValue = $this->normalizeForMasterSearch($value);
+
+        foreach ($allowedValues as $allowedValue) {
+            if ($this->normalizeForMasterSearch($allowedValue) === $normalizedValue) {
+                return (string) $allowedValue;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeArrayInput($value): array
@@ -2632,7 +2499,6 @@ class PendaftaranController extends Controller
     }
 
 
-
     private function resolvePosisiDilamarIdForKesiapan(?string $value = null, ?DataRiwayatDiri $pelamar = null): ?string
     {
         $value = trim((string) ($value ?: ''));
@@ -3073,95 +2939,5 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
         return null;
     }
-    public function updateKehadiranJadwalTest(Request $request, string $token, string $jadwalTest): JsonResponse
-    {
-        $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
-            ->first();
 
-        if (!$pelamar) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token pelamar tidak ditemukan.',
-            ], 404);
-        }
-
-        if (!Schema::hasColumn('jadwal_test_zoom', 'kehadiran')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Kolom kehadiran belum ada di tabel jadwal_test_zoom. Jalankan migration terlebih dahulu.',
-            ], 500);
-        }
-
-        $validated = $request->validate([
-            'kehadiran' => ['required', 'string', 'in:hadir,tidak_hadir'],
-        ], [
-            'kehadiran.required' => 'Pilihan kehadiran wajib diisi.',
-            'kehadiran.in' => 'Pilihan kehadiran harus Hadir atau Tidak Hadir.',
-        ]);
-
-        $jadwal = JadwalTestZoom::query()
-            ->where('id', $jadwalTest)
-            ->where('data_riwayat_diri_id', $pelamar->id)
-            ->first();
-
-        if (!$jadwal) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Jadwal test tidak ditemukan.',
-            ], 404);
-        }
-
-        if (empty($jadwal->jadwal)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tanggal jadwal test belum tersedia.',
-                'data' => $this->buildTahapanPelamar($pelamar),
-            ], 422);
-        }
-
-        $jadwalCarbon = $jadwal->jadwal instanceof Carbon
-            ? $jadwal->jadwal
-            : Carbon::parse($jadwal->jadwal);
-
-        if (!$jadwalCarbon->isToday()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Kehadiran hanya dapat diisi pada tanggal jadwal test.',
-                'data' => $this->buildTahapanPelamar($pelamar),
-            ], 422);
-        }
-
-        $kehadiranLama = $this->normalizeKehadiranValue($jadwal->kehadiran ?? null);
-
-        if (!empty($kehadiranLama)) {
-            $pelamarTerbaru = $this->pelamarQuery()
-                ->where('token', $token)
-                ->first();
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Status kehadiran sudah tersimpan dan tidak dapat diubah.',
-                'data' => $this->buildTahapanPelamar($pelamarTerbaru),
-            ], 409);
-        }
-
-        $jadwal->forceFill([
-            'kehadiran' => $validated['kehadiran'],
-        ]);
-
-        $jadwal->save();
-
-        $pelamarTerbaru = $this->pelamarQuery()
-            ->where('token', $token)
-            ->first();
-
-        return response()->json([
-            'success' => true,
-            'message' => $validated['kehadiran'] === 'hadir'
-                ? 'Kehadiran berhasil disimpan: Hadir.'
-                : 'Kehadiran berhasil disimpan: Tidak Hadir.',
-            'data' => $this->buildTahapanPelamar($pelamarTerbaru),
-        ]);
-    }
 }

@@ -13,8 +13,8 @@ export default function JadwalTestZoomPage({ actionSignals }) {
     const [editingData, setEditingData] = useState(null);
     const [detailData, setDetailData] = useState(null);
 
-    const [linkModalOpen, setLinkModalOpen] = useState(false);
-    const [linkLoading, setLinkLoading] = useState(false);
+    const [groupModalOpen, setGroupModalOpen] = useState(false);
+    const [groupLoading, setGroupLoading] = useState(false);
     const [editingGroup, setEditingGroup] = useState(null);
 
     const isFirstActionSignalRender = useRef(true);
@@ -27,19 +27,11 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         link_zoom: "",
     });
 
-    const [groupLinkForm, setGroupLinkForm] = useState({
+    const [groupForm, setGroupForm] = useState({
         jadwal: "",
         link_zoom: "",
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Data pelamar yang sudah dijadwalkan
-    |--------------------------------------------------------------------------
-    | Setelah controller diganti menjadi grouped response, dataJadwal tidak lagi
-    | selalu berisi data_riwayat_diri_id. Karena itu filter utama tetap memakai
-    | field sudah_dijadwalkan dari endpoint pelamar/list.
-    */
     const scheduledPelamarIds = useMemo(() => {
         const ids = [];
 
@@ -219,14 +211,6 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         setModalOpen(true);
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | Edit satu jadwal
-    |--------------------------------------------------------------------------
-    | Karena tabel utama sekarang grouped, edit per pelamar dilakukan dari modal
-    | detail. Item yang dikirim ke fungsi ini adalah row jadwal individual dari
-    | endpoint detail.
-    */
     const openEditModal = (item) => {
         const pelamar = item?.data_riwayat_diri;
 
@@ -256,7 +240,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         setDetailData(null);
     };
 
-    const openLinkModal = (item) => {
+    const openGroupEditModal = (item) => {
         const groupKey = item?.group_key || item?.id;
 
         if (!groupKey) {
@@ -265,56 +249,55 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         }
 
         setEditingGroup(item);
-        setGroupLinkForm({
+        setGroupForm({
             jadwal: toDateTimeLocalValue(item?.jadwal),
             link_zoom: item?.link_zoom || "",
         });
-        setLinkModalOpen(true);
+        setGroupModalOpen(true);
     };
 
-    const closeLinkModal = () => {
-        setLinkModalOpen(false);
+    const closeGroupModal = () => {
+        setGroupModalOpen(false);
         setEditingGroup(null);
-        setGroupLinkForm({
+        setGroupForm({
             jadwal: "",
             link_zoom: "",
         });
     };
 
-    const handleGroupLinkChange = (e) => {
+    const handleGroupChange = (e) => {
         const { name, value } = e.target;
 
-        setGroupLinkForm((prev) => ({
+        setGroupForm((prev) => ({
             ...prev,
             [name]: value,
         }));
     };
 
-    const validateGroupLinkForm = () => {
-        if (!groupLinkForm.jadwal) {
+    const validateGroupForm = () => {
+        if (!groupForm.jadwal) {
             alert("Jadwal Zoom wajib diisi.");
             return false;
         }
 
-        if (!groupLinkForm.link_zoom) {
-            alert("Link Zoom wajib diisi.");
-            return false;
-        }
-
-        try {
-            new URL(groupLinkForm.link_zoom);
-        } catch (error) {
-            alert("Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/123456789");
-            return false;
+        if (groupForm.link_zoom) {
+            try {
+                new URL(groupForm.link_zoom);
+            } catch (error) {
+                alert(
+                    "Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/123456789"
+                );
+                return false;
+            }
         }
 
         return true;
     };
 
-    const handleSubmitGroupLink = async (e) => {
+    const handleSubmitGroup = async (e) => {
         e.preventDefault();
 
-        if (!validateGroupLinkForm()) return;
+        if (!validateGroupForm()) return;
 
         const groupKey = editingGroup?.group_key || editingGroup?.id;
 
@@ -323,7 +306,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
             return;
         }
 
-        setLinkLoading(true);
+        setGroupLoading(true);
 
         try {
             const result = await fetchJson(
@@ -335,25 +318,71 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         "X-CSRF-TOKEN": getCsrfToken(),
                     },
                     body: JSON.stringify({
-                        jadwal: groupLinkForm.jadwal,
-                        link_zoom: groupLinkForm.link_zoom,
+                        jadwal: groupForm.jadwal,
+                        link_zoom: groupForm.link_zoom?.trim() || null,
                     }),
                 }
             );
 
-            alert(result.message || "Link Zoom berhasil disimpan untuk semua pelamar pada jadwal ini.");
+            alert(
+                result.message ||
+                    "Group jadwal berhasil diperbarui untuk semua pelamar pada jadwal ini."
+            );
 
-            closeLinkModal();
+            closeGroupModal();
             await refreshAllData();
 
             if (detailModalOpen && detailData?.group_key) {
                 closeDetailModal();
             }
         } catch (error) {
-            console.error("Gagal menyimpan Link Zoom:", error);
-            alert(error.message || "Terjadi kesalahan saat menyimpan Link Zoom.");
+            console.error("Gagal memperbarui group jadwal:", error);
+            alert(error.message || "Terjadi kesalahan saat memperbarui group jadwal.");
         } finally {
-            setLinkLoading(false);
+            setGroupLoading(false);
+        }
+    };
+
+    const handleDeleteGroup = async (item) => {
+        const groupKey = item?.group_key || item?.id;
+
+        if (!groupKey) {
+            alert("Group jadwal tidak valid.");
+            return;
+        }
+
+        const confirmDelete = confirm(
+            `Yakin ingin menghapus semua jadwal pada group ini?\n\nJadwal: ${
+                item?.jadwal_label || formatDateTime(item?.jadwal)
+            }\nTotal pelamar: ${item?.total_pelamar || 0} orang`
+        );
+
+        if (!confirmDelete) return;
+
+        try {
+            const result = await fetchJson(
+                `/admin/jadwal-test/zoom/group/${encodeURIComponent(groupKey)}`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                }
+            );
+
+            alert(result.message || "Group jadwal Zoom berhasil dihapus.");
+
+            await refreshAllData();
+
+            if (detailModalOpen && detailData?.group_key === groupKey) {
+                closeDetailModal();
+            }
+        } catch (error) {
+            console.error("Gagal menghapus group jadwal Zoom:", error);
+            alert(
+                error.message ||
+                    "Terjadi kesalahan saat menghapus group jadwal Zoom."
+            );
         }
     };
 
@@ -424,16 +453,15 @@ export default function JadwalTestZoomPage({ actionSignals }) {
             return false;
         }
 
-        if (!form.link_zoom) {
-            alert("Link Zoom wajib diisi.");
-            return false;
-        }
-
-        try {
-            new URL(form.link_zoom);
-        } catch (error) {
-            alert("Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/123456789");
-            return false;
+        if (form.link_zoom) {
+            try {
+                new URL(form.link_zoom);
+            } catch (error) {
+                alert(
+                    "Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/123456789"
+                );
+                return false;
+            }
         }
 
         if (editingData) {
@@ -451,7 +479,9 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         }
 
         if (!form.data_riwayat_diri_ids.length) {
-            alert("Tidak ada pelamar yang bisa dijadwalkan pada tanggal skrining ini.");
+            alert(
+                "Tidak ada pelamar yang bisa dijadwalkan pada tanggal skrining ini."
+            );
             return false;
         }
 
@@ -476,13 +506,13 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 ? {
                       data_riwayat_diri_id: form.data_riwayat_diri_id,
                       jadwal: form.jadwal,
-                      link_zoom: form.link_zoom,
+                      link_zoom: form.link_zoom?.trim() || null,
                   }
                 : {
                       tanggal_skrining: form.tanggal_skrining,
                       data_riwayat_diri_ids: form.data_riwayat_diri_ids,
                       jadwal: form.jadwal,
-                      link_zoom: form.link_zoom,
+                      link_zoom: form.link_zoom?.trim() || null,
                   };
 
             const result = await fetchJson(url, {
@@ -559,8 +589,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 render: (item) => (
                     <div className="min-w-[190px]">
                         <div className="font-black text-slate-950">
-                            {item?.tanggal_test_label ||
-                                formatDate(item?.tanggal_test)}
+                            {item?.tanggal_test_label || formatDate(item?.tanggal_test)}
                         </div>
                         <div className="mt-1 text-xs font-bold text-slate-500">
                             Group: {item?.group_key || item?.id || "-"}
@@ -600,7 +629,9 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                             Buka Link
                         </a>
                     ) : (
-                        <span className="text-sm font-bold text-slate-400">Belum Ada</span>
+                        <span className="text-sm font-bold text-slate-400">
+                            Belum Ada
+                        </span>
                     ),
             },
             {
@@ -611,9 +642,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         <div className="text-2xl font-black text-slate-950">
                             {item?.total_pelamar || 0}
                         </div>
-                        <div className="text-xs font-bold text-slate-500">
-                            orang
-                        </div>
+                        <div className="text-xs font-bold text-slate-500">orang</div>
                     </div>
                 ),
             },
@@ -652,10 +681,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"
-                            onClick={() => openLinkModal(item)}
+                            onClick={() => openGroupEditModal(item)}
                             className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
                         >
-                            Input Link
+                            Edit Group
                         </button>
 
                         <button
@@ -665,11 +694,19 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         >
                             Detail
                         </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleDeleteGroup(item)}
+                            className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50"
+                        >
+                            Hapus Group
+                        </button>
                     </div>
                 ),
             },
         ];
-    }, []);
+    }, [detailModalOpen, detailData]);
 
     return (
         <div className="space-y-6">
@@ -718,17 +755,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
 
                         <p className="mt-1 text-sm font-medium text-slate-500">
                             Data sudah digroup berdasarkan tanggal dan jam test.
-                            Klik Detail untuk melihat semua pelamar pada jadwal tersebut.
+                            Klik Detail untuk melihat semua pelamar pada jadwal
+                            tersebut.
                         </p>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={openCreateModal}
-                        className="w-fit rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700"
-                    >
-                        + Tambah Jadwal
-                    </button>
                 </div>
 
                 <DataTable
@@ -775,14 +805,14 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 />
             )}
 
-            {linkModalOpen && (
-                <LinkZoomGroupModal
+            {groupModalOpen && (
+                <GroupEditModal
                     group={editingGroup}
-                    form={groupLinkForm}
-                    loading={linkLoading}
-                    onChange={handleGroupLinkChange}
-                    onSubmit={handleSubmitGroupLink}
-                    onClose={closeLinkModal}
+                    form={groupForm}
+                    loading={groupLoading}
+                    onChange={handleGroupChange}
+                    onSubmit={handleSubmitGroup}
+                    onClose={closeGroupModal}
                 />
             )}
 
@@ -808,9 +838,7 @@ function StatCard({ label, value, description }) {
 
             <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
 
-            <p className="mt-1 text-xs font-bold text-slate-500">
-                {description}
-            </p>
+            <p className="mt-1 text-xs font-bold text-slate-500">{description}</p>
         </div>
     );
 }
@@ -882,11 +910,14 @@ function JadwalFormModal({
                             {!editingData && form.tanggal_skrining && (
                                 <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3">
                                     <p className="text-sm font-black text-teal-800">
-                                        {filteredPelamarByTanggal.length} pelamar belum dijadwalkan pada tanggal {formatDate(form.tanggal_skrining)}.
+                                        {filteredPelamarByTanggal.length} pelamar
+                                        belum dijadwalkan pada tanggal{" "}
+                                        {formatDate(form.tanggal_skrining)}.
                                     </p>
 
                                     <p className="mt-1 text-xs font-bold text-teal-700">
-                                        Pelamar yang sudah memiliki jadwal Zoom tidak ditampilkan lagi.
+                                        Pelamar yang sudah memiliki jadwal Zoom
+                                        tidak ditampilkan lagi.
                                     </p>
                                 </div>
                             )}
@@ -894,7 +925,9 @@ function JadwalFormModal({
                             <Select2Multi
                                 label="Pelamar"
                                 value={form.data_riwayat_diri_ids}
-                                options={editingData ? dataPelamar : filteredPelamarByTanggal}
+                                options={
+                                    editingData ? dataPelamar : filteredPelamarByTanggal
+                                }
                                 optionValue="id"
                                 optionLabel={getPelamarOptionLabel}
                                 placeholder={
@@ -935,7 +968,8 @@ function JadwalFormModal({
 
                             <div>
                                 <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Jadwal Zoom <span className="text-rose-500">*</span>
+                                    Jadwal Zoom{" "}
+                                    <span className="text-rose-500">*</span>
                                 </label>
 
                                 <input
@@ -950,7 +984,10 @@ function JadwalFormModal({
 
                             <div>
                                 <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Link Zoom <span className="text-rose-500">*</span>
+                                    Link Zoom{" "}
+                                    <span className="text-slate-400">
+                                        (opsional)
+                                    </span>
                                 </label>
 
                                 <input
@@ -958,13 +995,13 @@ function JadwalFormModal({
                                     name="link_zoom"
                                     value={form.link_zoom}
                                     onChange={handleChange}
-                                    required
                                     placeholder="https://zoom.us/j/123456789"
                                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
                                 />
 
                                 <p className="mt-2 text-xs font-semibold text-slate-500">
-                                    Link ini akan tersimpan bersama jadwal Zoom.
+                                    Link Zoom boleh dikosongkan dan bisa diisi
+                                    nanti melalui tombol Edit Group.
                                 </p>
                             </div>
                         </div>
@@ -995,8 +1032,7 @@ function JadwalFormModal({
     );
 }
 
-
-function LinkZoomGroupModal({
+function GroupEditModal({
     group,
     form,
     loading,
@@ -1011,15 +1047,16 @@ function LinkZoomGroupModal({
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <div className="inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-cyan-700">
-                                Input Link Zoom
+                                Edit Group Jadwal
                             </div>
 
                             <h2 className="mt-2 text-2xl font-black text-slate-950">
-                                Simpan Link Zoom Jadwal Test
+                                Edit Jadwal Test Group
                             </h2>
 
                             <p className="mt-1 text-sm font-medium text-slate-500">
-                                Link dan jadwal ini akan diperbarui untuk semua pelamar pada jadwal test yang sama.
+                                Perubahan jadwal dan Link Zoom akan diterapkan
+                                untuk semua pelamar dalam group ini.
                             </p>
                         </div>
 
@@ -1037,7 +1074,7 @@ function LinkZoomGroupModal({
                     <div className="min-h-0 flex-1 overflow-y-auto p-6">
                         <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
                             <p className="text-xs font-black uppercase tracking-wide text-cyan-700">
-                                Jadwal Dipilih
+                                Group Dipilih
                             </p>
 
                             <p className="mt-2 text-sm font-black text-slate-900">
@@ -1052,7 +1089,8 @@ function LinkZoomGroupModal({
                         <div className="mt-5 grid gap-5">
                             <div>
                                 <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Jadwal Zoom <span className="text-rose-500">*</span>
+                                    Jadwal Zoom{" "}
+                                    <span className="text-rose-500">*</span>
                                 </label>
 
                                 <input
@@ -1065,13 +1103,17 @@ function LinkZoomGroupModal({
                                 />
 
                                 <p className="mt-2 text-xs font-semibold text-slate-500">
-                                    Jika jadwal diubah, semua pelamar pada group jadwal ini ikut berubah.
+                                    Jika jadwal diubah, semua pelamar pada group
+                                    jadwal ini ikut berubah.
                                 </p>
                             </div>
 
                             <div>
                                 <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Link Zoom <span className="text-rose-500">*</span>
+                                    Link Zoom{" "}
+                                    <span className="text-slate-400">
+                                        (opsional)
+                                    </span>
                                 </label>
 
                                 <input
@@ -1079,13 +1121,12 @@ function LinkZoomGroupModal({
                                     name="link_zoom"
                                     value={form.link_zoom}
                                     onChange={onChange}
-                                    required
                                     placeholder="https://zoom.us/j/123456789"
                                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
                                 />
 
                                 <p className="mt-2 text-xs font-semibold text-slate-500">
-                                    Masukkan URL lengkap, contoh: https://zoom.us/j/123456789
+                                    Boleh dikosongkan. Jika diisi, gunakan URL lengkap.
                                 </p>
                             </div>
 
@@ -1117,7 +1158,7 @@ function LinkZoomGroupModal({
                                 disabled={loading}
                                 className="rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 transition hover:from-cyan-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                {loading ? "Menyimpan..." : "Simpan Link Zoom"}
+                                {loading ? "Menyimpan..." : "Simpan Perubahan"}
                             </button>
                         </div>
                     </div>
@@ -1144,7 +1185,9 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
 
                             <h2 className="mt-2 text-2xl font-black text-slate-950">
                                 {detailData?.jadwal_label ||
-                                    `${detailData?.tanggal_test_label || "-"} ${detailData?.jam_test || ""}`}
+                                    `${detailData?.tanggal_test_label || "-"} ${
+                                        detailData?.jam_test || ""
+                                    }`}
                             </h2>
 
                             <p className="mt-1 text-sm font-medium text-slate-500">
@@ -1187,7 +1230,9 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                             <div className="grid gap-4 md:grid-cols-4">
                                 <StatCard
                                     label="Total Pelamar"
-                                    value={detailData?.total_pelamar || pelamarRows.length}
+                                    value={
+                                        detailData?.total_pelamar || pelamarRows.length
+                                    }
                                     description="dalam jadwal ini"
                                 />
 
@@ -1263,10 +1308,12 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                             <td className="whitespace-nowrap px-5 py-4">
                                                                 <div className="min-w-[220px]">
                                                                     <div className="font-black text-slate-950">
-                                                                        {pelamar?.nama_lengkap || "-"}
+                                                                        {pelamar?.nama_lengkap ||
+                                                                            "-"}
                                                                     </div>
                                                                     <div className="mt-1 text-xs font-bold text-slate-500">
-                                                                        {pelamar?.nama_panggil || "-"}
+                                                                        {pelamar?.nama_panggil ||
+                                                                            "-"}
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -1277,26 +1324,36 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                         {pelamar?.email || "-"}
                                                                     </div>
                                                                     <div className="mt-1 text-xs font-black text-teal-700">
-                                                                        WA: {pelamar?.no_wa || "-"}
+                                                                        WA:{" "}
+                                                                        {pelamar?.no_wa ||
+                                                                            "-"}
                                                                     </div>
                                                                     <div className="mt-1 text-xs font-bold text-slate-500">
-                                                                        Token: {pelamar?.token || "-"}
+                                                                        Token:{" "}
+                                                                        {pelamar?.token ||
+                                                                            "-"}
                                                                     </div>
                                                                 </div>
                                                             </td>
 
                                                             <td className="whitespace-nowrap px-5 py-4">
                                                                 <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700">
-                                                                    {pelamar?.posisi?.nama_posisi || "-"}
+                                                                    {pelamar?.posisi
+                                                                        ?.nama_posisi ||
+                                                                        "-"}
                                                                 </span>
                                                             </td>
 
                                                             <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-600">
-                                                                {pelamar?.perusahaan?.nama_perusahaan || "-"}
+                                                                {pelamar?.perusahaan
+                                                                    ?.nama_perusahaan ||
+                                                                    "-"}
                                                             </td>
 
                                                             <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-slate-600">
-                                                                {formatDate(pelamar?.tanggal_skrining)}
+                                                                {formatDate(
+                                                                    pelamar?.tanggal_skrining
+                                                                )}
                                                             </td>
 
                                                             <td className="whitespace-nowrap px-5 py-4">
@@ -1310,7 +1367,9 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                         Buka Link
                                                                     </a>
                                                                 ) : (
-                                                                    <span className="text-sm font-bold text-slate-400">-</span>
+                                                                    <span className="text-sm font-bold text-slate-400">
+                                                                        -
+                                                                    </span>
                                                                 )}
                                                             </td>
 
@@ -1327,7 +1386,9 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                 <div className="flex justify-end gap-2">
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => onEdit(item)}
+                                                                        onClick={() =>
+                                                                            onEdit(item)
+                                                                        }
                                                                         className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
                                                                     >
                                                                         Edit
@@ -1335,7 +1396,11 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
 
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => onDelete(item.id)}
+                                                                        onClick={() =>
+                                                                            onDelete(
+                                                                                item.id
+                                                                            )
+                                                                        }
                                                                         className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-50"
                                                                     >
                                                                         Hapus
@@ -1353,7 +1418,8 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                 Tidak ada pelamar
                                                             </h3>
                                                             <p className="mt-1 text-sm font-medium text-slate-500">
-                                                                Detail jadwal ini belum memiliki data pelamar.
+                                                                Detail jadwal ini belum
+                                                                memiliki data pelamar.
                                                             </p>
                                                         </div>
                                                     </td>
@@ -1435,13 +1501,14 @@ function DataTable({
                 ? getSearchText(item)
                 : JSON.stringify(item || {});
 
-            return String(searchableText || "")
-                .toLowerCase()
-                .includes(keyword);
+            return String(searchableText || "").toLowerCase().includes(keyword);
         });
     }, [data, search, getSearchText]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredData.length / entriesPerPage));
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredData.length / entriesPerPage)
+    );
 
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * entriesPerPage;
@@ -1453,7 +1520,10 @@ function DataTable({
     const showingFrom =
         filteredData.length === 0 ? 0 : (currentPage - 1) * entriesPerPage + 1;
 
-    const showingTo = Math.min(currentPage * entriesPerPage, filteredData.length);
+    const showingTo = Math.min(
+        currentPage * entriesPerPage,
+        filteredData.length
+    );
 
     return (
         <>
@@ -1574,7 +1644,8 @@ function DataTable({
 
             <div className="flex flex-col gap-4 border-t border-slate-100 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <p className="text-sm font-bold text-slate-500">
-                    Showing {showingFrom} to {showingTo} of {filteredData.length} entries
+                    Showing {showingFrom} to {showingTo} of {filteredData.length}{" "}
+                    entries
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">

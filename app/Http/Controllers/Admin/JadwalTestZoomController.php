@@ -97,17 +97,6 @@ class JadwalTestZoomController extends Controller
             ], 422);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | PENTING
-        |--------------------------------------------------------------------------
-        | Sebelumnya ada error:
-        | Call to undefined method Illuminate\Database\Eloquent\Builder::orderByRelationName()
-        |
-        | Laravel tidak memiliki method orderByRelationName().
-        | Jadi data diambil dulu, lalu diurutkan memakai collection sortBy().
-        |--------------------------------------------------------------------------
-        */
         $rows = $this->jadwalDetailQuery()
             ->where('jadwal', $jadwal->toDateTimeString())
             ->get()
@@ -227,7 +216,7 @@ class JadwalTestZoomController extends Controller
                 'date',
             ],
             'link_zoom' => [
-                'required',
+                'nullable',
                 'url',
                 'max:2048',
             ],
@@ -245,7 +234,6 @@ class JadwalTestZoomController extends Controller
             'jadwal.required' => 'Jadwal Zoom wajib diisi.',
             'jadwal.date' => 'Format jadwal Zoom tidak valid.',
 
-            'link_zoom.required' => 'Link Zoom wajib diisi.',
             'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
             'link_zoom.max' => 'Link Zoom terlalu panjang.',
         ]);
@@ -294,7 +282,7 @@ class JadwalTestZoomController extends Controller
                 $items[] = JadwalTestZoom::query()->create([
                     'data_riwayat_diri_id' => $pelamarId,
                     'jadwal' => Carbon::parse($validated['jadwal'])->toDateTimeString(),
-                    'link_zoom' => $validated['link_zoom'],
+                    'link_zoom' => $validated['link_zoom'] ?? null,
                 ]);
             }
 
@@ -338,7 +326,7 @@ class JadwalTestZoomController extends Controller
                 'date',
             ],
             'link_zoom' => [
-                'required',
+                'nullable',
                 'url',
                 'max:2048',
             ],
@@ -350,7 +338,6 @@ class JadwalTestZoomController extends Controller
             'jadwal.required' => 'Jadwal Zoom wajib diisi.',
             'jadwal.date' => 'Format jadwal Zoom tidak valid.',
 
-            'link_zoom.required' => 'Link Zoom wajib diisi.',
             'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
             'link_zoom.max' => 'Link Zoom terlalu panjang.',
         ]);
@@ -374,7 +361,7 @@ class JadwalTestZoomController extends Controller
             $data->forceFill([
                 'data_riwayat_diri_id' => $validated['data_riwayat_diri_id'],
                 'jadwal' => $newJadwal,
-                'link_zoom' => $validated['link_zoom'],
+                'link_zoom' => $validated['link_zoom'] ?? null,
             ])->save();
 
             if ($oldJadwal) {
@@ -383,7 +370,7 @@ class JadwalTestZoomController extends Controller
                     ->where('jadwal', $oldJadwal->toDateTimeString())
                     ->update([
                         'jadwal' => $newJadwal,
-                        'link_zoom' => $validated['link_zoom'],
+                        'link_zoom' => $validated['link_zoom'] ?? null,
                     ]);
             }
         });
@@ -396,7 +383,7 @@ class JadwalTestZoomController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Jadwal test Zoom berhasil diperbarui untuk semua pelamar pada jadwal yang sama.',
+            'message' => 'Jadwal test Zoom berhasil diperbarui.',
             'data' => $freshData,
         ]);
     }
@@ -420,7 +407,7 @@ class JadwalTestZoomController extends Controller
                 'date',
             ],
             'link_zoom' => [
-                'required',
+                'nullable',
                 'url',
                 'max:2048',
             ],
@@ -428,7 +415,6 @@ class JadwalTestZoomController extends Controller
             'jadwal.required' => 'Jadwal Zoom wajib diisi.',
             'jadwal.date' => 'Format jadwal Zoom tidak valid.',
 
-            'link_zoom.required' => 'Link Zoom wajib diisi.',
             'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
             'link_zoom.max' => 'Link Zoom terlalu panjang.',
         ]);
@@ -445,13 +431,16 @@ class JadwalTestZoomController extends Controller
         }
 
         $newJadwal = Carbon::parse($validated['jadwal'])->toDateTimeString();
+        $newLinkZoom = $validated['link_zoom'] ?? null;
 
-        JadwalTestZoom::query()
-            ->where('jadwal', $oldJadwal->toDateTimeString())
-            ->update([
-                'jadwal' => $newJadwal,
-                'link_zoom' => $validated['link_zoom'],
-            ]);
+        DB::transaction(function () use ($oldJadwal, $newJadwal, $newLinkZoom) {
+            JadwalTestZoom::query()
+                ->where('jadwal', $oldJadwal->toDateTimeString())
+                ->update([
+                    'jadwal' => $newJadwal,
+                    'link_zoom' => $newLinkZoom,
+                ]);
+        });
 
         $newGroupKey = $this->makeGroupKey($newJadwal);
 
@@ -465,7 +454,7 @@ class JadwalTestZoomController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Jadwal dan Link Zoom berhasil diperbarui untuk semua pelamar pada jadwal ini.',
+            'message' => 'Group jadwal test Zoom berhasil diperbarui.',
             'data' => $this->formatDetailGroup(
                 $freshRows,
                 Carbon::parse($newJadwal),
@@ -516,9 +505,11 @@ class JadwalTestZoomController extends Controller
         }
 
         try {
-            JadwalTestZoom::query()
-                ->where('jadwal', $jadwal->toDateTimeString())
-                ->delete();
+            DB::transaction(function () use ($jadwal) {
+                JadwalTestZoom::query()
+                    ->where('jadwal', $jadwal->toDateTimeString())
+                    ->delete();
+            });
 
             return response()->json([
                 'success' => true,
@@ -671,12 +662,14 @@ class JadwalTestZoomController extends Controller
 
     private function mergeLinkZoom(Request $request): void
     {
+        $linkZoom = $request->input('link_zoom')
+            ?: $request->input('url_link')
+            ?: $request->input('link_url')
+            ?: $request->input('zoom_link')
+            ?: null;
+
         $request->merge([
-            'link_zoom' => $request->input('link_zoom')
-                ?: $request->input('url_link')
-                ?: $request->input('link_url')
-                ?: $request->input('zoom_link')
-                ?: null,
+            'link_zoom' => $linkZoom ? trim($linkZoom) : null,
         ]);
     }
 

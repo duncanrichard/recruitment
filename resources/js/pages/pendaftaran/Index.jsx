@@ -33,6 +33,7 @@ function PendaftaranPage() {
 
     const [activePage, setActivePage] = useState("pendaftaran");
     const [step, setStep] = useState(1);
+    const [progressStep, setProgressStep] = useState(1);
     const [errors, setErrors] = useState({});
     const [loadingToken, setLoadingToken] = useState(false);
     const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -272,8 +273,8 @@ function PendaftaranPage() {
     ];
 
     const progressPercent = useMemo(() => {
-        return Math.round((step / steps.length) * 100);
-    }, [step, steps.length]);
+        return Math.round((progressStep / steps.length) * 100);
+    }, [progressStep, steps.length]);
 
     useEffect(() => {
         loadMasterOptions();
@@ -311,6 +312,285 @@ function PendaftaranPage() {
         }
 
         return value === undefined || value === null || String(value).trim() === "";
+    };
+
+    const markProgressStep = (completedStep) => {
+        setProgressStep((currentProgressStep) =>
+            Math.max(currentProgressStep, Number(completedStep) || 1)
+        );
+    };
+
+    const hasMeaningfulValue = (value) => {
+        if (Array.isArray(value)) {
+            return value.some((item) => hasMeaningfulValue(item));
+        }
+
+        if (value && typeof value === "object") {
+            const ignoredKeys = new Set([
+                "id",
+                "token",
+                "data_riwayat_diri_id",
+                "data_riwayat_keluarga_id",
+                "created_at",
+                "updated_at",
+                "deleted_at",
+            ]);
+
+            return Object.entries(value).some(([key, item]) => {
+                if (ignoredKeys.has(key)) {
+                    return false;
+                }
+
+                return hasMeaningfulValue(item);
+            });
+        }
+
+        return value !== undefined && value !== null && String(value).trim() !== "";
+    };
+
+    const pickMeaningful = (source, fields = []) => {
+        if (!source) {
+            return false;
+        }
+
+        return fields.some((field) => hasMeaningfulValue(source?.[field]));
+    };
+
+    const hasMeaningfulRows = (rows, fields = []) => {
+        if (!Array.isArray(rows)) {
+            return false;
+        }
+
+        return rows.some((row) => pickMeaningful(row, fields));
+    };
+
+    const keluargaFields = [
+        "nama_ayah_kandung",
+        "pekerjaan_ayah_kandung",
+        "nama_ibu_kandung",
+        "pekerjaan_ibu_kandung",
+        "nama_ayah",
+        "nik_ayah",
+        "tempat_lahir_ayah",
+        "tanggal_lahir_ayah",
+        "pekerjaan_ayah",
+        "no_hp_ayah",
+        "alamat_ayah",
+        "nama_ibu",
+        "nik_ibu",
+        "tempat_lahir_ibu",
+        "tanggal_lahir_ibu",
+        "pekerjaan_ibu",
+        "no_hp_ibu",
+        "alamat_ibu",
+        "nama_suami_istri",
+        "pekerjaan_suami_istri",
+        "pekerjaan_sumi_istri",
+        "tlpn_suami_istri",
+        "nama_bapak_mertua",
+        "pekerjaan_bapak_mertua",
+        "nama_ibu_mertua",
+        "pekerjaan_ibu_mertua",
+        "hubungan_kerabat_instansi",
+        "kerabat_bekerja_diinstansi",
+        "kontak_darurat",
+        "tlpn_darurat",
+    ];
+
+    const saudaraFields = [
+        "nama",
+        "nama_saudara_kandung",
+        "nama_saudara_ipar",
+        "jenis_kelamin",
+        "hubungan",
+        "pekerjaan",
+        "no_hp",
+        "alamat",
+    ];
+
+    const kontakDaruratFields = ["nama", "status", "nomor", "no_hp", "telepon"];
+
+    const kesehatanFields = [
+        "gol_darah",
+        "golongan_darah",
+        "tinggi_badan",
+        "berat_badan",
+        "buta_warna",
+        "opsi_kacamata_id",
+        "alat_bantu_dengar",
+        "alat_bantu_pendengaran",
+        "menulis_dengan_tangan",
+        "tangan_dominan",
+        "sering_gemetar",
+        "tangan_gemetar",
+        "tangan_sering_berkeringat",
+        "tangan_berkeringat",
+        "penyakit_menular",
+        "riwayat_penyakit_menular",
+        "program_kehamilan",
+        "punya_alergi",
+        "memiliki_alergi",
+        "nama_alergi",
+        "alergi",
+        "punya_penyakit_genetik",
+        "nama_penyakit",
+        "riwayat_kronis",
+        "pengobatan_psikolog",
+        "kapan_dilakukan",
+        "pernah_kecelakaan",
+        "bagian_tubuh_kecelakaan",
+        "pernah_operasi",
+        "diagnosa_dokter",
+    ];
+
+    const pekerjaanFields = [
+        "status_pekerjaan",
+        "nama_perusahaan",
+        "posisi_pekerjaan",
+        "posisi_pekerjaan_terakhir",
+        "bidang_pekerjaan",
+        "lokasi_perusahaan",
+        "tahun_mulai_bekerja",
+        "tahun_selesai_bekerja",
+        "periode_kerja_awal",
+        "periode_kerja_akhir",
+        "lama_bekerja",
+        "deskripsi_pekerjaan",
+        "alasan_berhenti",
+        "gaji_terakhir",
+        "keahlian",
+        "catatan_pekerjaan",
+        "refrensi_kerja",
+        "nama_refrensi",
+        "telp_refrensi",
+        "refrensi_rekan_kerja",
+        "nama_refrensi_rekan",
+        "telp_refrensi_rekan",
+        "refrensi_kerabat",
+        "nama_refrensi_kerabat",
+        "telp_refrensi_kerabat",
+    ];
+
+    const kesiapanFields = [
+        "kapan_siap_bekerja",
+        "tanggal_siap_kerja",
+        "ekpetasi_gaji",
+        "gaji_diharapkan",
+        "penempatan",
+        "penempatan_luar_jawa_tengah",
+        "bersedia_ditempatkan",
+        "proses_bkhang",
+        "background_checking",
+        "bersedia_shift",
+        "dapat_dipertanggung_jawabkan",
+        "pernyataan_data_benar",
+        "bersedia_lembur",
+        "bersedia_training",
+        "bersedia_pelatihan",
+        "bersedia_hari_libur",
+        "lokasi_kerja_diinginkan",
+        "memiliki_kendaraan",
+        "memiliki_sim",
+        "status_ikatan_kerja",
+        "alasan_melamar",
+        "catatan_kesiapan",
+    ];
+
+    const isKeluargaFilled = (source) => {
+        const keluarga =
+            source?.riwayatKeluarga ||
+            source?.riwayat_keluarga ||
+            source?.riwayatKeluargaData ||
+            source;
+
+        return (
+            pickMeaningful(source, keluargaFields) ||
+            pickMeaningful(keluarga, keluargaFields) ||
+            hasMeaningfulRows(source?.kontak_darurat, kontakDaruratFields) ||
+            hasMeaningfulRows(keluarga?.kontak_darurat, kontakDaruratFields) ||
+            hasMeaningfulRows(source?.saudara_kandung || source?.saudaraKandung, saudaraFields) ||
+            hasMeaningfulRows(source?.saudara_ipar || source?.saudaraIpar, saudaraFields)
+        );
+    };
+
+    const isKesehatanFilled = (source) => {
+        const kesehatan =
+            source?.riwayatKesehatan ||
+            source?.riwayat_kesehatan ||
+            source;
+
+        return pickMeaningful(source, kesehatanFields) || pickMeaningful(kesehatan, kesehatanFields);
+    };
+
+    const isPekerjaanFilled = (source) => {
+        const pekerjaan =
+            source?.riwayatPekerjaan ||
+            source?.riwayat_pekerjaan ||
+            source;
+
+        return pickMeaningful(source, pekerjaanFields) || pickMeaningful(pekerjaan, pekerjaanFields);
+    };
+
+    const isKesiapanFilled = (source) => {
+        const kesiapan =
+            source?.kesiapanBekerja ||
+            source?.kesiapan_bekerja ||
+            source?.dataKesiapanBekerja ||
+            source;
+
+        return pickMeaningful(source, kesiapanFields) || pickMeaningful(kesiapan, kesiapanFields);
+    };
+
+    const getCompletedStepFromPelamar = (pelamar) => {
+        if (!pelamar) {
+            return 1;
+        }
+
+        if (isKesiapanFilled(pelamar)) {
+            return 5;
+        }
+
+        if (isPekerjaanFilled(pelamar)) {
+            return 4;
+        }
+
+        if (isKesehatanFilled(pelamar)) {
+            return 3;
+        }
+
+        if (isKeluargaFilled(pelamar)) {
+            return 2;
+        }
+
+        return 1;
+    };
+
+    const getCompletedStepFromForm = () => {
+        if (isKesiapanFilled(form)) {
+            return 5;
+        }
+
+        if (isPekerjaanFilled(form)) {
+            return 4;
+        }
+
+        if (isKesehatanFilled(form)) {
+            return 3;
+        }
+
+        if (isKeluargaFilled(form)) {
+            return 2;
+        }
+
+        return 1;
+    };
+
+    const syncProgressFromPelamarOrForm = (pelamar = null) => {
+        const completedStep = pelamar
+            ? getCompletedStepFromPelamar(pelamar)
+            : getCompletedStepFromForm();
+
+        markProgressStep(completedStep);
     };
 
     function getInitialTokenFromPage() {
@@ -1328,6 +1608,10 @@ function PendaftaranPage() {
         });
 
         setHasilCekTahapan(makeHasilCekTahapan(pelamar));
+
+        setProgressStep((currentProgressStep) =>
+            Math.max(currentProgressStep, getCompletedStepFromPelamar(pelamar))
+        );
     };
 
     const loadPelamarByToken = async (
@@ -2541,29 +2825,26 @@ function PendaftaranPage() {
 
     const saveCurrentStep = async () => {
         if (step === 1) {
-            await saveDataDiri();
-            return;
+            return await saveDataDiri();
         }
 
         if (step === 2) {
-            await saveRiwayatKeluarga();
-            return;
+            return await saveRiwayatKeluarga();
         }
 
         if (step === 3) {
-            await saveRiwayatKesehatan();
-            return;
+            return await saveRiwayatKesehatan();
         }
 
         if (step === 4) {
-            await saveRiwayatPekerjaan();
-            return;
+            return await saveRiwayatPekerjaan();
         }
 
         if (step === 5) {
-            await saveKesiapanBekerja();
-            return;
+            return await saveKesiapanBekerja();
         }
+
+        return null;
     };
 
     const nextStep = async () => {
@@ -2578,7 +2859,8 @@ function PendaftaranPage() {
         setLoadingSubmit(true);
 
         try {
-            await saveCurrentStep();
+            const savedPelamar = await saveCurrentStep();
+            syncProgressFromPelamarOrForm(savedPelamar);
 
             setStep((currentStep) => currentStep + 1);
 
@@ -2616,7 +2898,8 @@ function PendaftaranPage() {
         setLoadingSubmit(true);
 
         try {
-            await saveCurrentStep();
+            const savedPelamar = await saveCurrentStep();
+            syncProgressFromPelamarOrForm(savedPelamar);
             alert("Data berhasil diperbarui.");
         } catch (error) {
             console.error("Gagal memperbarui data:", error);
@@ -2631,25 +2914,35 @@ function PendaftaranPage() {
             return;
         }
 
+        if (selectedStep <= progressStep) {
+            setErrors({});
+            setStep(selectedStep);
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+            });
+
+            return;
+        }
+
         if (!validateStep()) {
             return;
         }
 
-        if (selectedStep > step) {
-            setLoadingSubmit(true);
+        setLoadingSubmit(true);
 
-            try {
-                await saveCurrentStep();
-            } catch (error) {
-                console.error("Gagal menyimpan data step:", error);
-                alert(error.message || "Gagal menyimpan data step ini.");
-                setLoadingSubmit(false);
-                return;
-            }
-
+        try {
+            const savedPelamar = await saveCurrentStep();
+            syncProgressFromPelamarOrForm(savedPelamar);
+        } catch (error) {
+            console.error("Gagal menyimpan data step:", error);
+            alert(error.message || "Gagal menyimpan data step ini.");
             setLoadingSubmit(false);
+            return;
         }
 
+        setLoadingSubmit(false);
         setErrors({});
         setStep(selectedStep);
 
@@ -2891,7 +3184,7 @@ function PendaftaranPage() {
                                                 Progress Pengisian
                                             </p>
                                             <p className="mt-1 text-sm font-black text-white">
-                                                Langkah {step} dari{" "}
+                                                Langkah {progressStep} dari{" "}
                                                 {steps.length}
                                             </p>
                                         </div>
@@ -2925,6 +3218,7 @@ function PendaftaranPage() {
                                 <StepMenu
                                     steps={steps}
                                     activeStep={step}
+                                    completedStep={progressStep}
                                     setActiveStep={goToStep}
                                 />
 
@@ -3035,12 +3329,12 @@ function PendaftaranPage() {
     );
 }
 
-function StepMenu({ steps, activeStep, setActiveStep }) {
+function StepMenu({ steps, activeStep, completedStep = 1, setActiveStep }) {
     return (
         <div className="space-y-3">
             {steps.map((item) => {
                 const active = item.id === activeStep;
-                const complete = item.id < activeStep;
+                const complete = item.id <= completedStep && item.id !== activeStep;
 
                 return (
                     <button

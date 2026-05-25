@@ -113,7 +113,9 @@ export default function DataPelamarPage({
 
     const fetchPerusahaan = async () => {
         try {
-            const result = await fetchJson("/admin/data-pelamar/perusahaan/list");
+            const result = await fetchJson(
+                "/admin/data-pelamar/perusahaan/list"
+            );
 
             if (result.success) {
                 setDataPerusahaan(result.data || []);
@@ -139,7 +141,9 @@ export default function DataPelamarPage({
 
     const fetchPendidikan = async () => {
         try {
-            const result = await fetchJson("/admin/data-pelamar/pendidikan/list");
+            const result = await fetchJson(
+                "/admin/data-pelamar/pendidikan/list"
+            );
 
             if (result.success) {
                 setDataPendidikan(result.data || []);
@@ -439,6 +443,33 @@ export default function DataPelamarPage({
         return sumberInformasi?.informasi || "-";
     };
 
+    const getKelengkapanForm = (item) => {
+        const completion = item?.kelengkapan_form || {};
+
+        return {
+            percentage: Number(
+                completion?.percentage ?? item?.persentase_kelengkapan ?? 0
+            ),
+            completed_steps: Number(
+                completion?.completed_steps ??
+                    item?.total_step_terisi ??
+                    item?.total_field_terisi ??
+                    0
+            ),
+            total_steps: Number(
+                completion?.total_steps ??
+                    item?.total_step_form ??
+                    item?.total_field_form ??
+                    5
+            ),
+            last_completed_label:
+                completion?.last_completed_label ??
+                item?.tahap_terakhir_form ??
+                "-",
+            steps: Array.isArray(completion?.steps) ? completion.steps : [],
+        };
+    };
+
     const formatTanggal = (value) => {
         if (!value) return "-";
 
@@ -477,16 +508,6 @@ export default function DataPelamarPage({
                         <div className="inline-flex rounded-2xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
                             {item.token || "-"}
                         </div>
-
-                        {item.token && (
-                            <button
-                                type="button"
-                                onClick={() => handleCopyPendaftaranUrl(item)}
-                                className="block rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700 transition hover:bg-teal-100"
-                            >
-                               {/*  Copy URL */}
-                            </button>
-                        )}
                     </div>
                 ),
             },
@@ -498,7 +519,9 @@ export default function DataPelamarPage({
                 render: (item) => (
                     <div className="flex min-w-[220px] items-center gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-sm font-black uppercase text-white shadow-lg shadow-teal-100">
-                            {(item.nama_lengkap || "P").charAt(0).toUpperCase()}
+                            {(item.nama_lengkap || "P")
+                                .charAt(0)
+                                .toUpperCase()}
                         </div>
 
                         <div>
@@ -507,11 +530,30 @@ export default function DataPelamarPage({
                             </div>
 
                             <div className="mt-0.5 text-sm font-medium text-slate-500">
-                                {item.nama_panggil || "Nama panggil belum diisi"}
+                                {item.nama_panggil ||
+                                    "Nama panggil belum diisi"}
                             </div>
                         </div>
                     </div>
                 ),
+            },
+            {
+                key: "kelengkapan_form",
+                label: "Kelengkapan Form",
+                accessor: (item) => getKelengkapanForm(item).percentage,
+                render: (item) => {
+                    const completion = getKelengkapanForm(item);
+
+                    return (
+                        <CompletionProgress
+                            percentage={completion.percentage}
+                            completedSteps={completion.completed_steps}
+                            totalSteps={completion.total_steps}
+                            lastCompletedLabel={completion.last_completed_label}
+                            steps={completion.steps}
+                        />
+                    );
+                },
             },
             {
                 key: "kontak",
@@ -532,7 +574,8 @@ export default function DataPelamarPage({
             {
                 key: "posisi",
                 label: "Posisi",
-                accessor: (item) => getNamaPosisi(item.posisi_yang_dilamar, item),
+                accessor: (item) =>
+                    getNamaPosisi(item.posisi_yang_dilamar, item),
                 render: (item) => (
                     <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700">
                         {getNamaPosisi(item.posisi_yang_dilamar, item)}
@@ -542,7 +585,8 @@ export default function DataPelamarPage({
             {
                 key: "perusahaan",
                 label: "Perusahaan",
-                accessor: (item) => getNamaPerusahaan(item.perusahaan_dilamar, item),
+                accessor: (item) =>
+                    getNamaPerusahaan(item.perusahaan_dilamar, item),
                 render: (item) => (
                     <span className="text-sm font-bold text-slate-600">
                         {getNamaPerusahaan(item.perusahaan_dilamar, item)}
@@ -680,7 +724,8 @@ export default function DataPelamarPage({
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Setelah disimpan, sistem akan membuat token dan URL pendaftaran kandidat.
+                                        Setelah disimpan, sistem akan membuat
+                                        token dan URL pendaftaran kandidat.
                                     </p>
                                 </div>
 
@@ -916,14 +961,19 @@ export default function DataPelamarPage({
                                                 <input
                                                     type="checkbox"
                                                     checked={alamatSama}
-                                                    onChange={handleAlamatSamaChange}
+                                                    onChange={
+                                                        handleAlamatSamaChange
+                                                    }
                                                     className="mt-1 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                                                 />
 
                                                 <span>
-                                                    Alamat domisili sama dengan alamat KTP
+                                                    Alamat domisili sama dengan
+                                                    alamat KTP
                                                     <span className="mt-0.5 block text-xs font-semibold text-slate-500">
-                                                        Jika dicentang, alamat domisili akan otomatis mengikuti alamat KTP.
+                                                        Jika dicentang, alamat
+                                                        domisili akan otomatis
+                                                        mengikuti alamat KTP.
                                                     </span>
                                                 </span>
                                             </label>
@@ -956,7 +1006,9 @@ export default function DataPelamarPage({
                                         disabled={loading}
                                         className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
-                                        {loading ? "Menyimpan..." : "Simpan Data"}
+                                        {loading
+                                            ? "Menyimpan..."
+                                            : "Simpan Data"}
                                     </button>
                                 </div>
                             </div>
@@ -964,6 +1016,143 @@ export default function DataPelamarPage({
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function CompletionProgress({
+    percentage = 0,
+    completedSteps = 0,
+    totalSteps = 5,
+    lastCompletedLabel = "-",
+    steps = [],
+}) {
+    const safePercentage = Math.min(
+        100,
+        Math.max(0, Number(percentage || 0))
+    );
+
+    const safeTotalSteps = Number(totalSteps || 5);
+
+    const safeCompletedSteps = Math.min(
+        safeTotalSteps,
+        Math.max(0, Number(completedSteps || 0))
+    );
+
+    const fixedSteps =
+        Array.isArray(steps) && steps.length > 0
+            ? steps
+            : [
+                  {
+                      key: "data_diri",
+                      label: "Data Diri",
+                      completed: safePercentage >= 20,
+                  },
+                  {
+                      key: "riwayat_keluarga",
+                      label: "Riwayat Keluarga",
+                      completed: safePercentage >= 40,
+                  },
+                  {
+                      key: "riwayat_kesehatan",
+                      label: "Riwayat Kesehatan",
+                      completed: safePercentage >= 60,
+                  },
+                  {
+                      key: "riwayat_pekerjaan",
+                      label: "Riwayat Pekerjaan",
+                      completed: safePercentage >= 80,
+                  },
+                  {
+                      key: "kesiapan_bekerja",
+                      label: "Kesiapan Bekerja",
+                      completed: safePercentage >= 100,
+                  },
+              ];
+
+    const statusLabel =
+        safePercentage >= 100
+            ? "Lengkap"
+            : safePercentage >= 80
+            ? "Sampai Riwayat Pekerjaan"
+            : safePercentage >= 60
+            ? "Sampai Riwayat Kesehatan"
+            : safePercentage >= 40
+            ? "Sampai Riwayat Keluarga"
+            : safePercentage >= 20
+            ? "Sampai Data Diri"
+            : "Belum Lengkap";
+
+    const colorClass =
+        safePercentage >= 100
+            ? "from-emerald-500 to-teal-500"
+            : safePercentage >= 80
+            ? "from-teal-500 to-cyan-500"
+            : safePercentage >= 60
+            ? "from-blue-500 to-cyan-500"
+            : safePercentage >= 40
+            ? "from-amber-500 to-orange-500"
+            : "from-rose-500 to-red-500";
+
+    const badgeClass =
+        safePercentage >= 100
+            ? "bg-emerald-50 text-emerald-700"
+            : safePercentage >= 80
+            ? "bg-teal-50 text-teal-700"
+            : safePercentage >= 60
+            ? "bg-blue-50 text-blue-700"
+            : safePercentage >= 40
+            ? "bg-amber-50 text-amber-700"
+            : "bg-rose-50 text-rose-700";
+
+    return (
+        <div className="min-w-[300px]">
+            <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                    <span className="text-lg font-black text-slate-950">
+                        {safePercentage}%
+                    </span>
+
+                    <p className="mt-0.5 text-xs font-bold text-slate-500">
+                        {safeCompletedSteps} dari {safeTotalSteps} tahapan
+                        selesai
+                    </p>
+                </div>
+
+                <span
+                    className={`rounded-full px-3 py-1 text-xs font-black ${badgeClass}`}
+                >
+                    {statusLabel}
+                </span>
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                <div
+                    className={`h-full rounded-full bg-gradient-to-r ${colorClass} transition-all duration-500`}
+                    style={{
+                        width: `${safePercentage}%`,
+                    }}
+                />
+            </div>
+
+            <div className="mt-3 grid grid-cols-5 gap-1">
+                {fixedSteps.map((step, index) => (
+                    <div
+                        key={step.key || index}
+                        title={step.label}
+                        className={`h-2 rounded-full ${
+                            step.completed ? "bg-teal-500" : "bg-slate-200"
+                        }`}
+                    />
+                ))}
+            </div>
+
+            <p className="mt-2 text-xs font-bold text-slate-500">
+                Tahap terakhir:{" "}
+                <span className="text-slate-800">
+                    {lastCompletedLabel || "-"}
+                </span>
+            </p>
         </div>
     );
 }
@@ -1064,7 +1253,10 @@ function DataTable({
         return result;
     }, [filteredData, sortableColumns, sortConfig]);
 
-    const totalPages = Math.max(1, Math.ceil(sortedData.length / entriesPerPage));
+    const totalPages = Math.max(
+        1,
+        Math.ceil(sortedData.length / entriesPerPage)
+    );
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * entriesPerPage;
@@ -1207,7 +1399,9 @@ function DataTable({
                                         ) : (
                                             <button
                                                 type="button"
-                                                onClick={() => handleSort(column)}
+                                                onClick={() =>
+                                                    handleSort(column)
+                                                }
                                                 className="inline-flex items-center gap-2 whitespace-nowrap font-black uppercase tracking-[0.12em] text-slate-500 transition hover:text-slate-800"
                                             >
                                                 <span>{column.label}</span>
@@ -1246,7 +1440,8 @@ function DataTable({
                                                     ? column.render(item, {
                                                           index,
                                                           rowNumber:
-                                                              showingFrom + index,
+                                                              showingFrom +
+                                                              index,
                                                       })
                                                     : String(
                                                           getColumnValue(
@@ -1384,7 +1579,9 @@ function Select2Single({
     const [search, setSearch] = useState("");
 
     const selectedOption = useMemo(() => {
-        return options.find((item) => String(item[optionValue]) === String(value));
+        return options.find(
+            (item) => String(item[optionValue]) === String(value)
+        );
     }, [options, optionValue, value]);
 
     const filteredOptions = useMemo(() => {
@@ -1512,7 +1709,9 @@ function Select2Single({
                                     <button
                                         key={itemValue}
                                         type="button"
-                                        onClick={() => handleSelect(itemValue)}
+                                        onClick={() =>
+                                            handleSelect(itemValue)
+                                        }
                                         className={`block w-full px-4 py-3 text-left text-sm font-bold transition ${
                                             isSelected
                                                 ? "bg-teal-600 text-white"

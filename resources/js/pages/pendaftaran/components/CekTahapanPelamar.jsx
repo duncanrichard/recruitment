@@ -40,9 +40,7 @@ export default function CekTahapanPelamar({
 
                 const json = await response.json();
 
-                if (cancelled) {
-                    return;
-                }
+                if (cancelled) return;
 
                 if (!response.ok || json?.success === false) {
                     setLocalErrors(
@@ -59,9 +57,7 @@ export default function CekTahapanPelamar({
                 setLocalErrors({});
                 setHasilTahapan(json?.data || hasil || null);
             } catch (error) {
-                if (cancelled) {
-                    return;
-                }
+                if (cancelled) return;
 
                 setLocalErrors({
                     token: "Gagal mengambil data tahapan seleksi.",
@@ -195,17 +191,103 @@ export default function CekTahapanPelamar({
 
 function HasilTahapan({ hasil, token, onUpdated }) {
     const jadwalTest = getJadwalTestFromHasil(hasil);
-    const isTerjadwal = Boolean(jadwalTest);
-    const tahapan = buildTahapanTampil(jadwalTest);
+    const hasilTest = getHasilTestFromHasil(hasil, jadwalTest);
+    const jadwalMmpi = getJadwalMmpiFromHasil(hasil);
+    const hasilTestMmpi = getHasilTestMmpiFromHasil(hasil, jadwalMmpi);
 
-    const statusUtama = isTerjadwal ? "Jadwal Test Tersedia" : "Administrasi";
-    const keteranganUtama = isTerjadwal
-        ? "Kandidat sudah mendapatkan jadwal test."
+    const completion = getKelengkapanForm(hasil);
+    const bolehLanjutJadwalTestZoom = canAccessJadwalTestZoom(hasil);
+    const pesanJadwalTestZoom = getPesanJadwalTestZoom(hasil);
+
+    const isTerjadwal = Boolean(jadwalTest);
+    const sudahAdaHasilTest = Boolean(hasilTest);
+    const jadwalTerkunci = isTerjadwal && !bolehLanjutJadwalTestZoom;
+
+    const tahapan = buildTahapanTampil(
+        jadwalTest,
+        hasilTest,
+        jadwalMmpi,
+        hasilTestMmpi,
+        bolehLanjutJadwalTestZoom,
+        completion,
+        pesanJadwalTestZoom
+    );
+
+    const statusUtama = hasilTestMmpi
+        ? hasilTestMmpi === "lolos"
+            ? "Lolos Seleksi Test MMPI"
+            : "Gagal Seleksi Test MMPI"
+        : jadwalMmpi
+        ? "Jadwal Test MMPI Tersedia"
+        : sudahAdaHasilTest
+        ? hasilTest === "lolos"
+            ? "Lolos Seleksi Test Zoom"
+            : "Gagal Seleksi Test Zoom"
+        : jadwalTerkunci
+        ? "Pendaftaran Belum Lengkap"
+        : isTerjadwal
+        ? "Jadwal Test Zoom Tersedia"
+        : "Administrasi";
+
+    const keteranganUtama = hasilTestMmpi
+        ? hasilTestMmpi === "lolos"
+            ? "Kandidat dinyatakan lolos pada seleksi test MMPI."
+            : "Kandidat dinyatakan belum lolos pada seleksi test MMPI."
+        : jadwalMmpi
+        ? "Kandidat sudah mendapatkan jadwal test MMPI."
+        : sudahAdaHasilTest
+        ? hasilTest === "lolos"
+            ? "Kandidat dinyatakan lolos pada seleksi test Zoom."
+            : "Kandidat dinyatakan belum lolos pada seleksi test Zoom."
+        : jadwalTerkunci
+        ? "Jadwal Test Zoom belum dapat dilanjutkan karena data pendaftaran belum lengkap sampai tahap Kesiapan Bekerja."
+        : isTerjadwal
+        ? "Kandidat sudah mendapatkan jadwal test Zoom."
         : "Status seleksi kandidat saat ini berada pada tahap Administrasi.";
-    const saranUtama = isTerjadwal
-        ? "Silakan mengikuti test sesuai jadwal yang sudah ditentukan."
+
+    const saranUtama = hasilTestMmpi
+        ? hasilTestMmpi === "lolos"
+            ? "Selamat, Anda lolos pada tahapan Test MMPI. Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen."
+            : "Terima kasih sudah mengikuti proses seleksi."
+        : jadwalMmpi
+        ? "Silakan mengikuti test MMPI sesuai jadwal yang sudah ditentukan."
+        : sudahAdaHasilTest
+        ? hasilTest === "lolos"
+            ? "Silakan pantau informasi jadwal test MMPI dari tim rekrutmen."
+            : "Terima kasih sudah mengikuti proses seleksi."
+        : jadwalTerkunci
+        ? pesanJadwalTestZoom
+        : isTerjadwal
+        ? "Silakan mengikuti test Zoom sesuai jadwal yang sudah ditentukan."
         : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.";
-    const tahapTerakhir = isTerjadwal ? "Jadwal Test" : "Administrasi";
+
+    const tahapTerakhir = hasilTestMmpi
+        ? "Hasil Seleksi Test MMPI"
+        : jadwalMmpi
+        ? "Jadwal Test MMPI"
+        : sudahAdaHasilTest
+        ? "Hasil Seleksi Test Zoom"
+        : jadwalTerkunci
+        ? completion.lastCompletedLabel || "Pendaftaran"
+        : isTerjadwal
+        ? "Jadwal Test Zoom"
+        : "Administrasi";
+
+    const warnaUtama = hasilTestMmpi
+        ? hasilTestMmpi === "lolos"
+            ? "emerald"
+            : "red"
+        : jadwalMmpi
+        ? "indigo"
+        : sudahAdaHasilTest
+        ? hasilTest === "lolos"
+            ? "emerald"
+            : "red"
+        : jadwalTerkunci
+        ? "amber"
+        : isTerjadwal
+        ? "blue"
+        : "teal";
 
     return (
         <div className="border-t border-slate-100 bg-slate-50 p-6 sm:p-8">
@@ -216,11 +298,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                             Hasil Pengecekan
                         </p>
 
-                        <h3
-                            className={`mt-2 text-2xl font-black ${
-                                isTerjadwal ? "text-blue-700" : "text-teal-700"
-                            }`}
-                        >
+                        <h3 className={`mt-2 text-2xl font-black ${getTextColor(warnaUtama)}`}>
                             {statusUtama}
                         </h3>
 
@@ -229,16 +307,47 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                         </p>
                     </div>
 
-                    <span
-                        className={`w-fit rounded-full px-4 py-2 text-xs font-bold ${
-                            isTerjadwal
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-teal-100 text-teal-700"
-                        }`}
-                    >
+                    <span className={`w-fit rounded-full px-4 py-2 text-xs font-bold ${getBadgeColor(warnaUtama)}`}>
                         Tahap Terakhir: {tahapTerakhir}
                     </span>
                 </div>
+
+                {jadwalTerkunci && (
+                    <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500 text-lg font-black text-white">
+                                !
+                            </div>
+
+                            <div>
+                                <h4 className="font-black text-amber-900">
+                                    Tahapan Test Zoom Belum Dapat Dilanjutkan
+                                </h4>
+
+                                <p className="mt-2 text-sm font-semibold leading-6 text-amber-800">
+                                    {pesanJadwalTestZoom}
+                                </p>
+
+                                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                    <InfoItem
+                                        label="Kelengkapan Form"
+                                        value={`${completion.completedSteps} dari ${completion.totalSteps} tahapan`}
+                                    />
+
+                                    <InfoItem
+                                        label="Progress"
+                                        value={`${completion.percentage}%`}
+                                    />
+
+                                    <InfoItem
+                                        label="Tahap Terakhir Form"
+                                        value={completion.lastCompletedLabel || "-"}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-5 md:grid-cols-4">
                     <InfoItem
@@ -266,36 +375,18 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                     />
                 </div>
 
-                <div
-                    className={`mt-6 rounded-3xl border p-5 ${
-                        isTerjadwal
-                            ? "border-blue-200 bg-blue-50"
-                            : "border-teal-200 bg-teal-50"
-                    }`}
-                >
+                <div className={`mt-6 rounded-3xl border p-5 ${getBoxColor(warnaUtama)}`}>
                     <div className="flex items-start gap-4">
-                        <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-black text-white ${
-                                isTerjadwal ? "bg-blue-600" : "bg-teal-600"
-                            }`}
-                        >
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-black text-white ${getCircleColor(warnaUtama)}`}>
                             !
                         </div>
 
                         <div>
-                            <h4
-                                className={`font-black ${
-                                    isTerjadwal ? "text-blue-900" : "text-teal-800"
-                                }`}
-                            >
+                            <h4 className={`font-black ${getTitleColor(warnaUtama)}`}>
                                 Informasi Seleksi
                             </h4>
 
-                            <p
-                                className={`mt-2 text-sm leading-6 ${
-                                    isTerjadwal ? "text-blue-800" : "text-teal-700"
-                                }`}
-                            >
+                            <p className={`mt-2 text-sm leading-6 ${getDescriptionColor(warnaUtama)}`}>
                                 {saranUtama}
                             </p>
                         </div>
@@ -318,6 +409,8 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                                     index={index}
                                     token={token}
                                     onUpdated={onUpdated}
+                                    disabledAllActions={!bolehLanjutJadwalTestZoom}
+                                    disabledReason={pesanJadwalTestZoom}
                                 />
                             ))}
                         </div>
@@ -328,17 +421,23 @@ function HasilTahapan({ hasil, token, onUpdated }) {
     );
 }
 
-function TahapanItem({ item, index, token, onUpdated }) {
+function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false, disabledReason = "" }) {
     const status = String(item?.status || "").toLowerCase();
 
     const isLolos = status.includes("lolos");
+    const isGagal = status.includes("gagal");
     const isProses = status.includes("proses");
     const isTerjadwal = status.includes("jadwal") || status.includes("terjadwal");
+    const isTerkunci = status.includes("terkunci") || item?.disabled === true;
 
     return (
         <div
             className={`relative flex gap-4 rounded-3xl border p-4 shadow-sm ${
-                isTerjadwal
+                isGagal
+                    ? "border-red-200 bg-red-50"
+                    : isTerkunci
+                    ? "border-amber-200 bg-amber-50"
+                    : isTerjadwal
                     ? "border-blue-200 bg-blue-50"
                     : isLolos
                     ? "border-emerald-200 bg-emerald-50"
@@ -349,7 +448,11 @@ function TahapanItem({ item, index, token, onUpdated }) {
         >
             <div
                 className={`z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white shadow-lg ${
-                    isTerjadwal
+                    isGagal
+                        ? "bg-red-600 shadow-red-100"
+                        : isTerkunci
+                        ? "bg-amber-500 shadow-amber-100"
+                        : isTerjadwal
                         ? "bg-blue-600 shadow-blue-100"
                         : isLolos
                         ? "bg-emerald-500 shadow-emerald-100"
@@ -358,14 +461,20 @@ function TahapanItem({ item, index, token, onUpdated }) {
                         : "bg-slate-400 shadow-slate-100"
                 }`}
             >
-                {isTerjadwal ? "📅" : isLolos ? "✓" : index + 1}
+                {isGagal ? "×" : isTerkunci ? "!" : isTerjadwal ? "📅" : isLolos ? "✓" : index + 1}
             </div>
 
             <div className="min-w-0 flex-1">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h5
                         className={`font-black ${
-                            isTerjadwal ? "text-blue-950" : "text-slate-950"
+                            isGagal
+                                ? "text-red-950"
+                                : isTerkunci
+                                ? "text-amber-950"
+                                : isTerjadwal
+                                ? "text-blue-950"
+                                : "text-slate-950"
                         }`}
                     >
                         {item?.nama || "-"}
@@ -373,7 +482,11 @@ function TahapanItem({ item, index, token, onUpdated }) {
 
                     <span
                         className={`w-fit rounded-full px-3 py-1 text-xs font-bold ${
-                            isTerjadwal
+                            isGagal
+                                ? "bg-red-100 text-red-700"
+                                : isTerkunci
+                                ? "bg-amber-100 text-amber-700"
+                                : isTerjadwal
                                 ? "bg-blue-100 text-blue-700"
                                 : isLolos
                                 ? "bg-emerald-100 text-emerald-700"
@@ -388,15 +501,45 @@ function TahapanItem({ item, index, token, onUpdated }) {
 
                 <p
                     className={`mt-2 text-sm leading-6 ${
-                        isTerjadwal ? "text-blue-800" : "text-slate-500"
+                        isGagal
+                            ? "text-red-800"
+                            : isTerkunci
+                            ? "text-amber-800"
+                            : isTerjadwal
+                            ? "text-blue-800"
+                            : "text-slate-500"
                     }`}
                 >
                     {item?.keterangan || "-"}
                 </p>
 
+                {item?.saran && (
+                    <p
+                        className={`mt-2 text-sm font-semibold leading-6 ${
+                            isGagal
+                                ? "text-red-800"
+                                : isTerkunci
+                                ? "text-amber-800"
+                                : "text-slate-600"
+                        }`}
+                    >
+                        {item.saran}
+                    </p>
+                )}
+
                 {item?.jadwal_test && (
                     <JadwalTestDalamTahapan
                         jadwalTest={item.jadwal_test}
+                        token={token}
+                        onUpdated={onUpdated}
+                        disabled={disabledAllActions || item?.disabled === true}
+                        disabledReason={item?.disabled_reason || item?.disabledReason || disabledReason}
+                    />
+                )}
+
+                {item?.jadwal_test_mmpi && (
+                    <JadwalMmpiDalamTahapan
+                        jadwalMmpi={item.jadwal_test_mmpi}
                         token={token}
                         onUpdated={onUpdated}
                     />
@@ -406,7 +549,13 @@ function TahapanItem({ item, index, token, onUpdated }) {
     );
 }
 
-function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
+function JadwalTestDalamTahapan({
+    jadwalTest,
+    token,
+    onUpdated,
+    disabled = false,
+    disabledReason = "",
+}) {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [localJadwalTest, setLocalJadwalTest] = useState(
@@ -419,11 +568,33 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
 
     const tanggal = getJadwalTanggal(localJadwalTest);
     const jam = getJadwalJam(localJadwalTest);
-    const bolehIsiKehadiran = isJadwalHariIni(localJadwalTest);
+    const jadwalDisabled =
+        disabled ||
+        localJadwalTest?.disabled === true ||
+        localJadwalTest?.boleh_akses_jadwal_test_zoom === false ||
+        localJadwalTest?.bolehAksesJadwalTestZoom === false;
+    const lockReason =
+        disabledReason ||
+        localJadwalTest?.disabled_reason ||
+        localJadwalTest?.disabledReason ||
+        "Tahapan Test Zoom belum dapat dilanjutkan. Lengkapi terlebih dahulu seluruh data pendaftaran sampai tahap Kesiapan Bekerja.";
+    const bolehIsiKehadiran =
+        !jadwalDisabled && isJadwalHariIni(localJadwalTest);
     const kehadiran = normalizeKehadiran(localJadwalTest?.kehadiran);
     const sudahMengisiKehadiran = Boolean(kehadiran);
+    const linkZoom = jadwalDisabled ? null : getLinkZoom(localJadwalTest);
+    const bolehBukaLinkZoom =
+        !jadwalDisabled &&
+        kehadiran === "hadir" &&
+        Boolean(linkZoom) &&
+        Boolean(localJadwalTest?.boleh_buka_link_zoom ?? true);
 
     async function submitKehadiran(value) {
+        if (jadwalDisabled) {
+            setMessage(lockReason);
+            return;
+        }
+
         const currentKehadiran = normalizeKehadiran(localJadwalTest?.kehadiran);
 
         if (currentKehadiran) {
@@ -431,9 +602,7 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
             return;
         }
 
-        if (saving) {
-            return;
-        }
+        if (saving) return;
 
         if (!token || !localJadwalTest?.id) {
             setMessage("Data jadwal tidak lengkap.");
@@ -468,10 +637,15 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
                 const serverJadwalTest = getJadwalTestFromHasil(json?.data);
 
                 if (serverJadwalTest?.kehadiran) {
-                    setLocalJadwalTest(serverJadwalTest);
+                    const fixedServerJadwalTest = normalizeJadwalTest({
+                        ...localJadwalTest,
+                        ...serverJadwalTest,
+                    });
+
+                    setLocalJadwalTest(fixedServerJadwalTest);
 
                     onUpdated?.((previousData) =>
-                        injectUpdatedJadwalTest(previousData, serverJadwalTest)
+                        injectUpdatedJadwalTest(previousData, fixedServerJadwalTest)
                     );
                 }
 
@@ -500,7 +674,9 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
 
             setMessage(
                 updatedJadwalTest.kehadiran === "hadir"
-                    ? "Kehadiran berhasil disimpan: Hadir."
+                    ? getLinkZoom(updatedJadwalTest)
+                        ? "Kehadiran berhasil disimpan: Hadir. Link Zoom sudah bisa dibuka."
+                        : "Kehadiran berhasil disimpan: Hadir. Link Zoom belum tersedia."
                     : "Kehadiran berhasil disimpan: Tidak Hadir."
             );
 
@@ -519,16 +695,42 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
     }
 
     return (
-        <div className="mt-4 rounded-2xl border border-blue-200 bg-white p-4">
+        <div
+            className={`mt-4 rounded-2xl border p-4 ${
+                jadwalDisabled
+                    ? "border-amber-200 bg-amber-50"
+                    : "border-blue-200 bg-white"
+            }`}
+        >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p className="text-sm font-black text-blue-900">
-                        Jadwal Test: {tanggal}
+                <div className="min-w-0 flex-1">
+                    <p
+                        className={`text-sm font-black ${
+                            jadwalDisabled ? "text-amber-900" : "text-blue-900"
+                        }`}
+                    >
+                        Jadwal Test Zoom: {tanggal}
                     </p>
 
-                    <p className="mt-1 text-sm font-semibold text-blue-700">
+                    <p
+                        className={`mt-1 text-sm font-semibold ${
+                            jadwalDisabled ? "text-amber-800" : "text-blue-700"
+                        }`}
+                    >
                         Pukul {jam} WIB
                     </p>
+
+                    {jadwalDisabled && (
+                        <div className="mt-3 rounded-2xl border border-amber-200 bg-white p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                                Akses Jadwal Test Zoom Terkunci
+                            </p>
+
+                            <p className="mt-2 text-sm font-semibold leading-6 text-amber-800">
+                                {lockReason}
+                            </p>
+                        </div>
+                    )}
 
                     {sudahMengisiKehadiran && (
                         <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -548,13 +750,13 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
                         </div>
                     )}
 
-                    {!bolehIsiKehadiran && !sudahMengisiKehadiran && (
+                    {!jadwalDisabled && !bolehIsiKehadiran && !sudahMengisiKehadiran && (
                         <p className="mt-3 text-sm font-semibold text-blue-700">
-                            Pilihan kehadiran hanya muncul pada tanggal jadwal test.
+                            Pilihan kehadiran hanya muncul pada tanggal jadwal test Zoom.
                         </p>
                     )}
 
-                    {bolehIsiKehadiran && !sudahMengisiKehadiran && (
+                    {!jadwalDisabled && bolehIsiKehadiran && !sudahMengisiKehadiran && (
                         <p className="mt-3 text-sm font-semibold text-blue-700">
                             Silakan pilih status kehadiran Anda.
                         </p>
@@ -566,29 +768,302 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
                         </p>
                     )}
 
+                    {!jadwalDisabled && kehadiran === "hadir" && !linkZoom && (
+                        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <p className="text-sm font-bold text-amber-800">
+                                Anda sudah memilih Hadir, tetapi Link Zoom belum tersedia.
+                            </p>
+                        </div>
+                    )}
+
+                    {bolehBukaLinkZoom && (
+                        <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                                Link Zoom
+                            </p>
+
+                            <p className="mt-1 break-all text-sm font-semibold text-emerald-800">
+                                {linkZoom}
+                            </p>
+
+                            <a
+                                href={linkZoom}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                            >
+                                Buka Link Zoom
+                            </a>
+                        </div>
+                    )}
+
                     {message && (
-                        <p className="mt-3 text-sm font-bold text-blue-900">
+                        <p
+                            className={`mt-3 text-sm font-bold ${
+                                jadwalDisabled ? "text-amber-900" : "text-blue-900"
+                            }`}
+                        >
                             {message}
                         </p>
                     )}
                 </div>
 
-                {bolehIsiKehadiran && !sudahMengisiKehadiran && (
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        disabled={saving || jadwalDisabled || !bolehIsiKehadiran || sudahMengisiKehadiran}
+                        onClick={() => submitKehadiran("hadir")}
+                        className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {saving ? "Menyimpan..." : "Hadir"}
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={saving || jadwalDisabled || !bolehIsiKehadiran || sudahMengisiKehadiran}
+                        onClick={() => submitKehadiran("tidak_hadir")}
+                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {saving ? "Menyimpan..." : "Tidak Hadir"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+    const [localJadwalMmpi, setLocalJadwalMmpi] = useState(
+        normalizeJadwalMmpi(jadwalMmpi)
+    );
+
+    useEffect(() => {
+        setLocalJadwalMmpi(normalizeJadwalMmpi(jadwalMmpi));
+        setMessage("");
+    }, [jadwalMmpi]);
+
+    const normalized = localJadwalMmpi;
+    const tanggal = getJadwalTanggal(normalized);
+    const jam = getJadwalJam(normalized);
+    const kehadiran = normalizeKehadiran(normalized?.kehadiran);
+    const hasilTestMmpi = normalizeHasilTest(normalized?.hasil_test || normalized?.hasilTest);
+    const sudahMengisiKehadiran = Boolean(kehadiran);
+    const bolehIsiKehadiran = isJadwalHariIni(normalized);
+
+    async function submitKehadiran(value) {
+        if (!bolehIsiKehadiran) {
+            setMessage("Kehadiran Test MMPI hanya dapat diisi pada tanggal jadwal test.");
+            return;
+        }
+
+        if (sudahMengisiKehadiran) {
+            setMessage("Status kehadiran Test MMPI sudah tersimpan dan tidak dapat diubah.");
+            return;
+        }
+
+        if (saving) return;
+
+        if (!token || !normalized?.id) {
+            setMessage("Data jadwal Test MMPI tidak lengkap.");
+            return;
+        }
+
+        const pilihan = value === "hadir" ? "hadir" : "tidak_hadir";
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            const response = await fetch(
+                `/pendaftaran/api/token/${encodeURIComponent(token)}/jadwal-test-mmpi/${encodeURIComponent(normalized.id)}/kehadiran`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        kehadiran: pilihan,
+                    }),
+                }
+            );
+
+            const json = await parseJsonResponse(response);
+
+            if (!response.ok || json?.success === false) {
+                const serverJadwalMmpi = getJadwalMmpiFromHasil(json?.data);
+
+                if (serverJadwalMmpi?.kehadiran) {
+                    setLocalJadwalMmpi(serverJadwalMmpi);
+                }
+
+                setMessage(
+                    json?.message ||
+                        "Gagal menyimpan kehadiran Test MMPI. Silakan coba lagi."
+                );
+
+                return;
+            }
+
+            const serverJadwalMmpi = getJadwalMmpiFromHasil(json?.data);
+            const updatedJadwalMmpi = normalizeJadwalMmpi({
+                ...normalized,
+                ...(serverJadwalMmpi || {}),
+                kehadiran: serverJadwalMmpi?.kehadiran || pilihan,
+                status_kehadiran: serverJadwalMmpi?.status_kehadiran || pilihan,
+            });
+
+            setLocalJadwalMmpi(updatedJadwalMmpi);
+            setMessage(
+                pilihan === "hadir"
+                    ? "Kehadiran Test MMPI berhasil disimpan: Hadir."
+                    : "Kehadiran Test MMPI berhasil disimpan: Tidak Hadir."
+            );
+
+            if (json?.data) {
+                onUpdated?.(json.data);
+            }
+        } catch (error) {
+            setMessage("Gagal menyimpan kehadiran Test MMPI.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="mt-4 rounded-2xl border border-indigo-200 bg-white p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-black text-white">
+                            📝
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-black text-indigo-900">
+                                Jadwal Test MMPI: {tanggal}
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold text-indigo-700">
+                                {jam && jam !== "-" && jam !== "00.00" && jam !== "00:00"
+                                    ? `Pukul ${jam} WIB`
+                                    : "Silakan hadir sesuai informasi dari tim rekrutmen."}
+                            </p>
+
+                            {normalized?.keterangan && (
+                                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                                    {normalized.keterangan}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {sudahMengisiKehadiran && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Status Kehadiran Test MMPI
+                            </p>
+
+                            <p
+                                className={`mt-1 text-lg font-black ${
+                                    kehadiran === "hadir"
+                                        ? "text-emerald-700"
+                                        : "text-red-700"
+                                }`}
+                            >
+                                {kehadiran === "hadir" ? "Hadir" : "Tidak Hadir"}
+                            </p>
+                        </div>
+                    )}
+
+                    {hasilTestMmpi && (
+                        <div
+                            className={`mt-4 rounded-2xl border p-4 ${
+                                hasilTestMmpi === "lolos"
+                                    ? "border-emerald-200 bg-emerald-50"
+                                    : "border-red-200 bg-red-50"
+                            }`}
+                        >
+                            <p
+                                className={`text-xs font-bold uppercase tracking-wide ${
+                                    hasilTestMmpi === "lolos"
+                                        ? "text-emerald-700"
+                                        : "text-red-700"
+                                }`}
+                            >
+                                Hasil Seleksi Test MMPI
+                            </p>
+
+                            <p
+                                className={`mt-1 text-lg font-black ${
+                                    hasilTestMmpi === "lolos"
+                                        ? "text-emerald-700"
+                                        : "text-red-700"
+                                }`}
+                            >
+                                {hasilTestMmpi === "lolos" ? "Lolos" : "Gagal"}
+                            </p>
+
+                            <p
+                                className={`mt-2 text-sm font-semibold ${
+                                    hasilTestMmpi === "lolos"
+                                        ? "text-emerald-800"
+                                        : "text-red-800"
+                                }`}
+                            >
+                                {hasilTestMmpi === "lolos"
+                                    ? "Selamat, Anda dinyatakan lolos pada seleksi Test MMPI."
+                                    : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi Test MMPI."}
+                            </p>
+                        </div>
+                    )}
+
+                    {!bolehIsiKehadiran && !sudahMengisiKehadiran && (
+                        <p className="mt-4 text-sm font-semibold text-indigo-700">
+                            Tombol kehadiran Test MMPI hanya muncul pada tanggal jadwal test.
+                        </p>
+                    )}
+
+                    {bolehIsiKehadiran && !sudahMengisiKehadiran && (
+                        <p className="mt-4 text-sm font-semibold text-indigo-700">
+                            Silakan pilih status kehadiran Test MMPI Anda.
+                        </p>
+                    )}
+
+                    {sudahMengisiKehadiran && (
+                        <p className="mt-3 text-sm font-semibold text-indigo-700">
+                            Status kehadiran sudah tersimpan dan tidak dapat diubah.
+                        </p>
+                    )}
+
+                    {message && (
+                        <p className="mt-3 text-sm font-bold text-indigo-900">
+                            {message}
+                        </p>
+                    )}
+                </div>
+
+                {(bolehIsiKehadiran || sudahMengisiKehadiran) && (
                     <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
-                            disabled={saving}
+                            disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
                             onClick={() => submitKehadiran("hadir")}
-                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {saving ? "Menyimpan..." : "Hadir"}
                         </button>
 
                         <button
                             type="button"
-                            disabled={saving}
+                            disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
                             onClick={() => submitKehadiran("tidak_hadir")}
-                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {saving ? "Menyimpan..." : "Tidak Hadir"}
                         </button>
@@ -599,44 +1074,369 @@ function JadwalTestDalamTahapan({ jadwalTest, token, onUpdated }) {
     );
 }
 
-function buildTahapanTampil(jadwalTest) {
+function buildTahapanTampil(
+    jadwalTest,
+    hasilTest,
+    jadwalMmpi = null,
+    hasilTestMmpi = null,
+    bolehLanjutJadwalTestZoom = true,
+    completion = {},
+    pesanJadwalTestZoom = ""
+) {
+    const lockMessage =
+        pesanJadwalTestZoom ||
+        "Tahapan Test Zoom belum dapat dilanjutkan karena data pendaftaran belum lengkap sampai tahap Kesiapan Bekerja. Silakan lengkapi seluruh formulir pendaftaran terlebih dahulu.";
+    const jadwalTerkunci = Boolean(jadwalTest) && !bolehLanjutJadwalTestZoom;
+
     const tahapan = [
         {
             nama: "Administrasi",
-            status: jadwalTest ? "Lolos" : "Proses",
-            keterangan: jadwalTest
-                ? "Tahap Administrasi sudah selesai."
-                : "Kandidat sedang berada pada tahap Administrasi.",
-            saran: jadwalTest
-                ? null
-                : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.",
+            status: jadwalTest && bolehLanjutJadwalTestZoom ? "Lolos" : "Proses",
+            keterangan:
+                jadwalTest && bolehLanjutJadwalTestZoom
+                    ? "Tahap Administrasi sudah selesai."
+                    : "Kandidat sedang berada pada tahap Administrasi.",
+            saran:
+                jadwalTest && bolehLanjutJadwalTestZoom
+                    ? null
+                    : jadwalTerkunci
+                    ? lockMessage
+                    : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.",
         },
     ];
 
     if (jadwalTest) {
         tahapan.push({
-            nama: "Jadwal Test",
-            status: "Terjadwal",
-            keterangan: "Jadwal test kandidat sudah tersedia.",
-            saran: "Silakan mengikuti test sesuai jadwal yang sudah ditentukan.",
-            jadwal_test: jadwalTest,
+            nama: "Jadwal Test Zoom",
+            status: bolehLanjutJadwalTestZoom ? "Terjadwal" : "Terkunci",
+            keterangan: bolehLanjutJadwalTestZoom
+                ? "Jadwal test Zoom kandidat sudah tersedia."
+                : "Jadwal test Zoom sudah tersedia, namun belum dapat dilanjutkan karena formulir pendaftaran belum lengkap sampai tahap Kesiapan Bekerja.",
+            saran: bolehLanjutJadwalTestZoom
+                ? "Silakan mengikuti test Zoom sesuai jadwal yang sudah ditentukan."
+                : lockMessage,
+            jadwal_test: {
+                ...jadwalTest,
+                disabled: !bolehLanjutJadwalTestZoom,
+                disabled_reason: bolehLanjutJadwalTestZoom ? null : lockMessage,
+                disabledReason: bolehLanjutJadwalTestZoom ? null : lockMessage,
+                boleh_akses_jadwal_test_zoom: bolehLanjutJadwalTestZoom,
+                bolehAksesJadwalTestZoom: bolehLanjutJadwalTestZoom,
+            },
+            disabled: !bolehLanjutJadwalTestZoom,
+            disabled_reason: bolehLanjutJadwalTestZoom ? null : lockMessage,
+            disabledReason: bolehLanjutJadwalTestZoom ? null : lockMessage,
         });
+    }
+
+    if (hasilTest && bolehLanjutJadwalTestZoom) {
+        tahapan.push({
+            nama: "Hasil Seleksi Test Zoom",
+            status: hasilTest === "lolos" ? "Lolos" : "Gagal",
+            keterangan:
+                hasilTest === "lolos"
+                    ? "Selamat, Anda dinyatakan lolos pada seleksi test Zoom."
+                    : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi test Zoom.",
+            saran:
+                hasilTest === "lolos"
+                    ? "Silakan pantau informasi jadwal test MMPI dari tim rekrutmen."
+                    : "Terima kasih sudah mengikuti proses seleksi.",
+            hasil_test: hasilTest,
+        });
+
+        if (hasilTest === "lolos") {
+            tahapan.push({
+                nama: "Jadwal Test MMPI",
+                status: jadwalMmpi ? "Terjadwal" : "Menunggu",
+                keterangan: jadwalMmpi
+                    ? "Jadwal test MMPI kandidat sudah tersedia."
+                    : "Kandidat sudah lolos test Zoom dan sedang menunggu jadwal test MMPI.",
+                saran: jadwalMmpi
+                    ? "Silakan mengikuti test MMPI sesuai jadwal yang sudah ditentukan."
+                    : "Silakan pantau halaman ini secara berkala untuk informasi jadwal test MMPI.",
+                jadwal_test_mmpi: jadwalMmpi || null,
+            });
+
+            if (hasilTestMmpi) {
+                tahapan.push({
+                    nama: "Hasil Seleksi Test MMPI",
+                    status: hasilTestMmpi === "lolos" ? "Lolos" : "Gagal",
+                    keterangan:
+                        hasilTestMmpi === "lolos"
+                            ? "Selamat, Anda dinyatakan lolos pada seleksi test MMPI."
+                            : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi test MMPI.",
+                    saran:
+                        hasilTestMmpi === "lolos"
+                            ? "Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen."
+                            : "Terima kasih sudah mengikuti proses seleksi.",
+                    hasil_test_mmpi: hasilTestMmpi,
+                    hasilTestMmpi: hasilTestMmpi,
+                });
+            }
+        }
     }
 
     return tahapan;
 }
 
-function getJadwalTestFromHasil(hasil) {
-    if (!hasil) {
-        return null;
+function getKelengkapanForm(hasil) {
+    const completion = hasil?.kelengkapan_form || hasil?.kelengkapanForm || {};
+
+    const totalSteps = Number(
+        completion?.total_steps ??
+            completion?.totalSteps ??
+            hasil?.total_step_form ??
+            hasil?.totalStepForm ??
+            5
+    );
+
+    const completedSteps = Number(
+        completion?.completed_steps ??
+            completion?.completedSteps ??
+            hasil?.total_step_terisi ??
+            hasil?.totalStepTerisi ??
+            0
+    );
+
+    const percentage = Number(
+        completion?.percentage ??
+            hasil?.persentase_kelengkapan ??
+            hasil?.persentaseKelengkapan ??
+            (totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0)
+    );
+
+    return {
+        percentage: Math.min(100, Math.max(0, percentage || 0)),
+        completedSteps: Math.min(totalSteps || 5, Math.max(0, completedSteps || 0)),
+        totalSteps: totalSteps || 5,
+        lastCompletedLabel:
+            completion?.last_completed_label ??
+            completion?.lastCompletedLabel ??
+            hasil?.tahap_terakhir_form ??
+            hasil?.tahapTerakhirForm ??
+            "-",
+        steps: Array.isArray(completion?.steps) ? completion.steps : [],
+    };
+}
+
+function canAccessJadwalTestZoom(hasil) {
+    const explicit =
+        hasil?.boleh_melanjutkan_jadwal_test_zoom ??
+        hasil?.bolehMelanjutkanJadwalTestZoom ??
+        hasil?.can_access_jadwal_test_zoom ??
+        hasil?.canAccessJadwalTestZoom ??
+        hasil?.tahapan_seleksi?.boleh_melanjutkan_jadwal_test_zoom ??
+        hasil?.tahapanSeleksi?.bolehMelanjutkanJadwalTestZoom ??
+        null;
+
+    if (explicit !== null && explicit !== undefined) {
+        return Boolean(explicit);
     }
 
+    const completion = getKelengkapanForm(hasil);
+
+    return completion.completedSteps >= completion.totalSteps;
+}
+
+function getPesanJadwalTestZoom(hasil) {
+    return (
+        hasil?.pesan_jadwal_test_zoom ||
+        hasil?.pesanJadwalTestZoom ||
+        hasil?.tahapan_seleksi?.pesan_jadwal_test_zoom ||
+        hasil?.tahapanSeleksi?.pesanJadwalTestZoom ||
+        "Tahapan Test Zoom belum dapat dilanjutkan karena data pendaftaran belum lengkap sampai tahap Kesiapan Bekerja. Silakan lengkapi seluruh formulir pendaftaran terlebih dahulu."
+    );
+}
+
+
+
+function getHasilTestMmpiFromHasil(hasil, jadwalMmpi = null) {
+    const raw =
+        hasil?.hasil_test_mmpi ??
+        hasil?.hasilTestMmpi ??
+        hasil?.status_hasil_test_mmpi ??
+        hasil?.statusHasilTestMmpi ??
+        jadwalMmpi?.hasil_test ??
+        jadwalMmpi?.hasilTest ??
+        jadwalMmpi?.status_hasil_test ??
+        jadwalMmpi?.statusHasilTest ??
+        hasil?.tahapan_seleksi?.hasil_test_mmpi ??
+        hasil?.tahapanSeleksi?.hasil_test_mmpi ??
+        hasil?.tahapanSeleksi?.hasilTestMmpi ??
+        null;
+
+    const direct = normalizeHasilTest(raw);
+
+    if (direct) return direct;
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemHasilMmpi = tahapan.find((item) => {
+        const nama = String(item?.nama || "").toLowerCase();
+
+        return (
+            nama.includes("hasil seleksi test mmpi") ||
+            nama.includes("hasil test mmpi") ||
+            normalizeHasilTest(item?.hasil_test_mmpi) ||
+            normalizeHasilTest(item?.hasilTestMmpi) ||
+            normalizeHasilTest(item?.status_hasil_test_mmpi) ||
+            normalizeHasilTest(item?.statusHasilTestMmpi)
+        );
+    });
+
+    return normalizeHasilTest(
+        itemHasilMmpi?.hasil_test_mmpi ||
+            itemHasilMmpi?.hasilTestMmpi ||
+            itemHasilMmpi?.status_hasil_test_mmpi ||
+            itemHasilMmpi?.statusHasilTestMmpi ||
+            itemHasilMmpi?.hasil_test ||
+            itemHasilMmpi?.hasilTest ||
+            itemHasilMmpi?.status
+    );
+}
+
+function getJadwalMmpiFromHasil(hasil) {
+    if (!hasil) return null;
+
     const direct =
-        hasil?.jadwal_test ||
-        hasil?.jadwalTest ||
+        hasil?.jadwal_test_mmpi ||
+        hasil?.jadwalTestMmpi ||
+        hasil?.jadwal_mmpi ||
+        hasil?.jadwalMmpi ||
+        hasil?.tahapan_seleksi?.jadwal_test_mmpi ||
+        hasil?.tahapan_seleksi?.jadwal_mmpi ||
+        hasil?.tahapanSeleksi?.jadwal_test_mmpi ||
+        hasil?.tahapanSeleksi?.jadwalMmpi ||
+        null;
+
+    if (direct && hasValidJadwalMmpi(direct)) {
+        return normalizeJadwalMmpi(direct);
+    }
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemDenganJadwal = tahapan.find((item) => {
+        return (
+            item?.jadwal_test_mmpi ||
+            item?.jadwalTestMmpi ||
+            item?.jadwal_mmpi ||
+            item?.jadwalMmpi
+        );
+    });
+
+    const nested =
+        itemDenganJadwal?.jadwal_test_mmpi ||
+        itemDenganJadwal?.jadwalTestMmpi ||
+        itemDenganJadwal?.jadwal_mmpi ||
+        itemDenganJadwal?.jadwalMmpi ||
+        null;
+
+    if (nested && hasValidJadwalMmpi(nested)) {
+        return normalizeJadwalMmpi(nested);
+    }
+
+    return null;
+}
+
+function normalizeJadwalMmpi(jadwalMmpi) {
+    if (!jadwalMmpi) return null;
+
+    const rawKehadiran =
+        jadwalMmpi?.kehadiran ??
+        jadwalMmpi?.status_kehadiran ??
+        jadwalMmpi?.statusKehadiran ??
+        jadwalMmpi?.konfirmasi_kehadiran ??
+        jadwalMmpi?.konfirmasiKehadiran ??
+        null;
+
+    const rawHasilTest =
+        jadwalMmpi?.hasil_test ??
+        jadwalMmpi?.hasilTest ??
+        jadwalMmpi?.status_hasil_test ??
+        jadwalMmpi?.statusHasilTest ??
+        null;
+
+    return {
+        id: jadwalMmpi?.id || null,
+        daftar_hadir_test_mmpi_id:
+            jadwalMmpi?.daftar_hadir_test_mmpi_id ||
+            jadwalMmpi?.daftarHadirTestMmpiId ||
+            null,
+        daftarHadirTestMmpiId:
+            jadwalMmpi?.daftarHadirTestMmpiId ||
+            jadwalMmpi?.daftar_hadir_test_mmpi_id ||
+            null,
+        daftar_hadir_test_zoom_id:
+            jadwalMmpi?.daftar_hadir_test_zoom_id ||
+            jadwalMmpi?.daftarHadirTestZoomId ||
+            null,
+        data_riwayat_diri_id:
+            jadwalMmpi?.data_riwayat_diri_id ||
+            jadwalMmpi?.dataRiwayatDiriId ||
+            null,
+        jadwal:
+            jadwalMmpi?.jadwal ||
+            jadwalMmpi?.tanggal ||
+            jadwalMmpi?.tanggal_jadwal ||
+            jadwalMmpi?.tanggalJadwal ||
+            null,
+        tanggal:
+            jadwalMmpi?.tanggal_label ||
+            jadwalMmpi?.tanggalLabel ||
+            jadwalMmpi?.tanggal ||
+            null,
+        jam: jadwalMmpi?.jam || null,
+        keterangan: jadwalMmpi?.keterangan || null,
+
+        kehadiran: normalizeKehadiran(rawKehadiran),
+        status_kehadiran: normalizeKehadiran(rawKehadiran),
+        statusKehadiran: normalizeKehadiran(rawKehadiran),
+        konfirmasi_kehadiran: normalizeKehadiran(rawKehadiran),
+        konfirmasiKehadiran: normalizeKehadiran(rawKehadiran),
+        sudah_mengisi_kehadiran: Boolean(normalizeKehadiran(rawKehadiran)),
+        sudahMengisiKehadiran: Boolean(normalizeKehadiran(rawKehadiran)),
+
+        hasil_test: normalizeHasilTest(rawHasilTest),
+        hasilTest: normalizeHasilTest(rawHasilTest),
+        status_hasil_test: normalizeHasilTest(rawHasilTest),
+        statusHasilTest: normalizeHasilTest(rawHasilTest),
+    };
+}
+
+
+function hasValidJadwalMmpi(jadwalMmpi) {
+    return Boolean(
+        jadwalMmpi &&
+            (jadwalMmpi.jadwal ||
+                jadwalMmpi.tanggal ||
+                jadwalMmpi.tanggal_jadwal ||
+                jadwalMmpi.tanggalJadwal)
+    );
+}
+
+function getJadwalTestFromHasil(hasil) {
+    if (!hasil) return null;
+
+    const direct =
         hasil?.jadwal_test_zoom ||
         hasil?.jadwalTestZoom ||
+        hasil?.jadwal_test ||
+        hasil?.jadwalTest ||
+        hasil?.tahapan_seleksi?.jadwal_test_zoom ||
         hasil?.tahapan_seleksi?.jadwal_test ||
+        hasil?.tahapanSeleksi?.jadwal_test_zoom ||
         hasil?.tahapanSeleksi?.jadwal_test ||
         null;
 
@@ -644,29 +1444,28 @@ function getJadwalTestFromHasil(hasil) {
         return normalizeJadwalTest(direct);
     }
 
-    const tahapan =
-        Array.isArray(hasil?.tahapan)
-            ? hasil.tahapan
-            : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
-            ? hasil.tahapan_seleksi.tahapan
-            : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
-            ? hasil.tahapanSeleksi.tahapan
-            : [];
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
 
     const itemDenganJadwal = tahapan.find((item) => {
         return (
-            item?.jadwal_test ||
-            item?.jadwalTest ||
             item?.jadwal_test_zoom ||
-            item?.jadwalTestZoom
+            item?.jadwalTestZoom ||
+            item?.jadwal_test ||
+            item?.jadwalTest
         );
     });
 
     const nested =
-        itemDenganJadwal?.jadwal_test ||
-        itemDenganJadwal?.jadwalTest ||
         itemDenganJadwal?.jadwal_test_zoom ||
         itemDenganJadwal?.jadwalTestZoom ||
+        itemDenganJadwal?.jadwal_test ||
+        itemDenganJadwal?.jadwalTest ||
         null;
 
     if (nested && hasValidJadwal(nested)) {
@@ -676,10 +1475,49 @@ function getJadwalTestFromHasil(hasil) {
     return null;
 }
 
+function getHasilTestFromHasil(hasil, jadwalTest = null) {
+    const raw =
+        hasil?.hasil_test ??
+        hasil?.hasilTest ??
+        hasil?.status_hasil_test ??
+        hasil?.statusHasilTest ??
+        jadwalTest?.hasil_test ??
+        jadwalTest?.hasilTest ??
+        jadwalTest?.status_hasil_test ??
+        jadwalTest?.statusHasilTest ??
+        hasil?.tahapan_seleksi?.hasil_test ??
+        hasil?.tahapanSeleksi?.hasil_test ??
+        null;
+
+    const direct = normalizeHasilTest(raw);
+
+    if (direct) return direct;
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemHasil = tahapan.find((item) => {
+        return (
+            normalizeHasilTest(item?.hasil_test) ||
+            normalizeHasilTest(item?.hasilTest) ||
+            String(item?.nama || "").toLowerCase().includes("hasil seleksi")
+        );
+    });
+
+    return normalizeHasilTest(
+        itemHasil?.hasil_test ||
+            itemHasil?.hasilTest ||
+            itemHasil?.status
+    );
+}
+
 function normalizeJadwalTest(jadwalTest) {
-    if (!jadwalTest) {
-        return null;
-    }
+    if (!jadwalTest) return null;
 
     const rawKehadiran =
         jadwalTest?.kehadiran ??
@@ -692,24 +1530,79 @@ function normalizeJadwalTest(jadwalTest) {
         jadwalTest?.hadir ??
         null;
 
+    const rawHasilTest =
+        jadwalTest?.hasil_test ??
+        jadwalTest?.hasilTest ??
+        jadwalTest?.status_hasil_test ??
+        jadwalTest?.statusHasilTest ??
+        null;
+
+    const linkZoom =
+        jadwalTest?.link_zoom ||
+        jadwalTest?.linkZoom ||
+        jadwalTest?.zoom_link ||
+        jadwalTest?.zoomLink ||
+        jadwalTest?.url_link ||
+        jadwalTest?.urlLink ||
+        jadwalTest?.link ||
+        null;
+
+    const bolehBukaLinkZoom =
+        jadwalTest?.boleh_buka_link_zoom ??
+        jadwalTest?.bolehBukaLinkZoom ??
+        jadwalTest?.can_open_zoom_link ??
+        jadwalTest?.canOpenZoomLink ??
+        null;
+
     return {
         id: jadwalTest?.id || null,
+
         jadwal:
             jadwalTest?.jadwal ||
             jadwalTest?.tanggal_jadwal ||
             jadwalTest?.tanggalJadwal ||
             null,
+
         tanggal: jadwalTest?.tanggal || null,
         jam: jadwalTest?.jam || null,
         keterangan: jadwalTest?.keterangan || null,
+
         kehadiran: normalizeKehadiran(rawKehadiran),
+
+        hasil_test: normalizeHasilTest(rawHasilTest),
+        hasilTest: normalizeHasilTest(rawHasilTest),
+
+        link_zoom: linkZoom,
+        zoom_link: linkZoom,
+        url_link: linkZoom,
+        boleh_buka_link_zoom: bolehBukaLinkZoom,
+
+        boleh_akses_jadwal_test_zoom:
+            jadwalTest?.boleh_akses_jadwal_test_zoom ??
+            jadwalTest?.bolehAksesJadwalTestZoom ??
+            jadwalTest?.can_access_jadwal_test_zoom ??
+            jadwalTest?.canAccessJadwalTestZoom ??
+            null,
+        bolehAksesJadwalTestZoom:
+            jadwalTest?.bolehAksesJadwalTestZoom ??
+            jadwalTest?.boleh_akses_jadwal_test_zoom ??
+            jadwalTest?.canAccessJadwalTestZoom ??
+            jadwalTest?.can_access_jadwal_test_zoom ??
+            null,
+        disabled: Boolean(jadwalTest?.disabled),
+        disabled_reason:
+            jadwalTest?.disabled_reason ||
+            jadwalTest?.disabledReason ||
+            null,
+        disabledReason:
+            jadwalTest?.disabledReason ||
+            jadwalTest?.disabled_reason ||
+            null,
     };
 }
 
 function normalizeKehadiran(value) {
-    if (value === undefined || value === null || value === "") {
-        return null;
-    }
+    if (value === undefined || value === null || value === "") return null;
 
     const normalized = String(value)
         .trim()
@@ -741,16 +1634,44 @@ function normalizeKehadiran(value) {
     return null;
 }
 
-function injectUpdatedJadwalTest(data, updatedJadwalTest) {
-    if (!data) {
-        return data;
+function normalizeHasilTest(value) {
+    if (value === undefined || value === null || value === "") return null;
+
+    const normalized = String(value)
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/-/g, "_");
+
+    if (
+        normalized === "lolos" ||
+        normalized === "1" ||
+        normalized === "true" ||
+        normalized === "ya" ||
+        normalized === "yes"
+    ) {
+        return "lolos";
     }
+
+    if (
+        normalized === "gagal" ||
+        normalized === "0" ||
+        normalized === "false" ||
+        normalized === "tidak" ||
+        normalized === "no"
+    ) {
+        return "gagal";
+    }
+
+    return null;
+}
+
+function injectUpdatedJadwalTest(data, updatedJadwalTest) {
+    if (!data) return data;
 
     const normalizedUpdatedJadwalTest = normalizeJadwalTest(updatedJadwalTest);
 
-    if (!normalizedUpdatedJadwalTest) {
-        return data;
-    }
+    if (!normalizedUpdatedJadwalTest) return data;
 
     const fixedData = {
         ...data,
@@ -758,79 +1679,69 @@ function injectUpdatedJadwalTest(data, updatedJadwalTest) {
             ...(data?.jadwal_test || {}),
             ...normalizedUpdatedJadwalTest,
         },
+        jadwal_test_zoom: {
+            ...(data?.jadwal_test_zoom || {}),
+            ...normalizedUpdatedJadwalTest,
+        },
+        jadwalTestZoom: {
+            ...(data?.jadwalTestZoom || {}),
+            ...normalizedUpdatedJadwalTest,
+        },
     };
 
     if (Array.isArray(fixedData.tahapan)) {
         fixedData.tahapan = fixedData.tahapan.map((item) => {
-            if (!item?.jadwal_test) {
+            if (!item?.jadwal_test && !item?.jadwal_test_zoom) {
                 return item;
             }
 
             return {
                 ...item,
                 jadwal_test: {
-                    ...item.jadwal_test,
+                    ...(item.jadwal_test || item.jadwal_test_zoom || {}),
+                    ...normalizedUpdatedJadwalTest,
+                },
+                jadwal_test_zoom: {
+                    ...(item.jadwal_test_zoom || item.jadwal_test || {}),
                     ...normalizedUpdatedJadwalTest,
                 },
             };
         });
     }
 
-    if (fixedData?.tahapan_seleksi?.jadwal_test) {
+    if (fixedData?.tahapan_seleksi?.jadwal_test || fixedData?.tahapan_seleksi?.jadwal_test_zoom) {
         fixedData.tahapan_seleksi = {
             ...fixedData.tahapan_seleksi,
             jadwal_test: {
-                ...fixedData.tahapan_seleksi.jadwal_test,
+                ...(fixedData.tahapan_seleksi.jadwal_test ||
+                    fixedData.tahapan_seleksi.jadwal_test_zoom ||
+                    {}),
+                ...normalizedUpdatedJadwalTest,
+            },
+            jadwal_test_zoom: {
+                ...(fixedData.tahapan_seleksi.jadwal_test_zoom ||
+                    fixedData.tahapan_seleksi.jadwal_test ||
+                    {}),
                 ...normalizedUpdatedJadwalTest,
             },
         };
     }
 
-    if (Array.isArray(fixedData?.tahapan_seleksi?.tahapan)) {
-        fixedData.tahapan_seleksi = {
-            ...fixedData.tahapan_seleksi,
-            tahapan: fixedData.tahapan_seleksi.tahapan.map((item) => {
-                if (!item?.jadwal_test) {
-                    return item;
-                }
-
-                return {
-                    ...item,
-                    jadwal_test: {
-                        ...item.jadwal_test,
-                        ...normalizedUpdatedJadwalTest,
-                    },
-                };
-            }),
-        };
-    }
-
-    if (fixedData?.tahapanSeleksi?.jadwal_test) {
+    if (fixedData?.tahapanSeleksi?.jadwal_test || fixedData?.tahapanSeleksi?.jadwal_test_zoom) {
         fixedData.tahapanSeleksi = {
             ...fixedData.tahapanSeleksi,
             jadwal_test: {
-                ...fixedData.tahapanSeleksi.jadwal_test,
+                ...(fixedData.tahapanSeleksi.jadwal_test ||
+                    fixedData.tahapanSeleksi.jadwal_test_zoom ||
+                    {}),
                 ...normalizedUpdatedJadwalTest,
             },
-        };
-    }
-
-    if (Array.isArray(fixedData?.tahapanSeleksi?.tahapan)) {
-        fixedData.tahapanSeleksi = {
-            ...fixedData.tahapanSeleksi,
-            tahapan: fixedData.tahapanSeleksi.tahapan.map((item) => {
-                if (!item?.jadwal_test) {
-                    return item;
-                }
-
-                return {
-                    ...item,
-                    jadwal_test: {
-                        ...item.jadwal_test,
-                        ...normalizedUpdatedJadwalTest,
-                    },
-                };
-            }),
+            jadwal_test_zoom: {
+                ...(fixedData.tahapanSeleksi.jadwal_test_zoom ||
+                    fixedData.tahapanSeleksi.jadwal_test ||
+                    {}),
+                ...normalizedUpdatedJadwalTest,
+            },
         };
     }
 
@@ -849,23 +1760,15 @@ function hasValidJadwal(jadwalTest) {
 }
 
 function getJadwalTanggal(jadwalTest) {
-    if (!jadwalTest) {
-        return "-";
-    }
+    if (!jadwalTest) return "-";
 
-    if (jadwalTest.tanggal) {
-        return jadwalTest.tanggal;
-    }
+    if (jadwalTest.tanggal) return jadwalTest.tanggal;
 
-    if (!jadwalTest.jadwal) {
-        return "-";
-    }
+    if (!jadwalTest.jadwal) return "-";
 
     const date = parseJadwalDate(jadwalTest.jadwal);
 
-    if (!date) {
-        return "-";
-    }
+    if (!date) return "-";
 
     return date.toLocaleDateString("id-ID", {
         day: "2-digit",
@@ -875,23 +1778,15 @@ function getJadwalTanggal(jadwalTest) {
 }
 
 function getJadwalJam(jadwalTest) {
-    if (!jadwalTest) {
-        return "-";
-    }
+    if (!jadwalTest) return "-";
 
-    if (jadwalTest.jam) {
-        return jadwalTest.jam;
-    }
+    if (jadwalTest.jam) return jadwalTest.jam;
 
-    if (!jadwalTest.jadwal) {
-        return "-";
-    }
+    if (!jadwalTest.jadwal) return "-";
 
     const date = parseJadwalDate(jadwalTest.jadwal);
 
-    if (!date) {
-        return "-";
-    }
+    if (!date) return "-";
 
     return date.toLocaleTimeString("id-ID", {
         hour: "2-digit",
@@ -900,12 +1795,24 @@ function getJadwalJam(jadwalTest) {
     });
 }
 
+function getLinkZoom(jadwalTest) {
+    if (!jadwalTest) return null;
+
+    return (
+        jadwalTest?.link_zoom ||
+        jadwalTest?.zoom_link ||
+        jadwalTest?.url_link ||
+        jadwalTest?.linkZoom ||
+        jadwalTest?.zoomLink ||
+        jadwalTest?.urlLink ||
+        null
+    );
+}
+
 function isJadwalHariIni(jadwalTest) {
     const jadwalDate = parseJadwalDate(jadwalTest?.jadwal);
 
-    if (!jadwalDate) {
-        return false;
-    }
+    if (!jadwalDate) return false;
 
     const today = new Date();
 
@@ -917,9 +1824,7 @@ function isJadwalHariIni(jadwalTest) {
 }
 
 function parseJadwalDate(value) {
-    if (!value) {
-        return null;
-    }
+    if (!value) return null;
 
     const normalizedValue =
         typeof value === "string" && value.includes(" ") && !value.includes("T")
@@ -928,9 +1833,7 @@ function parseJadwalDate(value) {
 
     const date = new Date(normalizedValue);
 
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
+    if (Number.isNaN(date.getTime())) return null;
 
     return date;
 }
@@ -938,9 +1841,7 @@ function parseJadwalDate(value) {
 async function parseJsonResponse(response) {
     const text = await response.text();
 
-    if (!text) {
-        return {};
-    }
+    if (!text) return {};
 
     try {
         return JSON.parse(text);
@@ -956,9 +1857,7 @@ function getTokenFromUrl() {
     const path = window.location.pathname || "";
     const match = path.match(/\/pendaftaran\/([^/]+)/);
 
-    if (!match?.[1]) {
-        return null;
-    }
+    if (!match?.[1]) return null;
 
     return decodeURIComponent(match[1]);
 }
@@ -969,4 +1868,82 @@ function getCsrfToken() {
             .querySelector('meta[name="csrf-token"]')
             ?.getAttribute("content") || ""
     );
+}
+
+function getTextColor(type) {
+    const colors = {
+        emerald: "text-emerald-700",
+        red: "text-red-700",
+        blue: "text-blue-700",
+        indigo: "text-indigo-700",
+        amber: "text-amber-700",
+        teal: "text-teal-700",
+    };
+
+    return colors[type] || colors.teal;
+}
+
+function getBadgeColor(type) {
+    const colors = {
+        emerald: "bg-emerald-100 text-emerald-700",
+        red: "bg-red-100 text-red-700",
+        blue: "bg-blue-100 text-blue-700",
+        indigo: "bg-indigo-100 text-indigo-700",
+        amber: "bg-amber-100 text-amber-700",
+        teal: "bg-teal-100 text-teal-700",
+    };
+
+    return colors[type] || colors.teal;
+}
+
+function getBoxColor(type) {
+    const colors = {
+        emerald: "border-emerald-200 bg-emerald-50",
+        red: "border-red-200 bg-red-50",
+        blue: "border-blue-200 bg-blue-50",
+        indigo: "border-indigo-200 bg-indigo-50",
+        amber: "border-amber-200 bg-amber-50",
+        teal: "border-teal-200 bg-teal-50",
+    };
+
+    return colors[type] || colors.teal;
+}
+
+function getCircleColor(type) {
+    const colors = {
+        emerald: "bg-emerald-600",
+        red: "bg-red-600",
+        blue: "bg-blue-600",
+        indigo: "bg-indigo-600",
+        amber: "bg-amber-500",
+        teal: "bg-teal-600",
+    };
+
+    return colors[type] || colors.teal;
+}
+
+function getTitleColor(type) {
+    const colors = {
+        emerald: "text-emerald-900",
+        red: "text-red-900",
+        blue: "text-blue-900",
+        indigo: "text-indigo-900",
+        amber: "text-amber-900",
+        teal: "text-teal-800",
+    };
+
+    return colors[type] || colors.teal;
+}
+
+function getDescriptionColor(type) {
+    const colors = {
+        emerald: "text-emerald-800",
+        red: "text-red-800",
+        blue: "text-blue-800",
+        indigo: "text-indigo-800",
+        amber: "text-amber-800",
+        teal: "text-teal-700",
+    };
+
+    return colors[type] || colors.teal;
 }

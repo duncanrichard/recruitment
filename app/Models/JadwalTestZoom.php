@@ -21,12 +21,17 @@ class JadwalTestZoom extends Model
     protected $fillable = [
         'data_riwayat_diri_id',
         'jadwal',
-        'link_zoom',
         'kehadiran',
+        'hasil_test',
+        'link_zoom',
+        'created_by',
+        'updated_by',
+        'deleted_by',
     ];
 
     protected $casts = [
         'jadwal' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function dataRiwayatDiri(): BelongsTo
@@ -34,6 +39,33 @@ class JadwalTestZoom extends Model
         return $this->belongsTo(
             DataRiwayatDiri::class,
             'data_riwayat_diri_id',
+            'id'
+        );
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'created_by',
+            'id'
+        );
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'updated_by',
+            'id'
+        );
+    }
+
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(
+            User::class,
+            'deleted_by',
             'id'
         );
     }
