@@ -159,4 +159,8 @@ class DataRiwayatDiri extends Model
         return $this->hasMany(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')
             ->orderByDesc('jadwal');
     }
+     public function jadwalInterviewKandidat()
+    {
+        return $this->hasMany(JadwalInterviewKandidat::class, 'data_riwayat_diri_id');
+    }
 }

@@ -22,3 +22,8 @@ require __DIR__ . '/jadwal_test_zoom.php';
 require __DIR__ . '/jadwal_test_mmpi.php';
 require __DIR__ . '/daftar_hadir_zoom.php';
 require __DIR__ . '/daftar_hadir_mmpi.php';
+require __DIR__ . '/master_data_jabatan.php';
+require __DIR__ . '/master_data_divisi.php';
+require __DIR__ . '/jadwal_interview.php';
+require __DIR__ . '/interviewer.php';
+require __DIR__ . '/interview_kandidat.php';

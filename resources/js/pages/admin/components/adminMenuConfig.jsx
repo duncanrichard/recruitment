@@ -13,6 +13,8 @@ import DaftarHadirMmpiPage from "../pages/daftar-hadir/mmpi/Index";
 import DetailDaftarHadirMmpiPage from "../pages/daftar-hadir/mmpi/Detail";
 
 import PosisiPage from "../pages/master-data/posisi/Index";
+import JabatanPage from "../pages/master-data/jabatan/Index";
+import DivisiPage from "../pages/master-data/divisi/Index";
 import PendidikanPage from "../pages/master-data/pendidikan/Index";
 import AgamaPage from "../pages/master-data/agama/Index";
 import KewarganegaraanPage from "../pages/master-data/kewarganegaraan/Index";
@@ -20,6 +22,10 @@ import StatusPernikahanPage from "../pages/master-data/status-pernikahan/Index";
 import OpsiKacamataPage from "../pages/master-data/opsi-kacamata/Index";
 import SumberInformasiPage from "../pages/master-data/sumber-informasi/Index";
 import DataPerusahaanPage from "../pages/master-data/perusahaan/Index";
+
+import InterviewerPage from "../pages/rangkaian-interview/interviewer/Index";
+import JadwalInterviewPage from "../pages/rangkaian-interview/jadwal-interview/Index";
+import KandidatInterviewPage from "../pages/rangkaian-interview/kandidat/Index";
 
 export const defaultMenuKey = "dashboard";
 
@@ -29,9 +35,17 @@ export const initialActionSignals = {
     pendaftarBaru: 0,
     pendaftarArsip: 0,
     tahapan: 0,
+
     jadwalTestZoom: 0,
     jadwalTestMmpi: 0,
+
+    interviewer: 0,
+    jadwalInterview: 0,
+    kandidatInterview: 0,
+
     masterPosisi: 0,
+    masterJabatan: 0,
+    masterDivisi: 0,
     masterPendidikan: 0,
     masterAgama: 0,
     masterKewarganegaraan: 0,
@@ -57,13 +71,35 @@ export const menuItems = [
         children: [
             {
                 key: "master-posisi",
-                label: "Posisi",
+                label: "Posisi Pelamar",
                 description: "Kelola posisi pekerjaan",
                 icon: "◆",
                 component: PosisiPage,
                 action: {
                     label: "Tambah Posisi",
                     signalKey: "masterPosisi",
+                },
+            },
+            {
+                key: "master-jabatan",
+                label: "Jabatan",
+                description: "Kelola data jabatan",
+                icon: "▧",
+                component: JabatanPage,
+                action: {
+                    label: "Tambah Jabatan",
+                    signalKey: "masterJabatan",
+                },
+            },
+            {
+                key: "master-divisi",
+                label: "Divisi",
+                description: "Kelola data divisi",
+                icon: "▦",
+                component: DivisiPage,
+                action: {
+                    label: "Tambah Divisi",
+                    signalKey: "masterDivisi",
                 },
             },
             {
@@ -159,7 +195,7 @@ export const menuItems = [
     {
         key: "jadwal-test",
         label: "Data Jadwal Test",
-        description: "Kelola jadwal test kandidat",
+        description: "Kelola jadwal test",
         icon: "◷",
         children: [
             {
@@ -189,7 +225,7 @@ export const menuItems = [
     {
         key: "daftar-hadir",
         label: "Daftar Hadir",
-        description: "Kelola kehadiran peserta",
+        description: "Kelola kehadiran",
         icon: "▨",
         children: [
             {
@@ -205,6 +241,47 @@ export const menuItems = [
                 description: "Daftar hadir test MMPI",
                 icon: "◉",
                 component: DaftarHadirMmpiPage,
+            },
+        ],
+    },
+    {
+        key: "rangkaian-interview",
+        label: "Interview",
+        description: "Kelola proses interview",
+        icon: "▣",
+        children: [
+            {
+                key: "interviewer",
+                label: "Interviewer",
+                description: "Kelola data interviewer",
+                icon: "◉",
+                component: InterviewerPage,
+                action: {
+                    label: "Tambah Interviewer",
+                    signalKey: "interviewer",
+                },
+            },
+            {
+                key: "jadwal-interview",
+                label: "Jadwal Interview",
+                description: "Kelola jadwal interview",
+                icon: "◷",
+                component: JadwalInterviewPage,
+                action: {
+                    label: "Tambah Jadwal Interview",
+                    signalKey: "jadwalInterview",
+                },
+            },
+            {
+                key: "kandidat-interview",
+                label: "Kandidat",
+                description: "Kelola kandidat interview",
+                icon: "▤",
+                component: KandidatInterviewPage,
+                action: {
+                    label: "Tambah Kandidat",
+                    signalKey: "kandidatInterview",
+                },
             },
         ],
     },
@@ -304,8 +381,10 @@ export function isMenuActive(menu, activeMenu) {
         activeMenu === menu.key ||
         childKeys.includes(activeMenu) ||
         (activeMenu === "data-pelamar-detail" && menu.key === "data-pelamar") ||
-        (activeMenu === "daftar-hadir-zoom-detail" && menu.key === "daftar-hadir") ||
-        (activeMenu === "daftar-hadir-mmpi-detail" && menu.key === "daftar-hadir")
+        (activeMenu === "daftar-hadir-zoom-detail" &&
+            menu.key === "daftar-hadir") ||
+        (activeMenu === "daftar-hadir-mmpi-detail" &&
+            menu.key === "daftar-hadir")
     );
 }
 

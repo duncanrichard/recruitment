@@ -336,6 +336,14 @@ class CekTahapanPelamarController extends Controller
                 'jadwalTestZoom' => null,
                 'jadwal_test_mmpi' => null,
                 'jadwalTestMmpi' => null,
+                'jadwal_interview' => null,
+                'jadwalInterview' => null,
+                'hasil_interview' => null,
+                'hasilInterview' => null,
+                'status_kehadiran_interview' => null,
+                'statusKehadiranInterview' => null,
+                'catatan_interview' => null,
+                'catatanInterview' => null,
                 'hasil_test' => null,
                 'hasilTest' => null,
                 'hasil_test_mmpi' => null,
@@ -368,13 +376,19 @@ class CekTahapanPelamarController extends Controller
 
         $jadwalTestData = $this->formatJadwalTest($jadwalTest);
         $jadwalTestMmpiData = $this->formatJadwalTestMmpi($pelamar);
+        $jadwalInterviewData = $this->formatJadwalInterview($pelamar);
 
         $hasilTest = $jadwalTestData['hasil_test'] ?? null;
         $hasilTestMmpi = $jadwalTestMmpiData['hasil_test'] ?? null;
+        $hasilInterview = $jadwalInterviewData['hasil_interview'] ?? null;
+        $statusKehadiranInterview = $jadwalInterviewData['kehadiran'] ?? null;
+        $isInterviewReschedule = $statusKehadiranInterview === 'reschedule';
         $punyaJadwalTest = !empty($jadwalTestData);
         $punyaHasilTest = !empty($hasilTest);
         $punyaJadwalTestMmpi = !empty($jadwalTestMmpiData);
         $punyaHasilTestMmpi = !empty($hasilTestMmpi);
+        $punyaJadwalInterview = !empty($jadwalInterviewData);
+        $punyaHasilInterview = !empty($hasilInterview);
         $pesanBelumLengkap = 'Tahapan Test Zoom belum dapat dilanjutkan karena data pendaftaran belum lengkap sampai tahap Kesiapan Bekerja. Silakan lengkapi seluruh formulir pendaftaran terlebih dahulu.';
         $tahapFormTerakhir = $formCompletion['last_completed_label'] ?? 'Data Diri';
 
@@ -454,13 +468,57 @@ class CekTahapanPelamarController extends Controller
                             ? 'Selamat, Anda dinyatakan lolos pada seleksi test MMPI.'
                             : 'Mohon maaf, Anda dinyatakan belum lolos pada seleksi test MMPI.',
                         'saran' => $hasilTestMmpi === 'lolos'
-                            ? 'Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen.'
+                            ? 'Silakan pantau informasi jadwal interview dari tim rekrutmen.'
                             : 'Terima kasih sudah mengikuti proses seleksi.',
                         'hasil_test' => $hasilTestMmpi,
                         'hasilTest' => $hasilTestMmpi,
                         'hasil_test_mmpi' => $hasilTestMmpi,
                         'hasilTestMmpi' => $hasilTestMmpi,
                     ];
+
+                    if ($hasilTestMmpi === 'lolos') {
+                        $tahapan[] = [
+                            'nama' => 'Jadwal Interview',
+                            'status' => $punyaJadwalInterview
+                                ? ($isInterviewReschedule ? 'Reschedule' : 'Terjadwal')
+                                : 'Menunggu',
+                            'keterangan' => $punyaJadwalInterview
+                                ? ($isInterviewReschedule
+                                    ? 'Jadwal interview kandidat sedang dalam proses penjadwalan ulang.'
+                                    : 'Jadwal interview kandidat sudah tersedia.')
+                                : 'Kandidat sudah lolos test MMPI dan sedang menunggu jadwal interview.',
+                            'saran' => $punyaJadwalInterview
+                                ? ($isInterviewReschedule
+                                    ? 'Silakan pantau informasi jadwal interview terbaru dari tim rekrutmen.'
+                                    : 'Silakan mengikuti interview sesuai jadwal yang sudah ditentukan.')
+                                : 'Silakan pantau halaman ini secara berkala untuk informasi jadwal interview.',
+                            'jadwal_interview' => $jadwalInterviewData,
+                            'jadwalInterview' => $jadwalInterviewData,
+                        ];
+
+                        if ($punyaHasilInterview) {
+                            $tahapan[] = [
+                                'nama' => 'Hasil Interview',
+                                'status' => $hasilInterview === 'lolos'
+                                    ? 'Lolos'
+                                    : ($hasilInterview === 'dipertimbangkan' ? 'Dipertimbangkan' : 'Gagal'),
+                                'keterangan' => $hasilInterview === 'lolos'
+                                    ? 'Selamat, Anda dinyatakan lolos pada tahap interview.'
+                                    : ($hasilInterview === 'dipertimbangkan'
+                                        ? 'Hasil interview Anda sedang dalam pertimbangan tim rekrutmen.'
+                                        : 'Mohon maaf, Anda dinyatakan belum lolos pada tahap interview.'),
+                                'saran' => $hasilInterview === 'lolos'
+                                    ? 'Silakan pantau informasi tahapan berikutnya dari tim rekrutmen.'
+                                    : ($hasilInterview === 'dipertimbangkan'
+                                        ? 'Silakan pantau informasi lanjutan dari tim rekrutmen.'
+                                        : 'Terima kasih sudah mengikuti proses seleksi.'),
+                                'hasil_interview' => $hasilInterview,
+                                'hasilInterview' => $hasilInterview,
+                                'catatan_interview' => $jadwalInterviewData['catatan'] ?? null,
+                                'catatanInterview' => $jadwalInterviewData['catatan'] ?? null,
+                            ];
+                        }
+                    }
                 }
             }
         }
@@ -517,10 +575,44 @@ class CekTahapanPelamarController extends Controller
                 : 'Kandidat dinyatakan belum lolos pada seleksi test MMPI.';
 
             $saran = $hasilTestMmpi === 'lolos'
-                ? 'Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen.'
+                ? 'Silakan pantau informasi jadwal interview dari tim rekrutmen.'
                 : 'Terima kasih sudah mengikuti proses seleksi.';
 
             $tahapanTerakhir = 'Hasil Seleksi Test MMPI';
+        }
+
+        if ($punyaJadwalInterview) {
+            if ($isInterviewReschedule) {
+                $status = 'Interview Reschedule';
+                $keterangan = 'Jadwal interview kandidat sedang dalam proses penjadwalan ulang.';
+                $saran = 'Silakan pantau informasi jadwal interview terbaru dari tim rekrutmen.';
+                $tahapanTerakhir = 'Reschedule Interview';
+            } else {
+                $status = 'Jadwal Interview Tersedia';
+                $keterangan = 'Kandidat sudah mendapatkan jadwal interview.';
+                $saran = 'Silakan mengikuti interview sesuai jadwal yang sudah ditentukan.';
+                $tahapanTerakhir = 'Jadwal Interview';
+            }
+        }
+
+        if ($punyaHasilInterview) {
+            $status = $hasilInterview === 'lolos'
+                ? 'Lolos Interview'
+                : ($hasilInterview === 'dipertimbangkan' ? 'Dipertimbangkan' : 'Tidak Lolos Interview');
+
+            $keterangan = $hasilInterview === 'lolos'
+                ? 'Kandidat dinyatakan lolos pada tahap interview.'
+                : ($hasilInterview === 'dipertimbangkan'
+                    ? 'Kandidat sedang dipertimbangkan berdasarkan hasil interview.'
+                    : 'Kandidat dinyatakan belum lolos pada tahap interview.');
+
+            $saran = $hasilInterview === 'lolos'
+                ? 'Silakan pantau informasi tahapan berikutnya dari tim rekrutmen.'
+                : ($hasilInterview === 'dipertimbangkan'
+                    ? 'Silakan pantau informasi lanjutan dari tim rekrutmen.'
+                    : 'Terima kasih sudah mengikuti proses seleksi.');
+
+            $tahapanTerakhir = 'Hasil Interview';
         }
 
         return [
@@ -595,6 +687,18 @@ class CekTahapanPelamarController extends Controller
             'status_hasil_test_mmpi' => $hasilTestMmpi,
             'statusHasilTestMmpi' => $hasilTestMmpi,
 
+            'jadwal_interview' => $jadwalInterviewData,
+            'jadwalInterview' => $jadwalInterviewData,
+            'interview' => $jadwalInterviewData,
+            'hasil_interview' => $hasilInterview,
+            'hasilInterview' => $hasilInterview,
+            'status_hasil_interview' => $hasilInterview,
+            'statusHasilInterview' => $hasilInterview,
+            'status_kehadiran_interview' => $jadwalInterviewData['kehadiran'] ?? null,
+            'statusKehadiranInterview' => $jadwalInterviewData['kehadiran'] ?? null,
+            'catatan_interview' => $jadwalInterviewData['catatan'] ?? null,
+            'catatanInterview' => $jadwalInterviewData['catatan'] ?? null,
+
             'jadwal_test_mmpi' => $jadwalTestMmpiData,
             'jadwalTestMmpi' => $jadwalTestMmpiData,
             'jadwal_mmpi' => $jadwalTestMmpiData,
@@ -628,9 +732,11 @@ class CekTahapanPelamarController extends Controller
                 'jadwal_test' => $jadwalTestData,
                 'jadwal_test_zoom' => $jadwalTestData,
                 'jadwal_test_mmpi' => $jadwalTestMmpiData,
+                'jadwal_interview' => $jadwalInterviewData,
                 'hasil_test' => $hasilTest,
                 'hasil_test_zoom' => $hasilTest,
                 'hasil_test_mmpi' => $hasilTestMmpi,
+                'hasil_interview' => $hasilInterview,
                 'boleh_melanjutkan_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom,
                 'pesan_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
                 'tahapan' => $tahapan,
@@ -640,9 +746,11 @@ class CekTahapanPelamarController extends Controller
                 'jadwal_test' => $jadwalTestData,
                 'jadwal_test_zoom' => $jadwalTestData,
                 'jadwal_test_mmpi' => $jadwalTestMmpiData,
+                'jadwal_interview' => $jadwalInterviewData,
                 'hasil_test' => $hasilTest,
                 'hasil_test_zoom' => $hasilTest,
                 'hasil_test_mmpi' => $hasilTestMmpi,
+                'hasil_interview' => $hasilInterview,
                 'bolehMelanjutkanJadwalTestZoom' => $bolehLanjutJadwalTestZoom,
                 'pesanJadwalTestZoom' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
                 'tahapan' => $tahapan,
@@ -942,6 +1050,101 @@ class CekTahapanPelamarController extends Controller
         return !empty($value);
     }
 
+
+    private function formatJadwalInterview(?DataRiwayatDiri $pelamar): ?array
+    {
+        if (!$pelamar || !Schema::hasTable('jadwal_interview') || !Schema::hasTable('jadwal_interview_kandidat')) {
+            return null;
+        }
+
+        $query = DB::table('jadwal_interview_kandidat as jik')
+            ->join('jadwal_interview as ji', 'ji.id', '=', 'jik.jadwal_interview_id')
+            ->where('jik.data_riwayat_diri_id', $pelamar->id);
+
+        if (Schema::hasColumn('jadwal_interview_kandidat', 'deleted_at')) {
+            $query->whereNull('jik.deleted_at');
+        }
+
+        if (Schema::hasColumn('jadwal_interview', 'deleted_at')) {
+            $query->whereNull('ji.deleted_at');
+        }
+
+        $select = [
+            'jik.id as pivot_id',
+            'jik.jadwal_interview_id',
+            'jik.data_riwayat_diri_id',
+            'ji.id as id',
+            'ji.judul_interview',
+            'ji.jadwal_interview',
+        ];
+
+        foreach (['status_kehadiran', 'hasil_interview', 'catatan'] as $column) {
+            if (Schema::hasColumn('jadwal_interview_kandidat', $column)) {
+                $select[] = "jik.{$column}";
+            }
+        }
+
+        $jadwalInterview = $query
+            ->select($select)
+            ->orderByDesc('ji.jadwal_interview')
+            ->first();
+
+        if (!$jadwalInterview || empty($jadwalInterview->jadwal_interview)) {
+            return null;
+        }
+
+        $jadwal = $this->parseDateTime($jadwalInterview->jadwal_interview);
+
+        if (!$jadwal) {
+            return null;
+        }
+
+        $kehadiran = $this->normalizeKehadiranInterviewValue($jadwalInterview->status_kehadiran ?? null);
+        $hasilInterview = $this->normalizeHasilInterviewValue($jadwalInterview->hasil_interview ?? null);
+        $catatan = $jadwalInterview->catatan ?? null;
+
+        return [
+            'id' => $jadwalInterview->id ?? null,
+            'pivot_id' => $jadwalInterview->pivot_id ?? null,
+            'pivotId' => $jadwalInterview->pivot_id ?? null,
+            'jadwal_interview_id' => $jadwalInterview->jadwal_interview_id ?? null,
+            'jadwalInterviewId' => $jadwalInterview->jadwal_interview_id ?? null,
+            'data_riwayat_diri_id' => $jadwalInterview->data_riwayat_diri_id ?? null,
+            'dataRiwayatDiriId' => $jadwalInterview->data_riwayat_diri_id ?? null,
+
+            'judul_interview' => $jadwalInterview->judul_interview ?? 'Interview',
+            'judulInterview' => $jadwalInterview->judul_interview ?? 'Interview',
+            'nama_interview' => $jadwalInterview->judul_interview ?? 'Interview',
+            'namaInterview' => $jadwalInterview->judul_interview ?? 'Interview',
+
+            'jadwal' => $jadwal->toDateTimeString(),
+            'jadwal_interview' => $jadwal->toDateTimeString(),
+            'jadwalInterview' => $jadwal->toDateTimeString(),
+            'tanggal' => $jadwal->translatedFormat('d F Y'),
+            'jam' => $jadwal->format('H:i'),
+
+            'kehadiran' => $kehadiran,
+            'status_kehadiran' => $kehadiran,
+            'statusKehadiran' => $kehadiran,
+            'status_kehadiran_interview' => $kehadiran,
+            'statusKehadiranInterview' => $kehadiran,
+            'konfirmasi_kehadiran' => $kehadiran,
+            'konfirmasiKehadiran' => $kehadiran,
+            'sudah_mengisi_kehadiran' => !empty($kehadiran),
+            'sudahMengisiKehadiran' => !empty($kehadiran),
+
+            'hasil_interview' => $hasilInterview,
+            'hasilInterview' => $hasilInterview,
+            'status_hasil_interview' => $hasilInterview,
+            'statusHasilInterview' => $hasilInterview,
+            'sudah_ada_hasil_interview' => !empty($hasilInterview),
+            'sudahAdaHasilInterview' => !empty($hasilInterview),
+
+            'catatan' => $catatan,
+            'catatan_interview' => $catatan,
+            'catatanInterview' => $catatan,
+        ];
+    }
 
     private function formatJadwalTestMmpi(?DataRiwayatDiri $pelamar): ?array
     {
@@ -1279,6 +1482,58 @@ class CekTahapanPelamarController extends Controller
 
         if (in_array($normalized, ['tidak_hadir', 'tidakhadir', 'tidak', '0', 'false', 'no'], true)) {
             return 'tidak_hadir';
+        }
+
+        return null;
+    }
+
+    private function normalizeKehadiranInterviewValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        if (in_array($normalized, ['hadir', '1', 'true', 'ya', 'yes'], true)) {
+            return 'hadir';
+        }
+
+        if (in_array($normalized, ['tidak_hadir', 'tidakhadir', 'tidak', '0', 'false', 'no'], true)) {
+            return 'tidak_hadir';
+        }
+
+        if (in_array($normalized, ['tidak_respon', 'tidakrespon', 'no_response', 'noresponse'], true)) {
+            return 'tidak_respon';
+        }
+
+        if (in_array($normalized, ['reschedule', 'rescheduled', 'jadwal_ulang', 'jadwalulang', 'ubah_jadwal', 'ubahjadwal'], true)) {
+            return 'reschedule';
+        }
+
+        return null;
+    }
+
+    private function normalizeHasilInterviewValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        if (in_array($normalized, ['lolos', 'lolos_interview', '1', 'true', 'ya', 'yes'], true)) {
+            return 'lolos';
+        }
+
+        if (in_array($normalized, ['tidak_lolos', 'tidak_lolos_interview', 'gagal', '0', 'false', 'tidak', 'no'], true)) {
+            return 'gagal';
+        }
+
+        if (in_array($normalized, ['dipertimbangkan', 'pertimbangan', 'considered', 'consider'], true)) {
+            return 'dipertimbangkan';
         }
 
         return null;

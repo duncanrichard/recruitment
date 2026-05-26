@@ -194,6 +194,8 @@ function HasilTahapan({ hasil, token, onUpdated }) {
     const hasilTest = getHasilTestFromHasil(hasil, jadwalTest);
     const jadwalMmpi = getJadwalMmpiFromHasil(hasil);
     const hasilTestMmpi = getHasilTestMmpiFromHasil(hasil, jadwalMmpi);
+    const jadwalInterview = getJadwalInterviewFromHasil(hasil);
+    const hasilInterview = getHasilInterviewFromHasil(hasil, jadwalInterview);
 
     const completion = getKelengkapanForm(hasil);
     const bolehLanjutJadwalTestZoom = canAccessJadwalTestZoom(hasil);
@@ -208,12 +210,24 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         hasilTest,
         jadwalMmpi,
         hasilTestMmpi,
+        jadwalInterview,
+        hasilInterview,
         bolehLanjutJadwalTestZoom,
         completion,
         pesanJadwalTestZoom
     );
 
-    const statusUtama = hasilTestMmpi
+    const statusUtama = hasilInterview
+        ? hasilInterview === "lolos"
+            ? "Lolos Interview"
+            : hasilInterview === "dipertimbangkan"
+            ? "Dipertimbangkan"
+            : "Tidak Lolos Interview"
+        : jadwalInterview?.kehadiran === "reschedule"
+        ? "Interview Reschedule"
+        : jadwalInterview
+        ? "Jadwal Interview Tersedia"
+        : hasilTestMmpi
         ? hasilTestMmpi === "lolos"
             ? "Lolos Seleksi Test MMPI"
             : "Gagal Seleksi Test MMPI"
@@ -229,7 +243,17 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Jadwal Test Zoom Tersedia"
         : "Administrasi";
 
-    const keteranganUtama = hasilTestMmpi
+    const keteranganUtama = hasilInterview
+        ? hasilInterview === "lolos"
+            ? "Kandidat dinyatakan lolos pada tahap interview."
+            : hasilInterview === "dipertimbangkan"
+            ? "Kandidat sedang dipertimbangkan berdasarkan hasil interview."
+            : "Kandidat dinyatakan belum lolos pada tahap interview."
+        : jadwalInterview?.kehadiran === "reschedule"
+        ? "Jadwal interview kandidat sedang dalam proses penjadwalan ulang."
+        : jadwalInterview
+        ? "Kandidat sudah mendapatkan jadwal interview."
+        : hasilTestMmpi
         ? hasilTestMmpi === "lolos"
             ? "Kandidat dinyatakan lolos pada seleksi test MMPI."
             : "Kandidat dinyatakan belum lolos pada seleksi test MMPI."
@@ -245,9 +269,19 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Kandidat sudah mendapatkan jadwal test Zoom."
         : "Status seleksi kandidat saat ini berada pada tahap Administrasi.";
 
-    const saranUtama = hasilTestMmpi
+    const saranUtama = hasilInterview
+        ? hasilInterview === "lolos"
+            ? "Selamat, Anda lolos pada tahap interview. Silakan pantau informasi tahapan berikutnya dari tim rekrutmen."
+            : hasilInterview === "dipertimbangkan"
+            ? "Silakan pantau informasi lanjutan dari tim rekrutmen."
+            : "Terima kasih sudah mengikuti proses seleksi."
+        : jadwalInterview?.kehadiran === "reschedule"
+        ? "Silakan pantau informasi jadwal interview terbaru dari tim rekrutmen."
+        : jadwalInterview
+        ? "Silakan mengikuti interview sesuai jadwal yang sudah ditentukan."
+        : hasilTestMmpi
         ? hasilTestMmpi === "lolos"
-            ? "Selamat, Anda lolos pada tahapan Test MMPI. Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen."
+            ? "Selamat, Anda lolos pada tahapan Test MMPI. Silakan pantau informasi jadwal interview dari tim rekrutmen."
             : "Terima kasih sudah mengikuti proses seleksi."
         : jadwalMmpi
         ? "Silakan mengikuti test MMPI sesuai jadwal yang sudah ditentukan."
@@ -261,7 +295,13 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Silakan mengikuti test Zoom sesuai jadwal yang sudah ditentukan."
         : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.";
 
-    const tahapTerakhir = hasilTestMmpi
+    const tahapTerakhir = hasilInterview
+        ? "Hasil Interview"
+        : jadwalInterview?.kehadiran === "reschedule"
+        ? "Reschedule Interview"
+        : jadwalInterview
+        ? "Jadwal Interview"
+        : hasilTestMmpi
         ? "Hasil Seleksi Test MMPI"
         : jadwalMmpi
         ? "Jadwal Test MMPI"
@@ -273,7 +313,17 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Jadwal Test Zoom"
         : "Administrasi";
 
-    const warnaUtama = hasilTestMmpi
+    const warnaUtama = hasilInterview
+        ? hasilInterview === "lolos"
+            ? "emerald"
+            : hasilInterview === "dipertimbangkan"
+            ? "amber"
+            : "red"
+        : jadwalInterview?.kehadiran === "reschedule"
+        ? "blue"
+        : jadwalInterview
+        ? "indigo"
+        : hasilTestMmpi
         ? hasilTestMmpi === "lolos"
             ? "emerald"
             : "red"
@@ -542,6 +592,12 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                         jadwalMmpi={item.jadwal_test_mmpi}
                         token={token}
                         onUpdated={onUpdated}
+                    />
+                )}
+
+                {(item?.jadwal_interview || item?.jadwalInterview) && (
+                    <JadwalInterviewDalamTahapan
+                        jadwalInterview={item.jadwal_interview || item.jadwalInterview}
                     />
                 )}
             </div>
@@ -1034,11 +1090,86 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
     );
 }
 
+function JadwalInterviewDalamTahapan({ jadwalInterview }) {
+    const normalized = normalizeJadwalInterview(jadwalInterview);
+    const tanggal = getJadwalTanggal(normalized);
+    const jam = getJadwalJam(normalized);
+    const kehadiran = normalizeKehadiranInterview(normalized?.kehadiran || normalized?.status_kehadiran || normalized?.statusKehadiran);
+    const hasilInterview = normalizeHasilInterview(normalized?.hasil_interview || normalized?.hasilInterview || normalized?.status_hasil_interview || normalized?.statusHasilInterview);
+    const catatan = normalized?.catatan || normalized?.catatan_interview || normalized?.catatanInterview || "";
+
+    return (
+        <div className="mt-4 rounded-2xl border border-purple-200 bg-white p-4">
+            <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple-600 text-lg font-black text-white">
+                    🎙️
+                </div>
+
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-purple-900">
+                        Jadwal Interview: {tanggal}
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-purple-700">
+                        {jam && jam !== "-" && jam !== "00.00" && jam !== "00:00"
+                            ? `Pukul ${jam} WIB`
+                            : "Silakan hadir sesuai informasi dari tim rekrutmen."}
+                    </p>
+
+                    {normalized?.judul_interview && (
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                            {normalized.judul_interview}
+                        </p>
+                    )}
+
+                    {kehadiran && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Status Kehadiran Interview
+                            </p>
+
+                            <p className={`mt-1 text-lg font-black ${getKehadiranInterviewTextColor(kehadiran)}`}>
+                                {formatKehadiranInterview(kehadiran)}
+                            </p>
+                        </div>
+                    )}
+
+                    {hasilInterview && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Hasil Interview
+                            </p>
+
+                            <p className={`mt-1 text-lg font-black ${hasilInterview === "lolos" ? "text-emerald-700" : hasilInterview === "dipertimbangkan" ? "text-amber-700" : "text-red-700"}`}>
+                                {hasilInterview === "lolos" ? "Lolos Interview" : hasilInterview === "dipertimbangkan" ? "Dipertimbangkan" : "Tidak Lolos Interview"}
+                            </p>
+                        </div>
+                    )}
+
+                    {catatan && (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Catatan Interview
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                                {catatan}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function buildTahapanTampil(
     jadwalTest,
     hasilTest,
     jadwalMmpi = null,
     hasilTestMmpi = null,
+    jadwalInterview = null,
+    hasilInterview = null,
     bolehLanjutJadwalTestZoom = true,
     completion = {},
     pesanJadwalTestZoom = ""
@@ -1127,11 +1258,52 @@ function buildTahapanTampil(
                             : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi test MMPI.",
                     saran:
                         hasilTestMmpi === "lolos"
-                            ? "Silakan pantau informasi tahapan seleksi berikutnya dari tim rekrutmen."
+                            ? "Silakan pantau informasi jadwal interview dari tim rekrutmen."
                             : "Terima kasih sudah mengikuti proses seleksi.",
                     hasil_test_mmpi: hasilTestMmpi,
                     hasilTestMmpi: hasilTestMmpi,
                 });
+
+                if (hasilTestMmpi === "lolos") {
+                    tahapan.push({
+                        nama: "Jadwal Interview",
+                        status: jadwalInterview ? "Terjadwal" : "Menunggu",
+                        keterangan: jadwalInterview
+                            ? "Jadwal interview kandidat sudah tersedia."
+                            : "Kandidat sudah lolos test MMPI dan sedang menunggu jadwal interview.",
+                        saran: jadwalInterview
+                            ? "Silakan mengikuti interview sesuai jadwal yang sudah ditentukan."
+                            : "Silakan pantau halaman ini secara berkala untuk informasi jadwal interview.",
+                        jadwal_interview: jadwalInterview || null,
+                        jadwalInterview: jadwalInterview || null,
+                    });
+
+                    if (hasilInterview) {
+                        tahapan.push({
+                            nama: "Hasil Interview",
+                            status:
+                                hasilInterview === "lolos"
+                                    ? "Lolos"
+                                    : hasilInterview === "dipertimbangkan"
+                                    ? "Dipertimbangkan"
+                                    : "Gagal",
+                            keterangan:
+                                hasilInterview === "lolos"
+                                    ? "Selamat, Anda dinyatakan lolos pada tahap interview."
+                                    : hasilInterview === "dipertimbangkan"
+                                    ? "Hasil interview Anda sedang dalam pertimbangan tim rekrutmen."
+                                    : "Mohon maaf, Anda dinyatakan belum lolos pada tahap interview.",
+                            saran:
+                                hasilInterview === "lolos"
+                                    ? "Silakan pantau informasi tahapan berikutnya dari tim rekrutmen."
+                                    : hasilInterview === "dipertimbangkan"
+                                    ? "Silakan pantau informasi lanjutan dari tim rekrutmen."
+                                    : "Terima kasih sudah mengikuti proses seleksi.",
+                            hasil_interview: hasilInterview,
+                            hasilInterview: hasilInterview,
+                        });
+                    }
+                }
             }
         }
     }
@@ -1209,6 +1381,78 @@ function getPesanJadwalTestZoom(hasil) {
 }
 
 
+
+function getJadwalInterviewFromHasil(hasil) {
+    if (!hasil) return null;
+
+    const direct =
+        hasil?.jadwal_interview ||
+        hasil?.jadwalInterview ||
+        hasil?.interview ||
+        hasil?.tahapan_seleksi?.jadwal_interview ||
+        hasil?.tahapanSeleksi?.jadwalInterview ||
+        null;
+
+    if (direct && hasValidJadwalInterview(direct)) {
+        return normalizeJadwalInterview(direct);
+    }
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemDenganJadwal = tahapan.find((item) => item?.jadwal_interview || item?.jadwalInterview);
+    const nested = itemDenganJadwal?.jadwal_interview || itemDenganJadwal?.jadwalInterview || null;
+
+    if (nested && hasValidJadwalInterview(nested)) {
+        return normalizeJadwalInterview(nested);
+    }
+
+    return null;
+}
+
+function getHasilInterviewFromHasil(hasil, jadwalInterview = null) {
+    const raw =
+        hasil?.hasil_interview ??
+        hasil?.hasilInterview ??
+        hasil?.status_hasil_interview ??
+        hasil?.statusHasilInterview ??
+        jadwalInterview?.hasil_interview ??
+        jadwalInterview?.hasilInterview ??
+        jadwalInterview?.status_hasil_interview ??
+        jadwalInterview?.statusHasilInterview ??
+        hasil?.tahapan_seleksi?.hasil_interview ??
+        hasil?.tahapanSeleksi?.hasilInterview ??
+        null;
+
+    const direct = normalizeHasilInterview(raw);
+    if (direct) return direct;
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemHasilInterview = tahapan.find((item) => {
+        const nama = String(item?.nama || "").toLowerCase();
+        return nama.includes("hasil interview") || normalizeHasilInterview(item?.hasil_interview) || normalizeHasilInterview(item?.hasilInterview);
+    });
+
+    return normalizeHasilInterview(
+        itemHasilInterview?.hasil_interview ||
+            itemHasilInterview?.hasilInterview ||
+            itemHasilInterview?.status_hasil_interview ||
+            itemHasilInterview?.statusHasilInterview ||
+            itemHasilInterview?.status
+    );
+}
 
 function getHasilTestMmpiFromHasil(hasil, jadwalMmpi = null) {
     const raw =
@@ -1590,6 +1834,101 @@ function normalizeKehadiran(value) {
     ) {
         return "tidak_hadir";
     }
+
+    return null;
+}
+
+function formatKehadiranInterview(value) {
+    const kehadiran = normalizeKehadiranInterview(value);
+
+    if (kehadiran === "hadir") return "Hadir";
+    if (kehadiran === "tidak_hadir") return "Tidak Hadir";
+    if (kehadiran === "tidak_respon") return "Tidak Respon";
+    if (kehadiran === "reschedule") return "Reschedule";
+
+    return "-";
+}
+
+function getKehadiranInterviewTextColor(value) {
+    const kehadiran = normalizeKehadiranInterview(value);
+
+    if (kehadiran === "hadir") return "text-emerald-700";
+    if (kehadiran === "tidak_hadir") return "text-red-700";
+    if (kehadiran === "tidak_respon") return "text-amber-700";
+    if (kehadiran === "reschedule") return "text-blue-700";
+
+    return "text-slate-700";
+}
+
+function normalizeJadwalInterview(jadwalInterview) {
+    if (!jadwalInterview) return null;
+
+    return {
+        ...jadwalInterview,
+        jadwal:
+            jadwalInterview.jadwal ||
+            jadwalInterview.jadwal_interview ||
+            jadwalInterview.jadwalInterview ||
+            jadwalInterview.tanggal ||
+            null,
+        tanggal:
+            jadwalInterview.tanggal ||
+            jadwalInterview.tanggal_jadwal ||
+            jadwalInterview.tanggalJadwal ||
+            jadwalInterview.jadwal_interview ||
+            jadwalInterview.jadwalInterview ||
+            jadwalInterview.jadwal ||
+            null,
+        jam: jadwalInterview.jam || jadwalInterview.waktu || null,
+        kehadiran: normalizeKehadiranInterview(
+            jadwalInterview.kehadiran ||
+                jadwalInterview.status_kehadiran ||
+                jadwalInterview.statusKehadiran ||
+                jadwalInterview.status_kehadiran_interview ||
+                jadwalInterview.statusKehadiranInterview
+        ),
+        hasil_interview: normalizeHasilInterview(
+            jadwalInterview.hasil_interview ||
+                jadwalInterview.hasilInterview ||
+                jadwalInterview.status_hasil_interview ||
+                jadwalInterview.statusHasilInterview
+        ),
+    };
+}
+
+function hasValidJadwalInterview(jadwalInterview) {
+    return Boolean(
+        jadwalInterview &&
+            (jadwalInterview.jadwal ||
+                jadwalInterview.jadwal_interview ||
+                jadwalInterview.jadwalInterview ||
+                jadwalInterview.tanggal ||
+                jadwalInterview.tanggal_jadwal ||
+                jadwalInterview.tanggalJadwal)
+    );
+}
+
+function normalizeKehadiranInterview(value) {
+    if (value === null || value === undefined || value === "") return null;
+
+    const normalized = String(value).toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+    if (["hadir", "1", "true", "ya", "yes"].includes(normalized)) return "hadir";
+    if (["tidak_hadir", "tidakhadir", "tidak", "0", "false", "no"].includes(normalized)) return "tidak_hadir";
+    if (["tidak_respon", "tidakrespon", "no_response", "noresponse"].includes(normalized)) return "tidak_respon";
+    if (["reschedule", "rescheduled", "jadwal_ulang", "jadwalulang", "ubah_jadwal", "ubahjadwal"].includes(normalized)) return "reschedule";
+
+    return null;
+}
+
+function normalizeHasilInterview(value) {
+    if (value === null || value === undefined || value === "") return null;
+
+    const normalized = String(value).toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+    if (["lolos", "lolos_interview", "1", "true", "ya", "yes"].includes(normalized)) return "lolos";
+    if (["tidak_lolos", "tidak_lolos_interview", "gagal", "0", "false", "tidak", "no"].includes(normalized)) return "gagal";
+    if (["dipertimbangkan", "pertimbangan", "considered", "consider"].includes(normalized)) return "dipertimbangkan";
 
     return null;
 }
