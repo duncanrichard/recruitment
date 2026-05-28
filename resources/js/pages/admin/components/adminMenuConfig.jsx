@@ -1,6 +1,4 @@
 import DashboardPage from "../pages/DashboardPage";
-import TahapanSeleksiPage from "../pages/TahapanSeleksiPage";
-
 import DataPelamarPage from "../pages/data-pelamar/Index";
 import DetailDataPelamarPage from "../pages/data-pelamar/Detail";
 
@@ -31,10 +29,6 @@ export const defaultMenuKey = "dashboard";
 
 export const initialActionSignals = {
     dataPelamar: 0,
-    pendaftarSemua: 0,
-    pendaftarBaru: 0,
-    pendaftarArsip: 0,
-    tahapan: 0,
 
     jadwalTestZoom: 0,
     jadwalTestMmpi: 0,
@@ -59,9 +53,113 @@ export const menuItems = [
     {
         key: "dashboard",
         label: "Dashboard",
-        description: "Ringkasan utama",
+        description: "Ringkasan rekrutmen",
         icon: "⌂",
         component: DashboardPage,
+    },
+    {
+        key: "data-pelamar",
+        label: "Data Pelamar",
+        description: "Kelola data riwayat diri",
+        icon: "▤",
+        component: DataPelamarPage,
+        action: {
+            label: "Tambah Pelamar",
+            signalKey: "dataPelamar",
+        },
+    },
+    {
+        key: "jadwal-test",
+        label: "Data Jadwal Test",
+        description: "Kelola jadwal test",
+        icon: "◷",
+        children: [
+            {
+                key: "jadwal-test-zoom",
+                label: "Zoom",
+                description: "Kelola jadwal test Zoom",
+                icon: "◎",
+                component: JadwalTestZoomPage,
+                action: {
+                    label: "Tambah Jadwal Zoom",
+                    signalKey: "jadwalTestZoom",
+                },
+            },
+            {
+                key: "jadwal-test-mmpi",
+                label: "MMPI",
+                description: "Kelola jadwal test MMPI",
+                icon: "◉",
+                component: JadwalTestMmpiPage,
+                action: {
+                    label: "Tambah Jadwal MMPI",
+                    signalKey: "jadwalTestMmpi",
+                },
+            },
+        ],
+    },
+    {
+        key: "daftar-hadir",
+        label: "Daftar Hadir",
+        description: "Kelola kehadiran",
+        icon: "▨",
+        children: [
+            {
+                key: "daftar-hadir-zoom",
+                label: "Zoom",
+                description: "Daftar hadir test Zoom",
+                icon: "◎",
+                component: DaftarHadirZoomPage,
+            },
+            {
+                key: "daftar-hadir-mmpi",
+                label: "MMPI",
+                description: "Daftar hadir test MMPI",
+                icon: "◉",
+                component: DaftarHadirMmpiPage,
+            },
+        ],
+    },
+    {
+        key: "rangkaian-interview",
+        label: "Interview",
+        description: "Kelola proses interview",
+        icon: "▣",
+        children: [
+            {
+                key: "interviewer",
+                label: "Interviewer",
+                description: "Kelola data interviewer",
+                icon: "◉",
+                component: InterviewerPage,
+                action: {
+                    label: "Tambah Interviewer",
+                    signalKey: "interviewer",
+                },
+            },
+            {
+                key: "jadwal-interview",
+                label: "Jadwal Interview",
+                description: "Kelola jadwal interview",
+                icon: "◷",
+                component: JadwalInterviewPage,
+                action: {
+                    label: "Tambah Jadwal Interview",
+                    signalKey: "jadwalInterview",
+                },
+            },
+            {
+                key: "kandidat-interview",
+                label: "Kandidat",
+                description: "Kelola kandidat interview",
+                icon: "▤",
+                component: KandidatInterviewPage,
+                action: {
+                    label: "Tambah Kandidat",
+                    signalKey: "kandidatInterview",
+                },
+            },
+        ],
     },
     {
         key: "master-data",
@@ -181,117 +279,6 @@ export const menuItems = [
             },
         ],
     },
-    {
-        key: "data-pelamar",
-        label: "Data Pelamar",
-        description: "Kelola data riwayat diri",
-        icon: "▤",
-        component: DataPelamarPage,
-        action: {
-            label: "Tambah Pelamar",
-            signalKey: "dataPelamar",
-        },
-    },
-    {
-        key: "jadwal-test",
-        label: "Data Jadwal Test",
-        description: "Kelola jadwal test",
-        icon: "◷",
-        children: [
-            {
-                key: "jadwal-test-zoom",
-                label: "Zoom",
-                description: "Kelola jadwal test Zoom",
-                icon: "◎",
-                component: JadwalTestZoomPage,
-                action: {
-                    label: "Tambah Jadwal Zoom",
-                    signalKey: "jadwalTestZoom",
-                },
-            },
-            {
-                key: "jadwal-test-mmpi",
-                label: "MMPI",
-                description: "Kelola jadwal test MMPI",
-                icon: "◉",
-                component: JadwalTestMmpiPage,
-                action: {
-                    label: "Tambah Jadwal MMPI",
-                    signalKey: "jadwalTestMmpi",
-                },
-            },
-        ],
-    },
-    {
-        key: "daftar-hadir",
-        label: "Daftar Hadir",
-        description: "Kelola kehadiran",
-        icon: "▨",
-        children: [
-            {
-                key: "daftar-hadir-zoom",
-                label: "Zoom",
-                description: "Daftar hadir test Zoom",
-                icon: "◎",
-                component: DaftarHadirZoomPage,
-            },
-            {
-                key: "daftar-hadir-mmpi",
-                label: "MMPI",
-                description: "Daftar hadir test MMPI",
-                icon: "◉",
-                component: DaftarHadirMmpiPage,
-            },
-        ],
-    },
-    {
-        key: "rangkaian-interview",
-        label: "Interview",
-        description: "Kelola proses interview",
-        icon: "▣",
-        children: [
-            {
-                key: "interviewer",
-                label: "Interviewer",
-                description: "Kelola data interviewer",
-                icon: "◉",
-                component: InterviewerPage,
-                action: {
-                    label: "Tambah Interviewer",
-                    signalKey: "interviewer",
-                },
-            },
-            {
-                key: "jadwal-interview",
-                label: "Jadwal Interview",
-                description: "Kelola jadwal interview",
-                icon: "◷",
-                component: JadwalInterviewPage,
-                action: {
-                    label: "Tambah Jadwal Interview",
-                    signalKey: "jadwalInterview",
-                },
-            },
-            {
-                key: "kandidat-interview",
-                label: "Kandidat",
-                description: "Kelola kandidat interview",
-                icon: "▤",
-                component: KandidatInterviewPage,
-                action: {
-                    label: "Tambah Kandidat",
-                    signalKey: "kandidatInterview",
-                },
-            },
-        ],
-    },
-    {
-        key: "tahapan",
-        label: "Tahapan Seleksi",
-        description: "Kelola proses seleksi",
-        icon: "▣",
-        component: TahapanSeleksiPage,
-    },
 ];
 
 export const detailMenus = {
@@ -342,8 +329,8 @@ export function getActiveMenuData(activeMenu) {
 
     return (
         getFlattenMenus().find((item) => item.key === activeMenu) ||
-        menuItems.find((item) => item.key === defaultMenuKey) ||
-        menuItems[0]
+        getFlattenMenus().find((item) => item.key === defaultMenuKey) ||
+        getFlattenMenus()[0]
     );
 }
 
@@ -381,19 +368,15 @@ export function isMenuActive(menu, activeMenu) {
         activeMenu === menu.key ||
         childKeys.includes(activeMenu) ||
         (activeMenu === "data-pelamar-detail" && menu.key === "data-pelamar") ||
-        (activeMenu === "daftar-hadir-zoom-detail" &&
-            menu.key === "daftar-hadir") ||
-        (activeMenu === "daftar-hadir-mmpi-detail" &&
-            menu.key === "daftar-hadir")
+        (activeMenu === "daftar-hadir-zoom-detail" && menu.key === "daftar-hadir") ||
+        (activeMenu === "daftar-hadir-mmpi-detail" && menu.key === "daftar-hadir")
     );
 }
 
 export function isChildActive(child, activeMenu) {
     return (
         activeMenu === child.key ||
-        (activeMenu === "daftar-hadir-zoom-detail" &&
-            child.key === "daftar-hadir-zoom") ||
-        (activeMenu === "daftar-hadir-mmpi-detail" &&
-            child.key === "daftar-hadir-mmpi")
+        (activeMenu === "daftar-hadir-zoom-detail" && child.key === "daftar-hadir-zoom") ||
+        (activeMenu === "daftar-hadir-mmpi-detail" && child.key === "daftar-hadir-mmpi")
     );
 }

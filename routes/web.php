@@ -9,7 +9,7 @@ Route::get('/', function () {
 require __DIR__ . '/pendaftaran.php';
 require __DIR__ . '/admin.php';
 require __DIR__ . '/data_pelamar.php';
-
+require __DIR__ . '/dashboard.php';
 require __DIR__ . '/master_data_posisi.php';
 require __DIR__ . '/master_data_pendidikan.php';
 require __DIR__ . '/master_data_agama.php';
