@@ -29,3 +29,4 @@ require __DIR__ . '/interviewer.php';
 require __DIR__ . '/interview_kandidat.php';
 require __DIR__ . '/account_role.php';
 require __DIR__ . '/review_management.php';
+require __DIR__ . '/account_user.php';

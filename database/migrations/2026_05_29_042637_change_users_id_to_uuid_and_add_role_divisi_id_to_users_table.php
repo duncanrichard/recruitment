@@ -1,88 +1,154 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 
 return new class extends Migration
 {
+    private array $deletedByTables = [
+        'offering_letter',
+        'data_riwayat_kesehatan',
+        'data_riwayat_pekerjaan',
+        'data_riwayat_keluarga',
+        'data_saudara_kandung',
+        'data_saudara_ipar',
+        'data_kesiapan_bekerja',
+    ];
+
     public function up(): void
     {
-        /**
-         * PostgreSQL butuh extension ini untuk generate UUID.
-         */
         DB::statement('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
 
-        /**
-         * Kalau tabel users sudah ada data, cara aman:
-         * 1. Tambah kolom uuid sementara
-         * 2. Isi dengan gen_random_uuid()
-         * 3. Hapus primary key lama
-         * 4. Hapus kolom id lama
-         * 5. Rename uuid menjadi id
-         * 6. Jadikan primary key baru
+        /*
+         * Pastikan kolom uuid di users sudah ada dan terisi.
          */
-        Schema::table('users', function (Blueprint $table) {
-            $table->uuid('uuid')->nullable()->after('id');
-        });
+        if (!Schema::hasColumn('users', 'uuid')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->uuid('uuid')->nullable();
+            });
+        }
 
         DB::statement('UPDATE users SET uuid = gen_random_uuid() WHERE uuid IS NULL');
 
+        /*
+         * 1. Drop semua foreign key yang masih bergantung ke users.id.
+         */
+        foreach ($this->deletedByTables as $table) {
+            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS {$table}_deleted_by_foreign");
+        }
+
+        /*
+         * 2. Ubah semua kolom deleted_by dari bigint menjadi uuid,
+         *    dengan mapping dari users.id lama ke users.uuid.
+         */
+        foreach ($this->deletedByTables as $table) {
+            if (!Schema::hasColumn($table, 'deleted_by')) {
+                continue;
+            }
+
+            if (!Schema::hasColumn($table, 'deleted_by_uuid')) {
+                Schema::table($table, function (Blueprint $tableBlueprint) {
+                    $tableBlueprint->uuid('deleted_by_uuid')->nullable();
+                });
+            }
+
+            DB::statement("
+                UPDATE {$table}
+                SET deleted_by_uuid = users.uuid
+                FROM users
+                WHERE {$table}.deleted_by = users.id
+            ");
+
+            Schema::table($table, function (Blueprint $tableBlueprint) {
+                $tableBlueprint->dropColumn('deleted_by');
+            });
+
+            DB::statement("ALTER TABLE {$table} RENAME COLUMN deleted_by_uuid TO deleted_by");
+        }
+
+        /*
+         * 3. Sekarang users_pkey sudah tidak dipakai foreign key lain.
+         *    Aman untuk drop primary key lama.
+         */
         DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey');
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('id');
-        });
+        /*
+         * 4. Hapus id lama bertipe bigint/bigserial.
+         */
+        if (Schema::hasColumn('users', 'id')) {
+            DB::statement('ALTER TABLE users DROP COLUMN id');
+        }
 
-        DB::statement('ALTER TABLE users RENAME COLUMN uuid TO id');
+        /*
+         * 5. Rename uuid menjadi id.
+         */
+        if (Schema::hasColumn('users', 'uuid') && !Schema::hasColumn('users', 'id')) {
+            DB::statement('ALTER TABLE users RENAME COLUMN uuid TO id');
+        }
 
+        /*
+         * 6. Jadikan users.id UUID primary key.
+         */
+        DB::statement('ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()');
         DB::statement('ALTER TABLE users ALTER COLUMN id SET NOT NULL');
         DB::statement('ALTER TABLE users ADD PRIMARY KEY (id)');
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('role_id')
-                ->nullable()
-                ->after('remember_token')
-                ->constrained('roles')
-                ->nullOnDelete();
+        /*
+         * 7. Tambahkan ulang foreign key deleted_by ke users.id UUID.
+         */
+        foreach ($this->deletedByTables as $table) {
+            if (!Schema::hasColumn($table, 'deleted_by')) {
+                continue;
+            }
 
-            $table->foreignId('divisi_id')
-                ->nullable()
-                ->after('role_id')
-                ->constrained('divisis')
-                ->nullOnDelete();
-        });
+            DB::statement("
+                ALTER TABLE {$table}
+                ADD CONSTRAINT {$table}_deleted_by_foreign
+                FOREIGN KEY (deleted_by)
+                REFERENCES users(id)
+                ON DELETE SET NULL
+            ");
+        }
+
+        /*
+         * 8. Tambahkan role_id jika belum ada.
+         */
+        if (!Schema::hasColumn('users', 'role_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->unsignedBigInteger('role_id')->nullable();
+            });
+        }
+
+        /*
+         * 9. Tambahkan divisi_id jika belum ada.
+         */
+        if (!Schema::hasColumn('users', 'divisi_id')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->uuid('divisi_id')->nullable();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['role_id']);
-            $table->dropForeign(['divisi_id']);
-            $table->dropColumn(['role_id', 'divisi_id']);
-        });
-
-        /**
-         * Rollback UUID ke bigserial.
-         * Data id UUID lama akan hilang dan diganti id integer baru.
+        /*
+         * Rollback perubahan UUID ke bigint tidak aman karena data id lama sudah dihapus.
+         * Jadi down dibuat minimal agar tidak merusak data.
          */
+        foreach ($this->deletedByTables as $table) {
+            DB::statement("ALTER TABLE {$table} DROP CONSTRAINT IF EXISTS {$table}_deleted_by_foreign");
+        }
+
         DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pkey');
 
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('id');
-        });
+        if (Schema::hasColumn('users', 'id') && !Schema::hasColumn('users', 'uuid')) {
+            DB::statement('ALTER TABLE users RENAME COLUMN id TO uuid');
+        }
 
-        DB::statement('CREATE SEQUENCE users_id_seq');
-
-        Schema::table('users', function (Blueprint $table) {
-            $table->bigInteger('id')->nullable();
-        });
-
-        DB::statement("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq')");
-        DB::statement("UPDATE users SET id = nextval('users_id_seq') WHERE id IS NULL");
-        DB::statement('ALTER TABLE users ALTER COLUMN id SET NOT NULL');
-        DB::statement('ALTER TABLE users ADD PRIMARY KEY (id)');
-        DB::statement("ALTER SEQUENCE users_id_seq OWNED BY users.id");
+        if (!Schema::hasColumn('users', 'id')) {
+            DB::statement('ALTER TABLE users ADD COLUMN id BIGSERIAL PRIMARY KEY');
+        }
     }
 };

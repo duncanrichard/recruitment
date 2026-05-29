@@ -28,6 +28,7 @@ import KandidatInterviewPage from "../pages/rangkaian-interview/kandidat/Index";
 import ReviewManagementPage from "../../review-management/Index";
 
 import RolePage from "../account/role/Index";
+import UserPage from "../account/user/Index";
 
 export const defaultMenuKey = "dashboard";
 
@@ -53,6 +54,7 @@ export const initialActionSignals = {
     masterPerusahaan: 0,
 
     accountRole: 0,
+    accountUser: 0,
 };
 
 export const menuItems = [
@@ -309,6 +311,17 @@ export const menuItems = [
                     signalKey: "accountRole",
                 },
             },
+            {
+                key: "account-user",
+                label: "User",
+                description: "Kelola user akun",
+                icon: "◍",
+                component: UserPage,
+                action: {
+                    label: "Tambah User",
+                    signalKey: "accountUser",
+                },
+            },
         ],
     },
 ];
@@ -388,6 +401,10 @@ export function getMenuParentKeyByChildKey(childKey) {
         return "data-pelamar";
     }
 
+    if (childKey === "account-role" || childKey === "account-user") {
+        return "account";
+    }
+
     return null;
 }
 
@@ -405,6 +422,7 @@ export function isMenuActive(menu, activeMenu) {
         (activeMenu === "daftar-hadir-mmpi-detail" &&
             menu.key === "daftar-hadir") ||
         (activeMenu === "account-role" && menu.key === "account") ||
+        (activeMenu === "account-user" && menu.key === "account") ||
         (activeMenu === "review-management" &&
             menu.key === "review-management")
     );
@@ -417,6 +435,7 @@ export function isChildActive(child, activeMenu) {
             child.key === "daftar-hadir-zoom") ||
         (activeMenu === "daftar-hadir-mmpi-detail" &&
             child.key === "daftar-hadir-mmpi") ||
-        (activeMenu === "account-role" && child.key === "account-role")
+        (activeMenu === "account-role" && child.key === "account-role") ||
+        (activeMenu === "account-user" && child.key === "account-user")
     );
 }
