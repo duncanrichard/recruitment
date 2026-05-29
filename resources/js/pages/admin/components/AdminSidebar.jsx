@@ -188,13 +188,13 @@ function SidebarInfo() {
     return (
         <div className="border-t border-white/10 p-4">
             <div className="rounded-3xl bg-white/10 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-teal-200">
+               {/*  <p className="text-xs font-bold uppercase tracking-wide text-teal-200">
                     Informasi
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-300">
                     Gunakan menu di atas untuk mengelola proses rekrutmen.
-                </p>
+                </p> */}
             </div>
         </div>
     );

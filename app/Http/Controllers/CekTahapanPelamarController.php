@@ -344,6 +344,14 @@ class CekTahapanPelamarController extends Controller
                 'statusKehadiranInterview' => null,
                 'catatan_interview' => null,
                 'catatanInterview' => null,
+                'review_management_id' => null,
+                'reviewManagementId' => null,
+                'review_management' => null,
+                'reviewManagement' => null,
+                'status_review_management' => null,
+                'statusReviewManagement' => null,
+                'status_review' => null,
+                'statusReview' => null,
                 'hasil_test' => null,
                 'hasilTest' => null,
                 'hasil_test_mmpi' => null,
@@ -382,13 +390,27 @@ class CekTahapanPelamarController extends Controller
         $hasilTestMmpi = $jadwalTestMmpiData['hasil_test'] ?? null;
         $hasilInterview = $jadwalInterviewData['hasil_interview'] ?? null;
         $statusKehadiranInterview = $jadwalInterviewData['kehadiran'] ?? null;
+        $statusReviewManagement = $jadwalInterviewData['status_review_management'] ?? null;
+        $reviewManagement = $jadwalInterviewData['review_management'] ?? null;
+
         $isInterviewReschedule = $statusKehadiranInterview === 'reschedule';
+
         $punyaJadwalTest = !empty($jadwalTestData);
         $punyaHasilTest = !empty($hasilTest);
         $punyaJadwalTestMmpi = !empty($jadwalTestMmpiData);
         $punyaHasilTestMmpi = !empty($hasilTestMmpi);
         $punyaJadwalInterview = !empty($jadwalInterviewData);
         $punyaHasilInterview = !empty($hasilInterview);
+        $punyaReviewManagement = !empty($statusReviewManagement);
+
+        // Aturan interview:
+        // - hasil_interview = Tidak Lolos Interview => gagal.
+        // - hasil_interview selain Tidak Lolos Interview => lanjut Review Management.
+        // - Review Management status Diterima => Lolos Interview.
+        // - Review Management status Gagal => Interview Gagal.
+        $hasilInterviewGagal = $hasilInterview === 'tidak_lolos_interview';
+        $hasilInterviewLanjutReview = !empty($hasilInterview) && !$hasilInterviewGagal;
+
         $pesanBelumLengkap = 'Tahapan Test Zoom belum dapat dilanjutkan karena data pendaftaran belum lengkap sampai tahap Kesiapan Bekerja. Silakan lengkapi seluruh formulir pendaftaran terlebih dahulu.';
         $tahapFormTerakhir = $formCompletion['last_completed_label'] ?? 'Data Diri';
 
@@ -499,24 +521,41 @@ class CekTahapanPelamarController extends Controller
                         if ($punyaHasilInterview) {
                             $tahapan[] = [
                                 'nama' => 'Hasil Interview',
-                                'status' => $hasilInterview === 'lolos'
-                                    ? 'Lolos'
-                                    : ($hasilInterview === 'dipertimbangkan' ? 'Dipertimbangkan' : 'Gagal'),
-                                'keterangan' => $hasilInterview === 'lolos'
-                                    ? 'Selamat, Anda dinyatakan lolos pada tahap interview.'
-                                    : ($hasilInterview === 'dipertimbangkan'
-                                        ? 'Hasil interview Anda sedang dalam pertimbangan tim rekrutmen.'
-                                        : 'Mohon maaf, Anda dinyatakan belum lolos pada tahap interview.'),
-                                'saran' => $hasilInterview === 'lolos'
-                                    ? 'Silakan pantau informasi tahapan berikutnya dari tim rekrutmen.'
-                                    : ($hasilInterview === 'dipertimbangkan'
-                                        ? 'Silakan pantau informasi lanjutan dari tim rekrutmen.'
-                                        : 'Terima kasih sudah mengikuti proses seleksi.'),
+                                'status' => $hasilInterviewGagal ? 'Gagal' : 'Review Management',
+                                'keterangan' => $hasilInterviewGagal
+                                    ? 'Mohon maaf, Anda dinyatakan tidak lolos pada tahap interview.'
+                                    : 'Hasil interview sudah tersedia dan sedang diproses ke tahap Review Management.',
+                                'saran' => $hasilInterviewGagal
+                                    ? 'Terima kasih sudah mengikuti proses seleksi.'
+                                    : 'Silakan pantau hasil Review Management dari tim rekrutmen.',
                                 'hasil_interview' => $hasilInterview,
                                 'hasilInterview' => $hasilInterview,
                                 'catatan_interview' => $jadwalInterviewData['catatan'] ?? null,
                                 'catatanInterview' => $jadwalInterviewData['catatan'] ?? null,
                             ];
+
+                            if ($hasilInterviewLanjutReview) {
+                                $tahapan[] = [
+                                    'nama' => 'Review Management',
+                                    'status' => !$punyaReviewManagement
+                                        ? 'Proses'
+                                        : ($statusReviewManagement === 'diterima' ? 'Lolos' : 'Gagal'),
+                                    'keterangan' => !$punyaReviewManagement
+                                        ? 'Kandidat sedang menunggu hasil Review Management.'
+                                        : ($statusReviewManagement === 'diterima'
+                                            ? 'Selamat, kandidat dinyatakan lolos interview berdasarkan hasil Review Management.'
+                                            : 'Mohon maaf, kandidat dinyatakan gagal berdasarkan hasil Review Management.'),
+                                    'saran' => !$punyaReviewManagement
+                                        ? 'Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management.'
+                                        : ($statusReviewManagement === 'diterima'
+                                            ? 'Selamat, Anda dinyatakan lolos pada proses seleksi.'
+                                            : 'Terima kasih sudah mengikuti proses seleksi.'),
+                                    'review_management' => $reviewManagement,
+                                    'reviewManagement' => $reviewManagement,
+                                    'status_review_management' => $statusReviewManagement,
+                                    'statusReviewManagement' => $statusReviewManagement,
+                                ];
+                            }
                         }
                     }
                 }
@@ -596,23 +635,29 @@ class CekTahapanPelamarController extends Controller
         }
 
         if ($punyaHasilInterview) {
-            $status = $hasilInterview === 'lolos'
-                ? 'Lolos Interview'
-                : ($hasilInterview === 'dipertimbangkan' ? 'Dipertimbangkan' : 'Tidak Lolos Interview');
-
-            $keterangan = $hasilInterview === 'lolos'
-                ? 'Kandidat dinyatakan lolos pada tahap interview.'
-                : ($hasilInterview === 'dipertimbangkan'
-                    ? 'Kandidat sedang dipertimbangkan berdasarkan hasil interview.'
-                    : 'Kandidat dinyatakan belum lolos pada tahap interview.');
-
-            $saran = $hasilInterview === 'lolos'
-                ? 'Silakan pantau informasi tahapan berikutnya dari tim rekrutmen.'
-                : ($hasilInterview === 'dipertimbangkan'
-                    ? 'Silakan pantau informasi lanjutan dari tim rekrutmen.'
-                    : 'Terima kasih sudah mengikuti proses seleksi.');
-
-            $tahapanTerakhir = 'Hasil Interview';
+            if ($hasilInterviewGagal) {
+                $status = 'Gagal';
+                $keterangan = 'Kandidat dinyatakan tidak lolos pada tahap interview.';
+                $saran = 'Terima kasih sudah mengikuti proses seleksi.';
+                $tahapanTerakhir = 'Interview';
+            } elseif ($hasilInterviewLanjutReview) {
+                if (!$punyaReviewManagement) {
+                    $status = 'Review Management';
+                    $keterangan = 'Kandidat sudah memiliki hasil interview dan sedang menunggu hasil Review Management.';
+                    $saran = 'Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management.';
+                    $tahapanTerakhir = 'Review Management';
+                } elseif ($statusReviewManagement === 'diterima') {
+                    $status = 'Lolos Interview';
+                    $keterangan = 'Kandidat dinyatakan lolos interview berdasarkan hasil Review Management.';
+                    $saran = 'Selamat, Anda dinyatakan lolos pada proses seleksi.';
+                    $tahapanTerakhir = 'Review Management';
+                } elseif ($statusReviewManagement === 'gagal') {
+                    $status = 'Gagal';
+                    $keterangan = 'Kandidat dinyatakan gagal berdasarkan hasil Review Management.';
+                    $saran = 'Terima kasih sudah mengikuti proses seleksi.';
+                    $tahapanTerakhir = 'Interview';
+                }
+            }
         }
 
         return [
@@ -699,6 +744,17 @@ class CekTahapanPelamarController extends Controller
             'catatan_interview' => $jadwalInterviewData['catatan'] ?? null,
             'catatanInterview' => $jadwalInterviewData['catatan'] ?? null,
 
+            'review_management_id' => $jadwalInterviewData['review_management_id'] ?? null,
+            'reviewManagementId' => $jadwalInterviewData['review_management_id'] ?? null,
+            'hasil_review_management_id' => $jadwalInterviewData['hasil_review_management_id'] ?? null,
+            'hasilReviewManagementId' => $jadwalInterviewData['hasil_review_management_id'] ?? null,
+            'review_management' => $jadwalInterviewData['review_management'] ?? null,
+            'reviewManagement' => $jadwalInterviewData['review_management'] ?? null,
+            'status_review_management' => $jadwalInterviewData['status_review_management'] ?? null,
+            'statusReviewManagement' => $jadwalInterviewData['status_review_management'] ?? null,
+            'status_review' => $jadwalInterviewData['status_review_management'] ?? null,
+            'statusReview' => $jadwalInterviewData['status_review_management'] ?? null,
+
             'jadwal_test_mmpi' => $jadwalTestMmpiData,
             'jadwalTestMmpi' => $jadwalTestMmpiData,
             'jadwal_mmpi' => $jadwalTestMmpiData,
@@ -737,6 +793,8 @@ class CekTahapanPelamarController extends Controller
                 'hasil_test_zoom' => $hasilTest,
                 'hasil_test_mmpi' => $hasilTestMmpi,
                 'hasil_interview' => $hasilInterview,
+                'review_management' => $jadwalInterviewData['review_management'] ?? null,
+                'status_review_management' => $jadwalInterviewData['status_review_management'] ?? null,
                 'boleh_melanjutkan_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom,
                 'pesan_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
                 'tahapan' => $tahapan,
@@ -751,6 +809,8 @@ class CekTahapanPelamarController extends Controller
                 'hasil_test_zoom' => $hasilTest,
                 'hasil_test_mmpi' => $hasilTestMmpi,
                 'hasil_interview' => $hasilInterview,
+                'reviewManagement' => $jadwalInterviewData['review_management'] ?? null,
+                'statusReviewManagement' => $jadwalInterviewData['status_review_management'] ?? null,
                 'bolehMelanjutkanJadwalTestZoom' => $bolehLanjutJadwalTestZoom,
                 'pesanJadwalTestZoom' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
                 'tahapan' => $tahapan,
@@ -1061,12 +1121,22 @@ class CekTahapanPelamarController extends Controller
             ->join('jadwal_interview as ji', 'ji.id', '=', 'jik.jadwal_interview_id')
             ->where('jik.data_riwayat_diri_id', $pelamar->id);
 
+        if (Schema::hasTable('hasil_review_management')) {
+            $query->leftJoin('hasil_review_management as hrm', function ($join) {
+                $join->on('hrm.hasil_interview_id', '=', 'jik.id');
+            });
+        }
+
         if (Schema::hasColumn('jadwal_interview_kandidat', 'deleted_at')) {
             $query->whereNull('jik.deleted_at');
         }
 
         if (Schema::hasColumn('jadwal_interview', 'deleted_at')) {
             $query->whereNull('ji.deleted_at');
+        }
+
+        if (Schema::hasTable('hasil_review_management') && Schema::hasColumn('hasil_review_management', 'deleted_at')) {
+            $query->whereNull('hrm.deleted_at');
         }
 
         $select = [
@@ -1082,6 +1152,30 @@ class CekTahapanPelamarController extends Controller
             if (Schema::hasColumn('jadwal_interview_kandidat', $column)) {
                 $select[] = "jik.{$column}";
             }
+        }
+
+        if (Schema::hasTable('hasil_review_management')) {
+            $select[] = DB::raw('hrm.id as review_management_id');
+            $select[] = DB::raw('hrm.id as hasil_review_management_id');
+            $select[] = DB::raw('hrm.hasil_interview_id as review_hasil_interview_id');
+
+            if (Schema::hasColumn('hasil_review_management', 'review_management')) {
+                $select[] = DB::raw('hrm.review_management as review_management');
+            } else {
+                $select[] = DB::raw('NULL as review_management');
+            }
+
+            if (Schema::hasColumn('hasil_review_management', 'status')) {
+                $select[] = DB::raw('hrm.status as status_review_management');
+            } else {
+                $select[] = DB::raw('NULL as status_review_management');
+            }
+        } else {
+            $select[] = DB::raw('NULL as review_management_id');
+            $select[] = DB::raw('NULL as hasil_review_management_id');
+            $select[] = DB::raw('NULL as review_hasil_interview_id');
+            $select[] = DB::raw('NULL as review_management');
+            $select[] = DB::raw('NULL as status_review_management');
         }
 
         $jadwalInterview = $query
@@ -1101,6 +1195,7 @@ class CekTahapanPelamarController extends Controller
 
         $kehadiran = $this->normalizeKehadiranInterviewValue($jadwalInterview->status_kehadiran ?? null);
         $hasilInterview = $this->normalizeHasilInterviewValue($jadwalInterview->hasil_interview ?? null);
+        $statusReviewManagement = $this->normalizeStatusReviewManagementValue($jadwalInterview->status_review_management ?? null);
         $catatan = $jadwalInterview->catatan ?? null;
 
         return [
@@ -1143,6 +1238,20 @@ class CekTahapanPelamarController extends Controller
             'catatan' => $catatan,
             'catatan_interview' => $catatan,
             'catatanInterview' => $catatan,
+
+            'review_management_id' => $jadwalInterview->review_management_id ?? null,
+            'reviewManagementId' => $jadwalInterview->review_management_id ?? null,
+            'hasil_review_management_id' => $jadwalInterview->hasil_review_management_id ?? null,
+            'hasilReviewManagementId' => $jadwalInterview->hasil_review_management_id ?? null,
+            'review_hasil_interview_id' => $jadwalInterview->review_hasil_interview_id ?? null,
+            'reviewHasilInterviewId' => $jadwalInterview->review_hasil_interview_id ?? null,
+
+            'review_management' => $jadwalInterview->review_management ?? null,
+            'reviewManagement' => $jadwalInterview->review_management ?? null,
+            'status_review_management' => $statusReviewManagement,
+            'statusReviewManagement' => $statusReviewManagement,
+            'status_review' => $statusReviewManagement,
+            'statusReview' => $statusReviewManagement,
         ];
     }
 
@@ -1515,6 +1624,50 @@ class CekTahapanPelamarController extends Controller
         return null;
     }
 
+    private function normalizeStatusReviewManagementValue($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        if (in_array($normalized, [
+            'diterima',
+            'terima',
+            'lolos',
+            'approved',
+            'approve',
+            'accept',
+            'accepted',
+            '1',
+            'true',
+            'ya',
+            'yes',
+        ], true)) {
+            return 'diterima';
+        }
+
+        if (in_array($normalized, [
+            'gagal',
+            'ditolak',
+            'tidak_diterima',
+            'tidak_lolos',
+            'reject',
+            'rejected',
+            'not_approved',
+            '0',
+            'false',
+            'tidak',
+            'no',
+        ], true)) {
+            return 'gagal';
+        }
+
+        return null;
+    }
+
     private function normalizeHasilInterviewValue($value): ?string
     {
         if ($value === null || $value === '') {
@@ -1524,19 +1677,23 @@ class CekTahapanPelamarController extends Controller
         $normalized = strtolower(trim((string) $value));
         $normalized = str_replace([' ', '-'], '_', $normalized);
 
-        if (in_array($normalized, ['lolos', 'lolos_interview', '1', 'true', 'ya', 'yes'], true)) {
-            return 'lolos';
+        if (in_array($normalized, [
+            'tidak_lolos_interview',
+            'tidak_lolos',
+            'gagal',
+            'failed',
+            'fail',
+            '0',
+            'false',
+            'tidak',
+            'no',
+        ], true)) {
+            return 'tidak_lolos_interview';
         }
 
-        if (in_array($normalized, ['tidak_lolos', 'tidak_lolos_interview', 'gagal', '0', 'false', 'tidak', 'no'], true)) {
-            return 'gagal';
-        }
-
-        if (in_array($normalized, ['dipertimbangkan', 'pertimbangan', 'considered', 'consider'], true)) {
-            return 'dipertimbangkan';
-        }
-
-        return null;
+        // Semua nilai selain Tidak Lolos Interview akan masuk ke Review Management.
+        // Contoh: Lolos, Dipertimbangkan, Lanjut Review, Diteruskan, dan nilai lain yang terisi.
+        return 'lanjut_review';
     }
 
     private function normalizeHasilTestValue($value): ?string

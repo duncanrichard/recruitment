@@ -1,10 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [LoginController::class, 'index'])->name('login');
+Route::get('/login', [LoginController::class, 'index'])->name('login.page');
 
 require __DIR__ . '/pendaftaran.php';
 require __DIR__ . '/admin.php';
@@ -27,3 +27,5 @@ require __DIR__ . '/master_data_divisi.php';
 require __DIR__ . '/jadwal_interview.php';
 require __DIR__ . '/interviewer.php';
 require __DIR__ . '/interview_kandidat.php';
+require __DIR__ . '/account_role.php';
+require __DIR__ . '/review_management.php';

@@ -25,6 +25,10 @@ import InterviewerPage from "../pages/rangkaian-interview/interviewer/Index";
 import JadwalInterviewPage from "../pages/rangkaian-interview/jadwal-interview/Index";
 import KandidatInterviewPage from "../pages/rangkaian-interview/kandidat/Index";
 
+import ReviewManagementPage from "../../review-management/Index";
+
+import RolePage from "../account/role/Index";
+
 export const defaultMenuKey = "dashboard";
 
 export const initialActionSignals = {
@@ -47,6 +51,8 @@ export const initialActionSignals = {
     masterOpsiKacamata: 0,
     masterSumberInformasi: 0,
     masterPerusahaan: 0,
+
+    accountRole: 0,
 };
 
 export const menuItems = [
@@ -279,6 +285,32 @@ export const menuItems = [
             },
         ],
     },
+    {
+        key: "review-management",
+        label: "Review Management",
+        description: "Kelola hasil review akhir",
+        icon: "◐",
+        component: ReviewManagementPage,
+    },
+    {
+        key: "account",
+        label: "Account",
+        description: "Kelola akun pengguna",
+        icon: "◫",
+        children: [
+            {
+                key: "account-role",
+                label: "Role",
+                description: "Kelola role akun",
+                icon: "◎",
+                component: RolePage,
+                action: {
+                    label: "Tambah Role",
+                    signalKey: "accountRole",
+                },
+            },
+        ],
+    },
 ];
 
 export const detailMenus = {
@@ -371,7 +403,10 @@ export function isMenuActive(menu, activeMenu) {
         (activeMenu === "daftar-hadir-zoom-detail" &&
             menu.key === "daftar-hadir") ||
         (activeMenu === "daftar-hadir-mmpi-detail" &&
-            menu.key === "daftar-hadir")
+            menu.key === "daftar-hadir") ||
+        (activeMenu === "account-role" && menu.key === "account") ||
+        (activeMenu === "review-management" &&
+            menu.key === "review-management")
     );
 }
 
@@ -381,6 +416,7 @@ export function isChildActive(child, activeMenu) {
         (activeMenu === "daftar-hadir-zoom-detail" &&
             child.key === "daftar-hadir-zoom") ||
         (activeMenu === "daftar-hadir-mmpi-detail" &&
-            child.key === "daftar-hadir-mmpi")
+            child.key === "daftar-hadir-mmpi") ||
+        (activeMenu === "account-role" && child.key === "account-role")
     );
 }
