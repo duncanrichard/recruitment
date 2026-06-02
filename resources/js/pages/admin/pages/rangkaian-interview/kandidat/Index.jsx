@@ -4,6 +4,17 @@ const STATUS_KEHADIRAN_OPTIONS = ["Hadir", "Tidak Hadir", "Tidak Respon", "Resch
 const HASIL_INTERVIEW_OPTIONS = ["Lolos Interview", "Tidak Lolos Interview", "Dipertimbangkan"];
 
 export default function KandidatInterviewPage({ actionSignals }) {
+    const getTodayDate = () => {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    };
+
+    const today = getTodayDate();
+
     const [dataList, setDataList] = useState([]);
     const [dataJadwal, setDataJadwal] = useState([]);
     const [dataKandidat, setDataKandidat] = useState([]);
@@ -25,6 +36,13 @@ export default function KandidatInterviewPage({ actionSignals }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState({ key: "jadwal", direction: "desc" });
 
+    const [tanggalMulai, setTanggalMulai] = useState(today);
+    const [tanggalSelesai, setTanggalSelesai] = useState(today);
+    const [appliedFilter, setAppliedFilter] = useState({
+        tanggalMulai: today,
+        tanggalSelesai: today,
+    });
+
     const [form, setForm] = useState({ jadwal_interview_id: "", kandidat_ids: [] });
     const [tanggalForm, setTanggalForm] = useState({ jadwal_interview: "" });
     const [statusForm, setStatusForm] = useState({ status_kehadiran: "" });
@@ -42,21 +60,39 @@ export default function KandidatInterviewPage({ actionSignals }) {
         setForm({ jadwal_interview_id: "", kandidat_ids: [] });
     };
 
-    const fetchData = async () => {
+    const fetchData = async (filters = appliedFilter) => {
         setTableLoading(true);
 
         try {
-            const response = await fetch("/admin/rangkaian-interview/kandidat/list", {
-                headers: { Accept: "application/json" },
+            const params = new URLSearchParams();
+
+            if (filters.tanggalMulai) {
+                params.append("tanggal_mulai", filters.tanggalMulai);
+            }
+
+            if (filters.tanggalSelesai) {
+                params.append("tanggal_selesai", filters.tanggalSelesai);
+            }
+
+            const url = params.toString()
+                ? `/admin/rangkaian-interview/kandidat/list?${params.toString()}`
+                : "/admin/rangkaian-interview/kandidat/list";
+
+            const response = await fetch(url, {
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
             });
 
             const result = await response.json();
 
-            if (result.success) {
-                setDataList(result.data || []);
-            } else {
+            if (!response.ok || !result.success) {
                 alert(result.message || "Gagal mengambil data kandidat interview.");
+                return;
             }
+
+            setDataList(Array.isArray(result.data) ? result.data : []);
         } catch (error) {
             console.error("Gagal mengambil data kandidat interview:", error);
             alert("Terjadi kesalahan saat mengambil data kandidat interview.");
@@ -119,8 +155,16 @@ export default function KandidatInterviewPage({ actionSignals }) {
     };
 
     useEffect(() => {
-        fetchData();
+        const defaultFilter = {
+            tanggalMulai: today,
+            tanggalSelesai: today,
+        };
+
+        setAppliedFilter(defaultFilter);
+        fetchData(defaultFilter);
         fetchOptions();
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -137,7 +181,39 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, entriesPerPage]);
+    }, [search, entriesPerPage, dataList]);
+
+    const handleFilterTanggal = (event) => {
+        event.preventDefault();
+
+        if (tanggalMulai && tanggalSelesai && tanggalSelesai < tanggalMulai) {
+            alert("Tanggal selesai tidak boleh lebih kecil dari tanggal mulai.");
+            return;
+        }
+
+        const nextFilter = {
+            tanggalMulai,
+            tanggalSelesai,
+        };
+
+        setAppliedFilter(nextFilter);
+        setCurrentPage(1);
+        fetchData(nextFilter);
+    };
+
+    const handleResetTanggal = () => {
+        const defaultFilter = {
+            tanggalMulai: today,
+            tanggalSelesai: today,
+        };
+
+        setTanggalMulai(today);
+        setTanggalSelesai(today);
+        setSearch("");
+        setCurrentPage(1);
+        setAppliedFilter(defaultFilter);
+        fetchData(defaultFilter);
+    };
 
     const formatDisplayDateTime = (value) => {
         if (!value) return "-";
@@ -179,9 +255,15 @@ export default function KandidatInterviewPage({ actionSignals }) {
         return dataList.filter((item) => {
             const judul = String(item.jadwal_interview?.judul_interview || "").toLowerCase();
             const tanggal = String(item.jadwal_interview?.jadwal_interview || "").toLowerCase();
+            const tanggalFormat = formatDisplayDateTime(item.jadwal_interview?.jadwal_interview).toLowerCase();
             const kandidat = formatKandidat(item.kandidats).toLowerCase();
 
-            return judul.includes(keyword) || tanggal.includes(keyword) || kandidat.includes(keyword);
+            return (
+                judul.includes(keyword) ||
+                tanggal.includes(keyword) ||
+                tanggalFormat.includes(keyword) ||
+                kandidat.includes(keyword)
+            );
         });
     }, [dataList, search]);
 
@@ -256,7 +338,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
     };
 
     const refreshAfterUpdate = async () => {
-        await fetchData();
+        await fetchData(appliedFilter);
 
         if (detailData?.jadwal_interview_id) {
             await fetchDetail(detailData.jadwal_interview_id);
@@ -323,7 +405,9 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
     const openTanggalModal = (item) => {
         setEditId(item.jadwal_interview_id);
-        setTanggalForm({ jadwal_interview: toDateTimeLocalValue(item.jadwal_interview?.jadwal_interview) });
+        setTanggalForm({
+            jadwal_interview: toDateTimeLocalValue(item.jadwal_interview?.jadwal_interview),
+        });
         setTanggalModalOpen(true);
     };
 
@@ -392,7 +476,6 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
     const canEditHasilInterview = (kandidat) => {
         const status = String(kandidat?.status_kehadiran || "").trim();
-
         return Boolean(status) && status !== "Reschedule";
     };
 
@@ -464,12 +547,18 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
     const submitHasil = async (e) => {
         e.preventDefault();
-        await updateKandidatField({ hasil_interview: hasilForm.hasil_interview || null }, "Hasil interview berhasil diperbarui.");
+        await updateKandidatField(
+            { hasil_interview: hasilForm.hasil_interview || null },
+            "Hasil interview berhasil diperbarui."
+        );
     };
 
     const submitCatatan = async (e) => {
         e.preventDefault();
-        await updateKandidatField({ catatan: catatanForm.catatan || null }, "Catatan berhasil disimpan.");
+        await updateKandidatField(
+            { catatan: catatanForm.catatan || null },
+            "Catatan berhasil disimpan."
+        );
     };
 
     const handleDeleteGroup = async (id) => {
@@ -490,7 +579,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
             alert(result.message || "Data berhasil dihapus.");
             if (detailData?.jadwal_interview_id === id) setDetailData(null);
-            await fetchData();
+            await fetchData(appliedFilter);
         } catch (error) {
             console.error("Gagal menghapus data:", error);
             alert("Terjadi kesalahan saat menghapus data.");
@@ -542,7 +631,12 @@ export default function KandidatInterviewPage({ actionSignals }) {
                         label="Jadwal Interview"
                         name="jadwal_interview_id"
                         value={form.jadwal_interview_id}
-                        onChange={(e) => setForm((prev) => ({ ...prev, jadwal_interview_id: e.target.value }))}
+                        onChange={(e) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                jadwal_interview_id: e.target.value,
+                            }))
+                        }
                         options={dataJadwal}
                         disabled={Boolean(editId)}
                         required
@@ -552,13 +646,19 @@ export default function KandidatInterviewPage({ actionSignals }) {
                         label="Kandidat"
                         value={form.kandidat_ids}
                         options={dataKandidat}
-                        onChange={(selectedIds) => setForm((prev) => ({ ...prev, kandidat_ids: selectedIds }))}
+                        onChange={(selectedIds) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                kandidat_ids: selectedIds,
+                            }))
+                        }
                         placeholder="Pilih kandidat..."
                         required
                     />
 
                     <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                        Kandidat yang tampil adalah pelamar yang sudah lolos MMPI dan belum memiliki jadwal interview. Dalam satu jadwal interview bisa memilih lebih dari satu kandidat.
+                        Kandidat yang tampil adalah pelamar yang sudah lolos MMPI dan belum memiliki jadwal interview.
+                        Dalam satu jadwal interview bisa memilih lebih dari satu kandidat.
                     </p>
                 </FormModal>
             )}
@@ -689,8 +789,6 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             >
                                 Edit Tanggal
                             </button>
-
-                           
                         </div>
                     </div>
                 </div>
@@ -802,7 +900,57 @@ export default function KandidatInterviewPage({ actionSignals }) {
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-100 px-6 py-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                        <form
+                            onSubmit={handleFilterTanggal}
+                            className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-end"
+                        >
+                            <DateInput
+                                label="Tanggal Mulai"
+                                value={tanggalMulai}
+                                onChange={setTanggalMulai}
+                            />
+
+                            <DateInput
+                                label="Tanggal Selesai"
+                                value={tanggalSelesai}
+                                onChange={setTanggalSelesai}
+                            />
+
+                            <button
+                                type="submit"
+                                disabled={tableLoading}
+                                className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Filter
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={tableLoading}
+                                onClick={handleResetTanggal}
+                                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Reset Hari Ini
+                            </button>
+                        </form>
+
+                        <div className="flex items-center gap-2">
+                            <span className="whitespace-nowrap text-sm font-bold text-slate-600">Search:</span>
+
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Cari kandidat interview..."
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="border-b border-slate-100 px-6 py-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-2">
                             <span className="whitespace-nowrap text-sm font-bold text-slate-600">Show</span>
 
@@ -821,17 +969,9 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             <span className="whitespace-nowrap text-sm font-bold text-slate-600">entries</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="whitespace-nowrap text-sm font-bold text-slate-600">Search:</span>
-
-                            <input
-                                type="text"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Cari kandidat interview..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
-                            />
-                        </div>
+                        <p className="text-sm font-bold text-slate-500">
+                            Filter aktif: {tanggalMulai || "-"} sampai {tanggalSelesai || "-"}
+                        </p>
                     </div>
                 </div>
 
@@ -857,7 +997,9 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             ) : paginatedData.length > 0 ? (
                                 paginatedData.map((item, index) => (
                                     <tr key={item.jadwal_interview_id} className="group transition hover:bg-slate-50">
-                                        <TableCell className="text-sm font-black text-slate-500">{showingFrom + index}</TableCell>
+                                        <TableCell className="text-sm font-black text-slate-500">
+                                            {showingFrom + index}
+                                        </TableCell>
 
                                         <TableCell>
                                             <div className="font-black text-slate-950">
@@ -923,7 +1065,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                             </h3>
 
                                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                                Belum ada kandidat yang dimasukkan ke jadwal interview.
+                                                Belum ada kandidat interview pada tanggal atau periode ini.
                                             </p>
                                         </div>
                                     </TableCell>
@@ -978,6 +1120,23 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
             {renderModals()}
         </div>
+    );
+}
+
+function DateInput({ label, value, onChange }) {
+    return (
+        <label className="block">
+            <span className="mb-2 block text-sm font-black text-slate-700">
+                {label}
+            </span>
+
+            <input
+                type="date"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            />
+        </label>
     );
 }
 
@@ -1123,7 +1282,11 @@ function Badge({ value }) {
                   ? "bg-blue-50 text-blue-700"
                   : "bg-slate-100 text-slate-500";
 
-    return <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-black ${cls}`}>{value || "Belum Diisi"}</span>;
+    return (
+        <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-black ${cls}`}>
+            {value || "Belum Diisi"}
+        </span>
+    );
 }
 
 function SelectJadwal({ label, name, value, onChange, options, required = false, disabled = false }) {

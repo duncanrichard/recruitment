@@ -2,6 +2,8 @@ import DashboardPage from "../pages/DashboardPage";
 import DataPelamarPage from "../pages/data-pelamar/Index";
 import DetailDataPelamarPage from "../pages/data-pelamar/Detail";
 
+import PermintaanKandidatPage from "../pages/permintaan-kandidat";
+
 import JadwalTestZoomPage from "../pages/jadwal-test/zoom/Index";
 import JadwalTestMmpiPage from "../pages/jadwal-test/mmpi/Index";
 
@@ -34,6 +36,7 @@ export const defaultMenuKey = "dashboard";
 
 export const initialActionSignals = {
     dataPelamar: 0,
+    permintaanKandidat: 0,
 
     jadwalTestZoom: 0,
     jadwalTestMmpi: 0,
@@ -192,6 +195,17 @@ export const menuItems = [
         action: {
             label: "Tambah Pelamar",
             signalKey: "dataPelamar",
+        },
+    },
+    {
+        key: "permintaan-kandidat",
+        label: "Permintaan Kandidat",
+        description: "Form permintaan kandidat",
+        icon: "▣",
+        component: PermintaanKandidatPage,
+        action: {
+            label: "Tambah Permintaan",
+            signalKey: "permintaanKandidat",
         },
     },
     {
@@ -405,6 +419,10 @@ export function getMenuParentKeyByChildKey(childKey) {
         return "account";
     }
 
+    if (childKey === "permintaan-kandidat") {
+        return null;
+    }
+
     return null;
 }
 
@@ -423,6 +441,8 @@ export function isMenuActive(menu, activeMenu) {
             menu.key === "daftar-hadir") ||
         (activeMenu === "account-role" && menu.key === "account") ||
         (activeMenu === "account-user" && menu.key === "account") ||
+        (activeMenu === "permintaan-kandidat" &&
+            menu.key === "permintaan-kandidat") ||
         (activeMenu === "review-management" &&
             menu.key === "review-management")
     );

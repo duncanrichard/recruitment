@@ -18,7 +18,17 @@ class RoleController extends Controller
     {
         $roles = Role::query()
             ->latest()
-            ->get();
+            ->get()
+            ->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'nama_role' => $role->name,
+                    'name' => $role->name,
+                    'guard_name' => $role->guard_name,
+                    'created_at' => $role->created_at,
+                    'updated_at' => $role->updated_at,
+                ];
+            });
 
         return response()->json([
             'success' => true,
@@ -30,20 +40,33 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama_role' => ['required', 'string', 'max:100', 'unique:roles,nama_role'],
-            'kode_role' => ['nullable', 'string', 'max:50', 'unique:roles,kode_role'],
-            'keterangan' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
+            'nama_role' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('roles', 'name'),
+            ],
+            'guard_name' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
         ]);
 
-        $validated['is_active'] = $request->boolean('is_active', true);
-
-        $role = Role::create($validated);
+        $role = Role::create([
+            'name' => $validated['nama_role'],
+            'guard_name' => $validated['guard_name'] ?? 'web',
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Data role berhasil ditambahkan.',
-            'data' => $role,
+            'data' => [
+                'id' => $role->id,
+                'nama_role' => $role->name,
+                'name' => $role->name,
+                'guard_name' => $role->guard_name,
+            ],
         ], 201);
     }
 
@@ -54,26 +77,29 @@ class RoleController extends Controller
                 'required',
                 'string',
                 'max:100',
-                Rule::unique('roles', 'nama_role')->ignore($role->id),
+                Rule::unique('roles', 'name')->ignore($role->id),
             ],
-            'kode_role' => [
+            'guard_name' => [
                 'nullable',
                 'string',
-                'max:50',
-                Rule::unique('roles', 'kode_role')->ignore($role->id),
+                'max:100',
             ],
-            'keterangan' => ['nullable', 'string'],
-            'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $validated['is_active'] = $request->boolean('is_active', true);
-
-        $role->update($validated);
+        $role->update([
+            'name' => $validated['nama_role'],
+            'guard_name' => $validated['guard_name'] ?? $role->guard_name ?? 'web',
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Data role berhasil diperbarui.',
-            'data' => $role,
+            'data' => [
+                'id' => $role->id,
+                'nama_role' => $role->name,
+                'name' => $role->name,
+                'guard_name' => $role->guard_name,
+            ],
         ]);
     }
 

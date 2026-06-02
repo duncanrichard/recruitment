@@ -33,13 +33,26 @@ class InterviewKandidatController extends Controller
         'Dipertimbangkan',
     ];
 
-    public function list()
+    public function list(Request $request)
     {
+        $validated = $request->validate([
+            'tanggal_mulai' => ['nullable', 'date'],
+            'tanggal_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
+        ]);
+
+        $tanggalMulai = $validated['tanggal_mulai'] ?? now()->toDateString();
+        $tanggalSelesai = $validated['tanggal_selesai'] ?? now()->toDateString();
+
         $rows = JadwalInterviewKandidat::query()
             ->with([
                 'jadwalInterview:id,judul_interview,jadwal_interview',
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar',
             ])
+            ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
+                $query
+                    ->whereDate('jadwal_interview', '>=', $tanggalMulai)
+                    ->whereDate('jadwal_interview', '<=', $tanggalSelesai);
+            })
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -66,6 +79,10 @@ class InterviewKandidatController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data kandidat interview berhasil diambil.',
+            'filter' => [
+                'tanggal_mulai' => $tanggalMulai,
+                'tanggal_selesai' => $tanggalSelesai,
+            ],
             'data' => $data,
         ]);
     }

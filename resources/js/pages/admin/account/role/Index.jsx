@@ -14,15 +14,13 @@ export default function RolePage({ actionSignals }) {
     const [currentPage, setCurrentPage] = useState(1);
 
     const [sortConfig, setSortConfig] = useState({
-        key: "nama_role",
+        key: "name",
         direction: "asc",
     });
 
     const [form, setForm] = useState({
-        nama_role: "",
-        kode_role: "",
-        keterangan: "",
-        is_active: true,
+        name: "",
+        guard_name: "web",
     });
 
     const getCsrfToken = () => {
@@ -35,10 +33,8 @@ export default function RolePage({ actionSignals }) {
         setEditId(null);
 
         setForm({
-            nama_role: "",
-            kode_role: "",
-            keterangan: "",
-            is_active: true,
+            name: "",
+            guard_name: "web",
         });
     };
 
@@ -104,17 +100,10 @@ export default function RolePage({ actionSignals }) {
         }
 
         return dataRole.filter((item) => {
-            const namaRole = String(item.nama_role || "").toLowerCase();
-            const kodeRole = String(item.kode_role || "").toLowerCase();
-            const keterangan = String(item.keterangan || "").toLowerCase();
-            const status = item.is_active ? "aktif" : "nonaktif";
+            const name = String(item.name || "").toLowerCase();
+            const guardName = String(item.guard_name || "").toLowerCase();
 
-            return (
-                namaRole.includes(keyword) ||
-                kodeRole.includes(keyword) ||
-                keterangan.includes(keyword) ||
-                status.includes(keyword)
-            );
+            return name.includes(keyword) || guardName.includes(keyword);
         });
     }, [dataRole, search]);
 
@@ -124,14 +113,6 @@ export default function RolePage({ actionSignals }) {
         data.sort((a, b) => {
             let valueA = a[sortConfig.key];
             let valueB = b[sortConfig.key];
-
-            if (typeof valueA === "boolean") {
-                valueA = valueA ? "aktif" : "nonaktif";
-            }
-
-            if (typeof valueB === "boolean") {
-                valueB = valueB ? "aktif" : "nonaktif";
-            }
 
             valueA = String(valueA || "").toLowerCase();
             valueB = String(valueB || "").toLowerCase();
@@ -212,11 +193,11 @@ export default function RolePage({ actionSignals }) {
     };
 
     const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value } = e.target;
 
         setForm((prev) => ({
             ...prev,
-            [name]: type === "checkbox" ? checked : value,
+            [name]: value,
         }));
     };
 
@@ -244,7 +225,13 @@ export default function RolePage({ actionSignals }) {
             const result = await response.json();
 
             if (!response.ok) {
-                alert(result.message || "Data role gagal disimpan.");
+                if (result.errors) {
+                    const firstError = Object.values(result.errors)?.[0]?.[0];
+                    alert(firstError || result.message || "Data role gagal disimpan.");
+                } else {
+                    alert(result.message || "Data role gagal disimpan.");
+                }
+
                 return;
             }
 
@@ -263,17 +250,15 @@ export default function RolePage({ actionSignals }) {
         setEditId(item.id);
 
         setForm({
-            nama_role: item.nama_role || "",
-            kode_role: item.kode_role || "",
-            keterangan: item.keterangan || "",
-            is_active: Boolean(item.is_active),
+            name: item.name || "",
+            guard_name: item.guard_name || "web",
         });
 
         setModalOpen(true);
     };
 
     const handleDelete = async (id) => {
-        const confirmDelete = confirm("Yakin ingin menghapus data role ini?");
+        const confirmDelete = confirm("Yakin ingin menghapus role ini?");
 
         if (!confirmDelete) return;
 
@@ -289,14 +274,14 @@ export default function RolePage({ actionSignals }) {
             const result = await response.json();
 
             if (result.success) {
-                alert(result.message || "Data role berhasil dihapus.");
+                alert(result.message || "Role berhasil dihapus.");
                 fetchData();
             } else {
-                alert(result.message || "Data role gagal dihapus.");
+                alert(result.message || "Role gagal dihapus.");
             }
         } catch (error) {
-            console.error("Gagal menghapus data role:", error);
-            alert("Terjadi kesalahan saat menghapus data role.");
+            console.error("Gagal menghapus role:", error);
+            alert("Terjadi kesalahan saat menghapus role.");
         }
     };
 
@@ -354,8 +339,6 @@ export default function RolePage({ actionSignals }) {
                                 />
                             </div>
                         </div>
-
-                      
                     </div>
                 </div>
 
@@ -367,25 +350,23 @@ export default function RolePage({ actionSignals }) {
 
                                 <SortableTableHead
                                     label="Nama Role"
-                                    sortKey="nama_role"
+                                    sortKey="name"
                                     onSort={handleSort}
-                                    icon={sortIcon("nama_role")}
+                                    icon={sortIcon("name")}
                                 />
 
                                 <SortableTableHead
-                                    label="Kode Role"
-                                    sortKey="kode_role"
+                                    label="Guard"
+                                    sortKey="guard_name"
                                     onSort={handleSort}
-                                    icon={sortIcon("kode_role")}
+                                    icon={sortIcon("guard_name")}
                                 />
 
-                                <TableHead>Keterangan</TableHead>
-
                                 <SortableTableHead
-                                    label="Status"
-                                    sortKey="is_active"
+                                    label="Dibuat"
+                                    sortKey="created_at"
                                     onSort={handleSort}
-                                    icon={sortIcon("is_active")}
+                                    icon={sortIcon("created_at")}
                                 />
 
                                 <TableHead align="right">Aksi</TableHead>
@@ -395,7 +376,7 @@ export default function RolePage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="5" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -413,43 +394,27 @@ export default function RolePage({ actionSignals }) {
 
                                         <td className="px-6 py-5">
                                             <div className="font-black text-slate-950">
-                                                {item.nama_role}
+                                                {item.name}
                                             </div>
                                         </td>
 
                                         <td className="px-6 py-5">
                                             <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-600">
-                                                {item.kode_role || "-"}
+                                                {item.guard_name || "web"}
                                             </span>
                                         </td>
 
                                         <td className="px-6 py-5">
-                                            <div className="max-w-md text-sm font-semibold text-slate-500">
-                                                {item.keterangan || "-"}
+                                            <div className="text-sm font-semibold text-slate-500">
+                                                {formatDate(item.created_at)}
                                             </div>
-                                        </td>
-
-                                        <td className="px-6 py-5">
-                                            <span
-                                                className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${
-                                                    item.is_active
-                                                        ? "bg-teal-50 text-teal-700"
-                                                        : "bg-rose-50 text-rose-700"
-                                                }`}
-                                            >
-                                                {item.is_active
-                                                    ? "Aktif"
-                                                    : "Nonaktif"}
-                                            </span>
                                         </td>
 
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        handleEdit(item)
-                                                    }
+                                                    onClick={() => handleEdit(item)}
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
                                                 >
                                                     Edit
@@ -470,7 +435,7 @@ export default function RolePage({ actionSignals }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="5" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ◎
@@ -549,7 +514,7 @@ export default function RolePage({ actionSignals }) {
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Lengkapi data role untuk hak akses akun.
+                                        Lengkapi data role sesuai tabel Spatie Permission.
                                     </p>
                                 </div>
 
@@ -567,47 +532,33 @@ export default function RolePage({ actionSignals }) {
                             <div className="space-y-5 px-6 py-6">
                                 <Input
                                     label="Nama Role"
-                                    name="nama_role"
-                                    value={form.nama_role}
+                                    name="name"
+                                    value={form.name}
                                     onChange={handleChange}
-                                    placeholder="Contoh: Super Admin"
+                                    placeholder="Contoh: Manager"
                                     required
                                 />
 
-                                <Input
-                                    label="Kode Role"
-                                    name="kode_role"
-                                    value={form.kode_role}
-                                    onChange={handleChange}
-                                    placeholder="Contoh: super_admin"
-                                />
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Guard Name <span className="text-rose-500">*</span>
+                                    </label>
 
-                                <Textarea
-                                    label="Keterangan"
-                                    name="keterangan"
-                                    value={form.keterangan}
-                                    onChange={handleChange}
-                                    placeholder="Tuliskan keterangan role..."
-                                />
-
-                                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <input
-                                        type="checkbox"
-                                        name="is_active"
-                                        checked={form.is_active}
+                                    <select
+                                        name="guard_name"
+                                        value={form.guard_name}
                                         onChange={handleChange}
-                                        className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                    />
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    >
+                                        <option value="web">web</option>
+                                        <option value="api">api</option>
+                                    </select>
 
-                                    <div>
-                                        <div className="text-sm font-black text-slate-700">
-                                            Role Aktif
-                                        </div>
-                                        <div className="text-xs font-semibold text-slate-500">
-                                            Role aktif dapat digunakan pada akun pengguna.
-                                        </div>
-                                    </div>
-                                </label>
+                                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                                        Untuk login biasa Laravel, gunakan guard <b>web</b>.
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
@@ -697,30 +648,18 @@ function Input({
     );
 }
 
-function Textarea({
-    label,
-    name,
-    value,
-    onChange,
-    required = false,
-    placeholder = "",
-}) {
-    return (
-        <div>
-            <label className="mb-2 block text-sm font-black text-slate-700">
-                {label}
-                {required && <span className="text-rose-500"> *</span>}
-            </label>
+function formatDate(value) {
+    if (!value) return "-";
 
-            <textarea
-                name={name}
-                value={value}
-                onChange={onChange}
-                required={required}
-                placeholder={placeholder}
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
-            />
-        </div>
-    );
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return "-";
+    }
+
+    return date.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
 }

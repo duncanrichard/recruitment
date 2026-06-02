@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login Admin</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <title>Login - Sirekrut</title>
 
     @viteReactRefresh
-    @vite(['resources/js/app.jsx'])
+    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
 </head>
 <body>
     <div id="root"></div>

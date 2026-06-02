@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
+    public function index()
+    {
+        return view('pages.admin.index');
+    }
+
     public function summary(): JsonResponse
     {
         $pelamarIds = $this->getPelamarIds();

@@ -267,15 +267,29 @@ class ReviewManagementController extends Controller
         return view('pages.admin.index');
     }
 
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'tanggal_mulai' => ['nullable', 'date'],
+            'tanggal_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
+        ]);
+
+        $tanggalMulai = $validated['tanggal_mulai'] ?? now()->toDateString();
+        $tanggalSelesai = $validated['tanggal_selesai'] ?? now()->toDateString();
+
         $data = JadwalInterviewKandidat::query()
             ->with([
                 'reviewManagement',
+                'jadwalInterview:id,judul_interview,jadwal_interview',
                 'kandidat' => function ($query) {
                     $query->with($this->safePelamarRelations());
                 },
             ])
+            ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
+                $query
+                    ->whereDate('jadwal_interview', '>=', $tanggalMulai)
+                    ->whereDate('jadwal_interview', '<=', $tanggalSelesai);
+            })
             ->whereIn('hasil_interview', [
                 'Lolos Interview',
                 'Dipertimbangkan',
@@ -284,6 +298,7 @@ class ReviewManagementController extends Controller
             ->get()
             ->map(function ($item) {
                 $kandidat = $item->kandidat;
+                $jadwalInterview = $item->jadwalInterview;
 
                 if ($kandidat) {
                     $kandidat = $this->appendExtraData($kandidat);
@@ -293,6 +308,12 @@ class ReviewManagementController extends Controller
                     'id' => $item->id,
                     'jadwal_interview_id' => $item->jadwal_interview_id,
                     'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
+
+                    'judul_interview' => $jadwalInterview?->judul_interview,
+                    'tanggal_interview' => $jadwalInterview?->jadwal_interview,
+                    'tanggal_interview_format' => $jadwalInterview?->jadwal_interview
+                        ? date('d F Y H:i', strtotime($jadwalInterview->jadwal_interview))
+                        : null,
 
                     'nama_kandidat' => $kandidat?->nama_lengkap ?? '-',
                     'email_kandidat' => $kandidat?->email,
@@ -317,6 +338,10 @@ class ReviewManagementController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data review management berhasil diambil.',
+            'filter' => [
+                'tanggal_mulai' => $tanggalMulai,
+                'tanggal_selesai' => $tanggalSelesai,
+            ],
             'data' => $data,
         ]);
     }
@@ -376,6 +401,7 @@ class ReviewManagementController extends Controller
     {
         $hasilReviewManagement->load([
             'hasilInterview.reviewManagement',
+            'hasilInterview.jadwalInterview:id,judul_interview,jadwal_interview',
             'hasilInterview.kandidat' => function ($query) {
                 $query->with($this->safePelamarRelations());
             },

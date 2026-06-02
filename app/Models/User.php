@@ -3,16 +3,17 @@
 namespace App\Models;
 
 use App\Models\Divisi;
-use App\Models\Role;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     use HasUuids;
     use Notifiable;
+    use HasRoles;
 
     protected $table = 'users';
 
@@ -22,13 +23,14 @@ class User extends Authenticatable
 
     protected $keyType = 'string';
 
+    protected $guard_name = 'web';
+
     protected $fillable = [
         'name',
         'email',
         'email_verified_at',
         'password',
         'remember_token',
-        'role_id',
         'divisi_id',
     ];
 
@@ -42,18 +44,12 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'role_id' => 'integer',
         'divisi_id' => 'string',
     ];
 
     public function uniqueIds(): array
     {
         return ['id'];
-    }
-
-    public function role()
-    {
-        return $this->belongsTo(Role::class, 'role_id', 'id');
     }
 
     public function divisi()
@@ -63,7 +59,7 @@ class User extends Authenticatable
 
     public function setPasswordAttribute($value): void
     {
-        if (!empty($value)) {
+        if (! empty($value)) {
             if (Hash::needsRehash($value)) {
                 $this->attributes['password'] = Hash::make($value);
                 return;

@@ -22,22 +22,28 @@ class UserController extends Controller
         try {
             $users = User::query()
                 ->with([
-                    'role:id,nama_role,kode_role,is_active',
+                    'roles:id,name,guard_name',
                     'divisi:id,nama',
                 ])
                 ->orderByDesc('created_at')
                 ->get()
                 ->map(function ($user) {
+                    $role = $user->roles->first();
+
                     return [
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
                         'email_verified_at' => $user->email_verified_at,
-                        'role_id' => $user->role_id,
-                        'role_label' => $user->role?->nama_role,
-                        'role_kode' => $user->role?->kode_role,
+
+                        'role_id' => $role?->id,
+                        'role_label' => $role?->name,
+                        'role_guard' => $role?->guard_name,
+                        'role_kode' => $role?->guard_name,
+
                         'divisi_id' => $user->divisi_id,
                         'divisi_label' => $user->divisi?->nama,
+
                         'created_at' => $user->created_at,
                         'updated_at' => $user->updated_at,
                     ];
@@ -61,10 +67,20 @@ class UserController extends Controller
     {
         try {
             $roles = Role::query()
-                ->select('id', 'nama_role', 'kode_role', 'is_active')
-                ->where('is_active', true)
-                ->orderBy('nama_role')
-                ->get();
+                ->select('id', 'name', 'guard_name')
+                ->orderBy('name')
+                ->get()
+                ->map(function ($role) {
+                    return [
+                        'id' => $role->id,
+                        'name' => $role->name,
+                        'guard_name' => $role->guard_name,
+
+                        // fallback supaya frontend lama tetap aman
+                        'nama_role' => $role->name,
+                        'kode_role' => $role->guard_name,
+                    ];
+                });
 
             $divisi = Divisi::query()
                 ->select('id', 'nama')
@@ -91,55 +107,35 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:191',
-            ],
-            'email' => [
-                'required',
-                'email',
-                'max:191',
-                'unique:users,email',
-            ],
-            'password' => [
-                'required',
-                'string',
-                'min:6',
-                'confirmed',
-            ],
-            'role_id' => [
-                'required',
-                'integer',
-                'exists:roles,id',
-            ],
-            'divisi_id' => [
-                'nullable',
-                'uuid',
-                'exists:divisi,id',
-            ],
-            'email_verified_at' => [
-                'nullable',
-                'date',
-            ],
+            'name' => ['required', 'string', 'max:191'],
+            'email' => ['required', 'email', 'max:191', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'role_id' => ['required', 'uuid', 'exists:roles,id'],
+            'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
+            'email_verified_at' => ['nullable', 'date'],
         ]);
 
         try {
             DB::transaction(function () use ($validated) {
-                User::create([
+                $role = Role::query()
+                    ->where('id', $validated['role_id'])
+                    ->firstOrFail();
+
+                $user = User::create([
                     'name' => $validated['name'],
                     'email' => $validated['email'],
                     'password' => $validated['password'],
-                    'role_id' => $validated['role_id'],
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ]);
+
+                $user->assignRole($role);
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'User berhasil ditambahkan.',
-            ]);
+            ], 201);
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
@@ -152,54 +148,39 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:191',
-            ],
+            'name' => ['required', 'string', 'max:191'],
             'email' => [
                 'required',
                 'email',
                 'max:191',
                 Rule::unique('users', 'email')->ignore($user->id, 'id'),
             ],
-            'password' => [
-                'nullable',
-                'string',
-                'min:6',
-                'confirmed',
-            ],
-            'role_id' => [
-                'required',
-                'integer',
-                'exists:roles,id',
-            ],
-            'divisi_id' => [
-                'nullable',
-                'uuid',
-                'exists:divisi,id',
-            ],
-            'email_verified_at' => [
-                'nullable',
-                'date',
-            ],
+            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
+            'role_id' => ['required', 'uuid', 'exists:roles,id'],
+            'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
+            'email_verified_at' => ['nullable', 'date'],
         ]);
 
         try {
             DB::transaction(function () use ($validated, $user) {
+                $role = Role::query()
+                    ->where('id', $validated['role_id'])
+                    ->firstOrFail();
+
                 $payload = [
                     'name' => $validated['name'],
                     'email' => $validated['email'],
-                    'role_id' => $validated['role_id'],
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ];
 
-                if (!empty($validated['password'])) {
+                if (! empty($validated['password'])) {
                     $payload['password'] = $validated['password'];
                 }
 
                 $user->update($payload);
+
+                $user->syncRoles([$role]);
             });
 
             return response()->json([
@@ -218,7 +199,10 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         try {
-            $user->delete();
+            DB::transaction(function () use ($user) {
+                $user->syncRoles([]);
+                $user->delete();
+            });
 
             return response()->json([
                 'success' => true,

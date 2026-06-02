@@ -30,6 +30,37 @@ export default function UserPage({ actionSignals }) {
 
     const isEdit = Boolean(selectedItem?.id);
 
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: "auto",
+        });
+
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+
+        const adminContent = document.getElementById("admin-content");
+
+        if (adminContent) {
+            adminContent.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: "auto",
+            });
+        }
+
+        const mainContent = document.querySelector("main");
+
+        if (mainContent) {
+            mainContent.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: "auto",
+            });
+        }
+    };
+
     const getCsrfToken = () => {
         return document
             .querySelector('meta[name="csrf-token"]')
@@ -37,15 +68,7 @@ export default function UserPage({ actionSignals }) {
     };
 
     const resetForm = () => {
-        setForm({
-            name: "",
-            email: "",
-            password: "",
-            password_confirmation: "",
-            role_id: "",
-            divisi_id: "",
-            email_verified_at: "",
-        });
+        setForm({ ...emptyForm });
     };
 
     const formatDateTimeLocal = (value) => {
@@ -64,21 +87,69 @@ export default function UserPage({ actionSignals }) {
         )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     };
 
+    const getRoleIdFromItem = (item) => {
+        return String(
+            item?.role_id ||
+                item?.role?.id ||
+                item?.roles?.[0]?.id ||
+                ""
+        );
+    };
+
+    const getRoleName = (role) => {
+        return role?.name || role?.nama_role || role?.role_label || "-";
+    };
+
+    const getRoleGuard = (role) => {
+        return role?.guard_name || role?.kode_role || role?.role_guard || "web";
+    };
+
+    const roleOptions = useMemo(() => {
+        const options = [...dataRole];
+
+        if (selectedItem?.role_id) {
+            const selectedRoleExists = options.some(
+                (role) => String(role.id) === String(selectedItem.role_id)
+            );
+
+            if (!selectedRoleExists) {
+                options.unshift({
+                    id: selectedItem.role_id,
+                    name: selectedItem.role_label || "Role saat ini",
+                    guard_name:
+                        selectedItem.role_guard ||
+                        selectedItem.role_kode ||
+                        "web",
+                });
+            }
+        }
+
+        return options;
+    }, [dataRole, selectedItem]);
+
     const openCreateModal = () => {
+        scrollToTop();
         setSelectedItem(null);
         resetForm();
         setModalOpen(true);
     };
 
     const openEditModal = (item) => {
-        setSelectedItem(item);
+        scrollToTop();
+
+        const roleId = getRoleIdFromItem(item);
+
+        setSelectedItem({
+            ...item,
+            role_id: roleId,
+        });
 
         setForm({
             name: item.name || "",
             email: item.email || "",
             password: "",
             password_confirmation: "",
-            role_id: item.role_id ? String(item.role_id) : "",
+            role_id: roleId,
             divisi_id: item.divisi_id ? String(item.divisi_id) : "",
             email_verified_at: formatDateTimeLocal(item.email_verified_at),
         });
@@ -140,6 +211,7 @@ export default function UserPage({ actionSignals }) {
     };
 
     useEffect(() => {
+        scrollToTop();
         fetchData();
         fetchOptions();
     }, []);
@@ -170,7 +242,9 @@ export default function UserPage({ actionSignals }) {
             const name = String(item.name || "").toLowerCase();
             const email = String(item.email || "").toLowerCase();
             const role = String(item.role_label || "").toLowerCase();
-            const roleKode = String(item.role_kode || "").toLowerCase();
+            const roleGuard = String(
+                item.role_guard || item.role_kode || ""
+            ).toLowerCase();
             const divisi = String(item.divisi_label || "").toLowerCase();
             const verified = item.email_verified_at
                 ? "verified terverifikasi"
@@ -180,7 +254,7 @@ export default function UserPage({ actionSignals }) {
                 name.includes(keyword) ||
                 email.includes(keyword) ||
                 role.includes(keyword) ||
-                roleKode.includes(keyword) ||
+                roleGuard.includes(keyword) ||
                 divisi.includes(keyword) ||
                 verified.includes(keyword)
             );
@@ -260,12 +334,7 @@ export default function UserPage({ actionSignals }) {
             email_verified_at: form.email_verified_at || null,
         };
 
-        if (form.password) {
-            payload.password = form.password;
-            payload.password_confirmation = form.password_confirmation;
-        }
-
-        if (!isEdit) {
+        if (!isEdit || form.password) {
             payload.password = form.password;
             payload.password_confirmation = form.password_confirmation;
         }
@@ -287,6 +356,16 @@ export default function UserPage({ actionSignals }) {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
+
+        if (!form.role_id) {
+            alert("Role wajib dipilih.");
+            return;
+        }
+
+        if (!isEdit && !form.password) {
+            alert("Password wajib diisi.");
+            return;
+        }
 
         if (form.password || form.password_confirmation) {
             if (form.password !== form.password_confirmation) {
@@ -328,6 +407,7 @@ export default function UserPage({ actionSignals }) {
             alert(result.message || "Data user berhasil disimpan.");
             closeModal();
             fetchData();
+            scrollToTop();
         } catch (error) {
             console.error("Gagal menyimpan data user:", error);
             alert("Terjadi kesalahan saat menyimpan data user.");
@@ -355,6 +435,7 @@ export default function UserPage({ actionSignals }) {
             if (response.ok && result.success) {
                 alert(result.message || "User berhasil dihapus.");
                 fetchData();
+                scrollToTop();
             } else {
                 alert(result.message || "User gagal dihapus.");
             }
@@ -426,7 +507,9 @@ export default function UserPage({ actionSignals }) {
                                 <input
                                     type="text"
                                     value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
                                     placeholder="Cari nama, email, role, divisi..."
                                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
                                 />
@@ -487,7 +570,9 @@ export default function UserPage({ actionSignals }) {
                                             </div>
 
                                             <div className="mt-1 text-xs font-semibold text-slate-500">
-                                                {item.role_kode || "-"}
+                                                {item.role_guard ||
+                                                    item.role_kode ||
+                                                    "-"}
                                             </div>
                                         </td>
 
@@ -519,7 +604,9 @@ export default function UserPage({ actionSignals }) {
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => openEditModal(item)}
+                                                    onClick={() =>
+                                                        openEditModal(item)
+                                                    }
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
                                                 >
                                                     Edit
@@ -527,7 +614,9 @@ export default function UserPage({ actionSignals }) {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleDelete(item)}
+                                                    onClick={() =>
+                                                        handleDelete(item)
+                                                    }
                                                     className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
                                                 >
                                                     Hapus
@@ -698,11 +787,14 @@ export default function UserPage({ actionSignals }) {
                                         >
                                             <option value="">Pilih Role</option>
 
-                                            {dataRole.map((role) => (
-                                                <option key={role.id} value={role.id}>
-                                                    {role.nama_role}
-                                                    {role.kode_role
-                                                        ? ` - ${role.kode_role}`
+                                            {roleOptions.map((role) => (
+                                                <option
+                                                    key={role.id}
+                                                    value={String(role.id)}
+                                                >
+                                                    {getRoleName(role)}
+                                                    {getRoleGuard(role)
+                                                        ? ` - ${getRoleGuard(role)}`
                                                         : ""}
                                                 </option>
                                             ))}
@@ -723,7 +815,10 @@ export default function UserPage({ actionSignals }) {
                                             <option value="">Pilih Divisi</option>
 
                                             {dataDivisi.map((item) => (
-                                                <option key={item.id} value={item.id}>
+                                                <option
+                                                    key={item.id}
+                                                    value={String(item.id)}
+                                                >
                                                     {item.nama}
                                                 </option>
                                             ))}
