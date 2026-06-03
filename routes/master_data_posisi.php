@@ -7,6 +7,9 @@ Route::prefix('admin/master-data/posisi')
     ->name('admin.master-data.posisi.')
     ->middleware('auth')
     ->group(function () {
+        Route::get('/', [PosisiController::class, 'index'])
+            ->name('index');
+
         Route::get('/list', [PosisiController::class, 'list'])
             ->middleware('permission:admin.master-data.posisi.list')
             ->name('list');

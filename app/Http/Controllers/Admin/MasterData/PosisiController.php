@@ -12,22 +12,29 @@ use Illuminate\Validation\Rule;
 
 class PosisiController extends Controller
 {
+    public function index()
+    {
+        return view('pages.admin.index');
+    }
+
     public function list()
     {
         try {
-            if (! Schema::hasTable((new Posisi())->getTable())) {
+            $tableName = (new Posisi())->getTable();
+
+            if (! Schema::hasTable($tableName)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Tabel posisi tidak ditemukan.',
-                    'error' => 'Table not found: ' . (new Posisi())->getTable(),
+                    'error' => 'Table not found: ' . $tableName,
                 ], 500);
             }
 
             $query = Posisi::query();
 
-            if (Schema::hasColumn((new Posisi())->getTable(), 'nama_posisi')) {
-                $query->orderBy('nama_posisi');
-            } else {
+            if (Schema::hasColumn($tableName, 'nama_posisi')) {
+                $query->orderBy('nama_posisi', 'asc');
+            } elseif (Schema::hasColumn($tableName, 'created_at')) {
                 $query->orderByDesc('created_at');
             }
 
@@ -50,7 +57,12 @@ class PosisiController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama_posisi' => ['required', 'string', 'max:255'],
+            'nama_posisi' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique((new Posisi())->getTable(), 'nama_posisi'),
+            ],
             'deskripsi' => ['nullable', 'string'],
             'str_aktif' => ['nullable', Rule::in(['active', 'non_active'])],
         ]);
@@ -58,7 +70,11 @@ class PosisiController extends Controller
         try {
             $validated['str_aktif'] = $validated['str_aktif'] ?? 'active';
 
-            $posisi = Posisi::create($validated);
+            $posisi = Posisi::create([
+                'nama_posisi' => $validated['nama_posisi'],
+                'deskripsi' => $validated['deskripsi'] ?? null,
+                'str_aktif' => $validated['str_aktif'],
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -74,20 +90,30 @@ class PosisiController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'nama_posisi' => ['required', 'string', 'max:255'],
-            'deskripsi' => ['nullable', 'string'],
-            'str_aktif' => ['nullable', Rule::in(['active', 'non_active'])],
-        ]);
-
         try {
             $posisi = Posisi::findOrFail($id);
 
+            $validated = $request->validate([
+                'nama_posisi' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique((new Posisi())->getTable(), 'nama_posisi')
+                        ->ignore($posisi->id, 'id'),
+                ],
+                'deskripsi' => ['nullable', 'string'],
+                'str_aktif' => ['nullable', Rule::in(['active', 'non_active'])],
+            ]);
+
             $validated['str_aktif'] = $validated['str_aktif'] ?? 'active';
 
-            $posisi->update($validated);
+            $posisi->update([
+                'nama_posisi' => $validated['nama_posisi'],
+                'deskripsi' => $validated['deskripsi'] ?? null,
+                'str_aktif' => $validated['str_aktif'],
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -108,7 +134,7 @@ class PosisiController extends Controller
         }
     }
 
-    public function destroy($id)
+    public function destroy(string $id)
     {
         try {
             $posisi = Posisi::findOrFail($id);
