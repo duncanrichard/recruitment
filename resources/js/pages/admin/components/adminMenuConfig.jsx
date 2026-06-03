@@ -31,6 +31,7 @@ import ReviewManagementPage from "../../review-management/Index";
 
 import RolePage from "../account/role/Index";
 import UserPage from "../account/user/Index";
+import PermissionPage from "../account/permission/Index";
 
 export const defaultMenuKey = "dashboard";
 
@@ -58,6 +59,7 @@ export const initialActionSignals = {
 
     accountRole: 0,
     accountUser: 0,
+    accountPermission: 0,
 };
 
 export const menuItems = [
@@ -336,6 +338,14 @@ export const menuItems = [
                     signalKey: "accountUser",
                 },
             },
+            {
+                key: "account-permission",
+                label: "Permission",
+                description: "Setting permission role",
+                icon: "◈",
+                component: PermissionPage,
+                
+            },
         ],
     },
 ];
@@ -415,7 +425,11 @@ export function getMenuParentKeyByChildKey(childKey) {
         return "data-pelamar";
     }
 
-    if (childKey === "account-role" || childKey === "account-user") {
+    if (
+        childKey === "account-role" ||
+        childKey === "account-user" ||
+        childKey === "account-permission"
+    ) {
         return "account";
     }
 
@@ -441,6 +455,7 @@ export function isMenuActive(menu, activeMenu) {
             menu.key === "daftar-hadir") ||
         (activeMenu === "account-role" && menu.key === "account") ||
         (activeMenu === "account-user" && menu.key === "account") ||
+        (activeMenu === "account-permission" && menu.key === "account") ||
         (activeMenu === "permintaan-kandidat" &&
             menu.key === "permintaan-kandidat") ||
         (activeMenu === "review-management" &&
@@ -456,6 +471,8 @@ export function isChildActive(child, activeMenu) {
         (activeMenu === "daftar-hadir-mmpi-detail" &&
             child.key === "daftar-hadir-mmpi") ||
         (activeMenu === "account-role" && child.key === "account-role") ||
-        (activeMenu === "account-user" && child.key === "account-user")
+        (activeMenu === "account-user" && child.key === "account-user") ||
+        (activeMenu === "account-permission" &&
+            child.key === "account-permission")
     );
 }

@@ -3,30 +3,27 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
+use Spatie\Permission\Models\Permission as SpatiePermission;
 
-class Posisi extends Model
+class Permission extends SpatiePermission
 {
     use HasUuids;
 
-    protected $table = 'posisi';
+    protected $table = 'permissions';
 
     protected $primaryKey = 'id';
 
-    public $incrementing = false;
-
     protected $keyType = 'string';
 
+    public $incrementing = false;
+
     protected $fillable = [
-        'nama_posisi',
-        'deskripsi',
-        'str_aktif',
+        'name',
+        'guard_name',
     ];
 
     protected $casts = [
         'id' => 'string',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
     ];
 
     public function uniqueIds(): array

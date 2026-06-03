@@ -52,6 +52,11 @@ class User extends Authenticatable
         return ['id'];
     }
 
+    public function guardName(): string
+    {
+        return 'web';
+    }
+
     public function divisi()
     {
         return $this->belongsTo(Divisi::class, 'divisi_id', 'id');

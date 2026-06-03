@@ -37,17 +37,73 @@ export default function PosisiPage({ actionSignals }) {
         });
     };
 
+    const getFirstErrorMessage = (errors) => {
+        if (!errors) return null;
+
+        const firstError = Object.values(errors)?.[0];
+
+        if (Array.isArray(firstError)) {
+            return firstError[0];
+        }
+
+        return firstError;
+    };
+
+    const parseResponse = async (response) => {
+        const text = await response.text();
+
+        if (!text) {
+            return {
+                success: false,
+                message: `Response server kosong. Status: ${response.status} ${response.statusText}`,
+            };
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            console.error("Response server bukan JSON valid:", {
+                status: response.status,
+                statusText: response.statusText,
+                body: text,
+                parseError: error.message,
+            });
+
+            return {
+                success: false,
+                message: `Response server bukan JSON valid. Status: ${response.status} ${response.statusText}. Cek Console untuk detail error.`,
+                error: error.message,
+                raw: text,
+            };
+        }
+    };
+
     const fetchData = async () => {
         setTableLoading(true);
 
         try {
             const response = await fetch("/admin/master-data/posisi/list", {
+                method: "GET",
+                credentials: "same-origin",
                 headers: {
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                 },
             });
 
-            const result = await response.json();
+            const result = await parseResponse(response);
+
+            if (!response.ok) {
+                console.error("Gagal mengambil data posisi:", result);
+
+                alert(
+                    getFirstErrorMessage(result.errors) ||
+                        result.message ||
+                        result.error ||
+                        `Gagal mengambil data posisi. Status: ${response.status}`
+                );
+                return;
+            }
 
             if (result.success) {
                 setDataPosisi(result.data || []);
@@ -56,7 +112,7 @@ export default function PosisiPage({ actionSignals }) {
             }
         } catch (error) {
             console.error("Gagal mengambil data posisi:", error);
-            alert("Terjadi kesalahan saat mengambil data posisi.");
+            alert(error.message || "Terjadi kesalahan saat mengambil data posisi.");
         } finally {
             setTableLoading(false);
         }
@@ -132,7 +188,10 @@ export default function PosisiPage({ actionSignals }) {
         return data;
     }, [filteredData, sortConfig]);
 
-    const totalPages = Math.max(1, Math.ceil(sortedData.length / entriesPerPage));
+    const totalPages = Math.max(
+        1,
+        Math.ceil(sortedData.length / entriesPerPage)
+    );
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * entriesPerPage;
@@ -220,18 +279,27 @@ export default function PosisiPage({ actionSignals }) {
 
             const response = await fetch(url, {
                 method,
+                credentials: "same-origin",
                 headers: {
                     "Content-Type": "application/json",
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
                 body: JSON.stringify(form),
             });
 
-            const result = await response.json();
+            const result = await parseResponse(response);
 
             if (!response.ok) {
-                alert(result.message || "Data gagal disimpan.");
+                console.error("Gagal menyimpan data posisi:", result);
+
+                alert(
+                    getFirstErrorMessage(result.errors) ||
+                        result.message ||
+                        result.error ||
+                        "Data posisi gagal disimpan."
+                );
                 return;
             }
 
@@ -240,7 +308,7 @@ export default function PosisiPage({ actionSignals }) {
             fetchData();
         } catch (error) {
             console.error("Gagal menyimpan data posisi:", error);
-            alert("Terjadi kesalahan saat menyimpan data posisi.");
+            alert(error.message || "Terjadi kesalahan saat menyimpan data posisi.");
         } finally {
             setLoading(false);
         }
@@ -266,23 +334,37 @@ export default function PosisiPage({ actionSignals }) {
         try {
             const response = await fetch(`/admin/master-data/posisi/${id}`, {
                 method: "DELETE",
+                credentials: "same-origin",
                 headers: {
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
             });
 
-            const result = await response.json();
+            const result = await parseResponse(response);
+
+            if (!response.ok) {
+                console.error("Gagal menghapus data posisi:", result);
+
+                alert(
+                    getFirstErrorMessage(result.errors) ||
+                        result.message ||
+                        result.error ||
+                        "Data posisi gagal dihapus."
+                );
+                return;
+            }
 
             if (result.success) {
                 alert(result.message || "Data posisi berhasil dihapus.");
                 fetchData();
             } else {
-                alert(result.message || "Data gagal dihapus.");
+                alert(result.message || "Data posisi gagal dihapus.");
             }
         } catch (error) {
             console.error("Gagal menghapus data posisi:", error);
-            alert("Terjadi kesalahan saat menghapus data posisi.");
+            alert(error.message || "Terjadi kesalahan saat menghapus data posisi.");
         }
     };
 
@@ -297,10 +379,6 @@ export default function PosisiPage({ actionSignals }) {
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                
-                </div>
-
                 <div className="border-b border-slate-100 px-6 py-4">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex items-center gap-2">
@@ -509,7 +587,7 @@ export default function PosisiPage({ actionSignals }) {
             </div>
 
             {modalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
                     <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
                         <div className="shrink-0 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
