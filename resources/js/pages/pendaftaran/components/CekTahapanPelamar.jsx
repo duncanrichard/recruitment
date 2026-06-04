@@ -231,14 +231,12 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         statusReviewManagement
     );
 
-    const statusUtama = reviewDiterima
+    const statusUtama = reviewDiterima || reviewProses
         ? "Lolos Interview"
         : reviewGagal
         ? "Gagal Interview"
         : interviewGagal
         ? "Tidak Lolos Interview"
-        : reviewProses
-        ? "Review Management"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Interview Reschedule"
         : jadwalInterview
@@ -259,14 +257,12 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Jadwal Test Zoom Tersedia"
         : "Administrasi";
 
-    const keteranganUtama = reviewDiterima
-        ? "Kandidat dinyatakan lolos interview berdasarkan hasil Review Management."
+    const keteranganUtama = reviewDiterima || reviewProses
+        ? "Kandidat dinyatakan lolos pada tahap interview."
         : reviewGagal
-        ? "Kandidat dinyatakan gagal berdasarkan hasil Review Management."
+        ? "Kandidat dinyatakan gagal pada tahap interview."
         : interviewGagal
         ? "Kandidat dinyatakan tidak lolos pada tahap interview."
-        : reviewProses
-        ? "Hasil interview sudah tersedia dan sedang menunggu Review Management."
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Jadwal interview kandidat sedang dalam proses penjadwalan ulang."
         : jadwalInterview
@@ -287,14 +283,12 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Kandidat sudah mendapatkan jadwal test Zoom."
         : "Status seleksi kandidat saat ini berada pada tahap Administrasi.";
 
-    const saranUtama = reviewDiterima
+    const saranUtama = reviewDiterima || reviewProses
         ? "Selamat, Anda dinyatakan lolos pada proses seleksi."
         : reviewGagal
         ? "Terima kasih sudah mengikuti proses seleksi."
         : interviewGagal
         ? "Terima kasih sudah mengikuti proses seleksi."
-        : reviewProses
-        ? "Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management."
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Silakan pantau informasi jadwal interview terbaru dari tim rekrutmen."
         : jadwalInterview
@@ -315,9 +309,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Silakan mengikuti test Zoom sesuai jadwal yang sudah ditentukan."
         : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.";
 
-    const tahapTerakhir = reviewDiterima || reviewGagal || reviewProses
-        ? "Review Management"
-        : interviewGagal
+    const tahapTerakhir = reviewDiterima || reviewGagal || reviewProses || interviewGagal
         ? "Interview"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Reschedule Interview"
@@ -340,7 +332,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         : reviewGagal || interviewGagal
         ? "red"
         : reviewProses
-        ? "teal"
+        ? "emerald"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "blue"
         : jadwalInterview
@@ -498,7 +490,7 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
 
     const isLolos = status.includes("lolos");
     const isGagal = status.includes("gagal");
-    const isProses = status.includes("proses") || status.includes("review management");
+    const isProses = status.includes("proses");
     const isTerjadwal = status.includes("jadwal") || status.includes("terjadwal");
     const isTerkunci = status.includes("terkunci") || item?.disabled === true;
 
@@ -1127,14 +1119,6 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
             normalized?.status_hasil_interview ||
             normalized?.statusHasilInterview
     );
-    const statusReviewManagement = normalizeStatusReviewManagement(
-        normalized?.status_review_management ||
-            normalized?.statusReviewManagement ||
-            normalized?.status_review ||
-            normalized?.statusReview
-    );
-    const reviewManagement =
-        normalized?.review_management || normalized?.reviewManagement || "";
     const catatan =
         normalized?.catatan ||
         normalized?.catatan_interview ||
@@ -1190,38 +1174,8 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
                             <p className={`mt-1 text-lg font-black ${interviewGagal ? "text-red-700" : "text-teal-700"}`}>
                                 {interviewGagal
                                     ? "Tidak Lolos Interview"
-                                    : "Lanjut Review Management"}
+                                    : "Lolos Interview"}
                             </p>
-                        </div>
-                    )}
-
-                    {hasilInterview && !interviewGagal && (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Review Management
-                            </p>
-
-                            <p
-                                className={`mt-1 text-lg font-black ${
-                                    statusReviewManagement === "diterima"
-                                        ? "text-emerald-700"
-                                        : statusReviewManagement === "gagal"
-                                        ? "text-red-700"
-                                        : "text-teal-700"
-                                }`}
-                            >
-                                {statusReviewManagement === "diterima"
-                                    ? "Diterima"
-                                    : statusReviewManagement === "gagal"
-                                    ? "Gagal"
-                                    : "Proses"}
-                            </p>
-
-                            {reviewManagement && (
-                                <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">
-                                    {reviewManagement}
-                                </p>
-                            )}
                         </div>
                     )}
 
@@ -1377,53 +1331,18 @@ function buildTahapanTampil(
                     if (hasilInterview) {
                         tahapan.push({
                             nama: "Hasil Interview",
-                            status: interviewGagal ? "Gagal" : "Review Management",
+                            status: interviewGagal ? "Gagal" : "Lolos",
                             keterangan: interviewGagal
                                 ? "Mohon maaf, Anda dinyatakan tidak lolos pada tahap interview."
-                                : "Hasil interview sudah tersedia dan dilanjutkan ke tahap Review Management.",
+                                : "Selamat, Anda dinyatakan lolos pada tahap interview.",
                             saran: interviewGagal
                                 ? "Terima kasih sudah mengikuti proses seleksi."
-                                : "Silakan pantau hasil Review Management dari tim rekrutmen.",
+                                : "Selamat, Anda dinyatakan lolos pada proses seleksi.",
                             hasil_interview: hasilInterview,
                             hasilInterview: hasilInterview,
                         });
 
-                        if (interviewLanjutReview) {
-                            tahapan.push({
-                                nama: "Review Management",
-                                status: !statusReviewManagement
-                                    ? "Proses"
-                                    : reviewDiterima
-                                    ? "Lolos"
-                                    : reviewGagal
-                                    ? "Gagal"
-                                    : "Proses",
-                                keterangan: !statusReviewManagement
-                                    ? "Kandidat sedang menunggu hasil Review Management."
-                                    : reviewDiterima
-                                    ? "Selamat, kandidat dinyatakan lolos interview berdasarkan hasil Review Management."
-                                    : reviewGagal
-                                    ? "Mohon maaf, kandidat dinyatakan gagal berdasarkan hasil Review Management."
-                                    : "Kandidat sedang menunggu hasil Review Management.",
-                                saran: !statusReviewManagement
-                                    ? "Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management."
-                                    : reviewDiterima
-                                    ? "Selamat, Anda dinyatakan lolos pada proses seleksi."
-                                    : reviewGagal
-                                    ? "Terima kasih sudah mengikuti proses seleksi."
-                                    : "Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management.",
-                                review_management:
-                                    jadwalInterview?.review_management ||
-                                    jadwalInterview?.reviewManagement ||
-                                    null,
-                                reviewManagement:
-                                    jadwalInterview?.reviewManagement ||
-                                    jadwalInterview?.review_management ||
-                                    null,
-                                status_review_management: statusReviewManagement,
-                                statusReviewManagement: statusReviewManagement,
-                            });
-                        }
+
                     }
                 }
             }
@@ -2144,7 +2063,6 @@ function normalizeHasilInterview(value) {
         return "tidak_lolos_interview";
     }
 
-    // Semua hasil interview selain Tidak Lolos Interview masuk ke Review Management.
     // Contoh dari database: Lolos, Dipertimbangkan, Lanjut, Ya, Diterima Interview, dll.
     return "lanjut_review";
 }
