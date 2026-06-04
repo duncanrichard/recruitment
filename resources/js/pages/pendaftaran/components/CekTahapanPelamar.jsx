@@ -1111,23 +1111,15 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
     const kehadiran = normalizeKehadiranInterview(
         normalized?.kehadiran ||
             normalized?.status_kehadiran ||
-            normalized?.statusKehadiran
-    );
-    const hasilInterview = normalizeHasilInterview(
-        normalized?.hasil_interview ||
-            normalized?.hasilInterview ||
-            normalized?.status_hasil_interview ||
-            normalized?.statusHasilInterview
+            normalized?.statusKehadiran ||
+            normalized?.status_kehadiran_interview ||
+            normalized?.statusKehadiranInterview
     );
     const catatan =
         normalized?.catatan ||
         normalized?.catatan_interview ||
         normalized?.catatanInterview ||
         "";
-
-    const interviewGagal =
-        hasilInterview === "tidak_lolos_interview" ||
-        hasilInterview === "gagal";
 
     return (
         <div className="mt-4 rounded-2xl border border-purple-200 bg-white p-4">
@@ -1159,22 +1151,12 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
                                 Status Kehadiran Interview
                             </p>
 
-                            <p className={`mt-1 text-lg font-black ${getKehadiranInterviewTextColor(kehadiran)}`}>
+                            <p
+                                className={`mt-1 text-lg font-black ${getKehadiranInterviewTextColor(
+                                    kehadiran
+                                )}`}
+                            >
                                 {formatKehadiranInterview(kehadiran)}
-                            </p>
-                        </div>
-                    )}
-
-                    {hasilInterview && (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Hasil Interview
-                            </p>
-
-                            <p className={`mt-1 text-lg font-black ${interviewGagal ? "text-red-700" : "text-teal-700"}`}>
-                                {interviewGagal
-                                    ? "Tidak Lolos Interview"
-                                    : "Lolos Interview"}
                             </p>
                         </div>
                     )}

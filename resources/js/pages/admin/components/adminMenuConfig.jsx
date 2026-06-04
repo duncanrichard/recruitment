@@ -29,6 +29,11 @@ import KandidatInterviewPage from "../pages/rangkaian-interview/kandidat/Index";
 
 import ReviewManagementPage from "../../review-management/Index";
 
+import ReportDataPelamarPage from "../pages/report-data-pelamar/Index";
+import ReportHasilTestZoomPage from "../pages/report-hasil-test-zoom/Index";
+import ReportHasilTestMmpiPage from "../pages/report-hasil-test-mmpi/Index";
+import ReportInterviewKandidatPage from "../pages/report-interview-kandidat/Index";
+
 import RolePage from "../account/role/Index";
 import UserPage from "../account/user/Index";
 import PermissionPage from "../account/permission/Index";
@@ -311,6 +316,42 @@ export const menuItems = [
         component: ReviewManagementPage,
     },
     {
+        key: "report",
+        label: "Report",
+        description: "Laporan data rekrutmen",
+        icon: "▧",
+        children: [
+            {
+                key: "report-data-pelamar",
+                label: "Data Pelamar",
+                description: "Report data pelamar berdasarkan tanggal skrining",
+                icon: "▤",
+                component: ReportDataPelamarPage,
+            },
+            {
+                key: "report-hasil-test-zoom",
+                label: "Hasil Test Zoom",
+                description: "Report hasil test Zoom berdasarkan daftar hadir",
+                icon: "◷",
+                component: ReportHasilTestZoomPage,
+            },
+            {
+                key: "report-hasil-test-mmpi",
+                label: "Hasil Test MMPI",
+                description: "Report hasil test MMPI berdasarkan daftar hadir",
+                icon: "◉",
+                component: ReportHasilTestMmpiPage,
+            },
+            {
+                key: "report-interview-kandidat",
+                label: "Interview Kandidat",
+                description: "Report interview kandidat dan hasilnya",
+                icon: "▣",
+                component: ReportInterviewKandidatPage,
+            },
+        ],
+    },
+    {
         key: "account",
         label: "Account",
         description: "Kelola akun pengguna",
@@ -344,7 +385,6 @@ export const menuItems = [
                 description: "Setting permission role",
                 icon: "◈",
                 component: PermissionPage,
-                
             },
         ],
     },
@@ -433,6 +473,15 @@ export function getMenuParentKeyByChildKey(childKey) {
         return "account";
     }
 
+    if (
+        childKey === "report-data-pelamar" ||
+        childKey === "report-hasil-test-zoom" ||
+        childKey === "report-hasil-test-mmpi" ||
+        childKey === "report-interview-kandidat"
+    ) {
+        return "report";
+    }
+
     if (childKey === "permintaan-kandidat") {
         return null;
     }
@@ -459,7 +508,11 @@ export function isMenuActive(menu, activeMenu) {
         (activeMenu === "permintaan-kandidat" &&
             menu.key === "permintaan-kandidat") ||
         (activeMenu === "review-management" &&
-            menu.key === "review-management")
+            menu.key === "review-management") ||
+        (activeMenu === "report-data-pelamar" && menu.key === "report") ||
+        (activeMenu === "report-hasil-test-zoom" && menu.key === "report") ||
+        (activeMenu === "report-hasil-test-mmpi" && menu.key === "report") ||
+        (activeMenu === "report-interview-kandidat" && menu.key === "report")
     );
 }
 
@@ -473,6 +526,14 @@ export function isChildActive(child, activeMenu) {
         (activeMenu === "account-role" && child.key === "account-role") ||
         (activeMenu === "account-user" && child.key === "account-user") ||
         (activeMenu === "account-permission" &&
-            child.key === "account-permission")
+            child.key === "account-permission") ||
+        (activeMenu === "report-data-pelamar" &&
+            child.key === "report-data-pelamar") ||
+        (activeMenu === "report-hasil-test-zoom" &&
+            child.key === "report-hasil-test-zoom") ||
+        (activeMenu === "report-hasil-test-mmpi" &&
+            child.key === "report-hasil-test-mmpi") ||
+        (activeMenu === "report-interview-kandidat" &&
+            child.key === "report-interview-kandidat")
     );
 }
