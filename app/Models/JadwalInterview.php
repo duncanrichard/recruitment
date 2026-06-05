@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JadwalInterview extends Model
@@ -40,8 +41,13 @@ class JadwalInterview extends Model
             'interviewer_id'
         );
     }
-     public function jadwalInterviewKandidat()
+
+    public function jadwalInterviewKandidat(): HasMany
     {
-        return $this->hasMany(JadwalInterviewKandidat::class, 'data_riwayat_diri_id');
+        return $this->hasMany(
+            JadwalInterviewKandidat::class,
+            'jadwal_interview_id',
+            'id'
+        );
     }
 }

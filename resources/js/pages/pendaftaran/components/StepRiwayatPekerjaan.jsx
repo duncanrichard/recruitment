@@ -11,6 +11,8 @@ export default function StepRiwayatPekerjaan({
     const isBelumBekerja =
         statusPekerjaan.toLowerCase() === "belum bekerja";
 
+    const isWorkFieldsDisabled = isBelumBekerja;
+
     const handlePosisiChange = (e) => {
         const value = e.target.value;
 
@@ -86,85 +88,10 @@ export default function StepRiwayatPekerjaan({
                 </h3>
 
                 <p className="mt-1 text-sm text-orange-600">
-                    Lengkapi pengalaman kerja terakhir dan data referensi kerja.
+                    Lengkapi status pekerjaan, detail pekerjaan, pengalaman kerja terakhir,
+                    dan data referensi kerja.
                 </p>
             </div>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h4 className="mb-5 text-lg font-bold text-slate-800">
-                    Pengalaman Kerja Terakhir
-                </h4>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Nama Perusahaan"
-                        name="nama_perusahaan"
-                        value={form.nama_perusahaan}
-                        onChange={handleChange}
-                        placeholder="Contoh: PT Maju Bersama"
-                        error={errors.nama_perusahaan}
-                    />
-
-                    <Input
-                        label="Posisi Pekerjaan Terakhir"
-                        name="posisi_pekerjaan_terakhir"
-                        value={
-                            form.posisi_pekerjaan_terakhir ||
-                            form.posisi_pekerjaan ||
-                            ""
-                        }
-                        onChange={handlePosisiChange}
-                        placeholder="Contoh: Staff Administrasi"
-                        error={
-                            errors.posisi_pekerjaan_terakhir ||
-                            errors.posisi_pekerjaan
-                        }
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Periode Kerja Awal"
-                        type="date"
-                        name="periode_kerja_awal"
-                        value={normalizeDateValue(form.periode_kerja_awal)}
-                        onChange={handleChange}
-                        error={errors.periode_kerja_awal}
-                    />
-
-                    <Input
-                        label="Periode Kerja Akhir"
-                        type="date"
-                        name="periode_kerja_akhir"
-                        value={normalizeDateValue(form.periode_kerja_akhir)}
-                        onChange={handleChange}
-                        error={errors.periode_kerja_akhir}
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Gaji Terakhir"
-                        type="number"
-                        name="gaji_terakhir"
-                        value={form.gaji_terakhir}
-                        onChange={handleGajiChange}
-                        placeholder="Contoh: 4000000"
-                        error={errors.gaji_terakhir}
-                        min="0"
-                        max={String(maxGajiTerakhir)}
-                        step="1000"
-                    />
-
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
-                        Maksimal gaji yang dapat diinput adalah{" "}
-                        <span className="font-black">
-                            Rp {formatRupiah(maxGajiTerakhir)}
-                        </span>
-                        .
-                    </div>
-                </div>
-            </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h4 className="mb-5 text-lg font-bold text-slate-800">
@@ -175,7 +102,7 @@ export default function StepRiwayatPekerjaan({
                     <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
                         Status pekerjaan dipilih{" "}
                         <span className="font-black">Belum Bekerja</span>,
-                        sehingga detail pekerjaan tidak perlu diisi.
+                        sehingga semua form pekerjaan dan referensi kerja tidak perlu diisi.
                     </div>
                 )}
 
@@ -193,6 +120,7 @@ export default function StepRiwayatPekerjaan({
                             "Freelance",
                             "Wiraswasta",
                         ]}
+                        required
                     />
 
                     <Input
@@ -202,7 +130,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Contoh: Administrasi, IT, Marketing"
                         error={errors.bidang_pekerjaan}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -212,7 +140,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Contoh: Jakarta"
                         error={errors.lokasi_perusahaan}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -224,7 +152,7 @@ export default function StepRiwayatPekerjaan({
                         error={errors.tahun_mulai_bekerja}
                         inputMode="numeric"
                         maxLength={4}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -236,7 +164,7 @@ export default function StepRiwayatPekerjaan({
                         error={errors.tahun_selesai_bekerja}
                         inputMode="numeric"
                         maxLength={4}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -262,7 +190,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Jelaskan tugas dan tanggung jawab pekerjaan"
                         error={errors.deskripsi_pekerjaan}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Textarea
@@ -272,7 +200,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Contoh: Kontrak selesai, ingin mencari pengalaman baru"
                         error={errors.alasan_berhenti}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Textarea
@@ -282,7 +210,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Contoh: Microsoft Office, komunikasi, administrasi"
                         error={errors.keahlian}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Textarea
@@ -292,8 +220,102 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Catatan tambahan terkait pekerjaan"
                         error={errors.catatan_pekerjaan}
-                        disabled={isBelumBekerja}
+                        disabled={isWorkFieldsDisabled}
                     />
+                </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h4 className="mb-5 text-lg font-bold text-slate-800">
+                    Pengalaman Kerja Terakhir
+                </h4>
+
+                {isBelumBekerja && (
+                    <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                        Pengalaman kerja terakhir otomatis dinonaktifkan karena status pekerjaan
+                        adalah <span className="font-black">Belum Bekerja</span>.
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Nama Perusahaan"
+                        name="nama_perusahaan"
+                        value={form.nama_perusahaan}
+                        onChange={handleChange}
+                        placeholder="Contoh: PT Maju Bersama"
+                        error={errors.nama_perusahaan}
+                        disabled={isWorkFieldsDisabled}
+                    />
+
+                    <Input
+                        label="Posisi Pekerjaan Terakhir"
+                        name="posisi_pekerjaan_terakhir"
+                        value={
+                            form.posisi_pekerjaan_terakhir ||
+                            form.posisi_pekerjaan ||
+                            ""
+                        }
+                        onChange={handlePosisiChange}
+                        placeholder="Contoh: Staff Administrasi"
+                        error={
+                            errors.posisi_pekerjaan_terakhir ||
+                            errors.posisi_pekerjaan
+                        }
+                        disabled={isWorkFieldsDisabled}
+                    />
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Periode Kerja Awal"
+                        type="date"
+                        name="periode_kerja_awal"
+                        value={normalizeDateValue(form.periode_kerja_awal)}
+                        onChange={handleChange}
+                        error={errors.periode_kerja_awal}
+                        disabled={isWorkFieldsDisabled}
+                    />
+
+                    <Input
+                        label="Periode Kerja Akhir"
+                        type="date"
+                        name="periode_kerja_akhir"
+                        value={normalizeDateValue(form.periode_kerja_akhir)}
+                        onChange={handleChange}
+                        error={errors.periode_kerja_akhir}
+                        disabled={isWorkFieldsDisabled}
+                    />
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <Input
+                        label="Gaji Terakhir"
+                        type="number"
+                        name="gaji_terakhir"
+                        value={form.gaji_terakhir}
+                        onChange={handleGajiChange}
+                        placeholder="Contoh: 4000000"
+                        error={errors.gaji_terakhir}
+                        min="0"
+                        max={String(maxGajiTerakhir)}
+                        step="1000"
+                        disabled={isWorkFieldsDisabled}
+                    />
+
+                    <div
+                        className={`rounded-2xl border p-4 text-sm font-semibold ${
+                            isWorkFieldsDisabled
+                                ? "border-slate-200 bg-slate-50 text-slate-500"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                        }`}
+                    >
+                        Maksimal gaji yang dapat diinput adalah{" "}
+                        <span className="font-black">
+                            Rp {formatRupiah(maxGajiTerakhir)}
+                        </span>
+                        .
+                    </div>
                 </div>
             </section>
 
@@ -302,6 +324,13 @@ export default function StepRiwayatPekerjaan({
                     Referensi Kerja
                 </h4>
 
+                {isBelumBekerja && (
+                    <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                        Referensi kerja tidak perlu diisi karena status pekerjaan
+                        adalah <span className="font-black">Belum Bekerja</span>.
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                     <SelectYaTidak
                         label="Ada Referensi Kerja?"
@@ -309,6 +338,7 @@ export default function StepRiwayatPekerjaan({
                         value={form.referensi_kerja}
                         onChange={handleChange}
                         error={errors.referensi_kerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -318,6 +348,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nama referensi"
                         error={errors.nama_refrensi}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -327,6 +358,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi}
+                        disabled={isWorkFieldsDisabled}
                     />
                 </div>
             </section>
@@ -343,6 +375,7 @@ export default function StepRiwayatPekerjaan({
                         value={form.refrensi_rekan_kerja}
                         onChange={handleChange}
                         error={errors.refrensi_rekan_kerja}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -352,6 +385,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nama rekan kerja"
                         error={errors.nama_refrensi_rekan}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -361,6 +395,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi_rekan}
+                        disabled={isWorkFieldsDisabled}
                     />
                 </div>
             </section>
@@ -377,6 +412,7 @@ export default function StepRiwayatPekerjaan({
                         value={form.refrensi_kerabat}
                         onChange={handleChange}
                         error={errors.refrensi_kerabat}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -386,6 +422,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nama kerabat"
                         error={errors.nama_refrensi_kerabat}
+                        disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
@@ -395,6 +432,7 @@ export default function StepRiwayatPekerjaan({
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi_kerabat}
+                        disabled={isWorkFieldsDisabled}
                     />
                 </div>
             </section>
@@ -424,10 +462,11 @@ function formatRupiah(value) {
     return new Intl.NumberFormat("id-ID").format(value);
 }
 
-function FieldLabel({ label }) {
+function FieldLabel({ label, required = false }) {
     return (
         <label className="mb-2 block text-sm font-semibold text-slate-700">
             {label}
+            {required && <span className="ml-1 text-red-500">*</span>}
         </label>
     );
 }
@@ -532,10 +571,11 @@ function Select({
     error,
     options = [],
     disabled = false,
+    required = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} />
+            <FieldLabel label={label} required={required} />
 
             <select
                 name={name}
@@ -543,6 +583,7 @@ function Select({
                 onChange={onChange}
                 className={fieldClass(error, disabled)}
                 disabled={disabled}
+                required={required}
             >
                 <option value="">Pilih {label}</option>
 
@@ -564,6 +605,7 @@ function SelectYaTidak({
     value,
     onChange,
     error,
+    disabled = false,
 }) {
     return (
         <div>
@@ -573,7 +615,8 @@ function SelectYaTidak({
                 name={name}
                 value={value ?? ""}
                 onChange={onChange}
-                className={fieldClass(error)}
+                className={fieldClass(error, disabled)}
+                disabled={disabled}
             >
                 <option value="">Pilih</option>
                 <option value="Ya">Ya</option>

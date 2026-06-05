@@ -29,6 +29,8 @@ import KandidatInterviewPage from "../pages/rangkaian-interview/kandidat/Index";
 
 import ReviewManagementPage from "../../review-management/Index";
 
+import JadwalOlPage from "../pages/jadwal-ol/Index";
+
 import ReportDataPelamarPage from "../pages/report-data-pelamar/Index";
 import ReportHasilTestZoomPage from "../pages/report-hasil-test-zoom/Index";
 import ReportHasilTestMmpiPage from "../pages/report-hasil-test-mmpi/Index";
@@ -50,6 +52,8 @@ export const initialActionSignals = {
     interviewer: 0,
     jadwalInterview: 0,
     kandidatInterview: 0,
+
+    jadwalOl: 0,
 
     masterPosisi: 0,
     masterJabatan: 0,
@@ -316,6 +320,17 @@ export const menuItems = [
         component: ReviewManagementPage,
     },
     {
+        key: "jadwal-ol",
+        label: "Jadwal OL",
+        description: "Jadwal Offering Letter kandidat diterima",
+        icon: "◷",
+        component: JadwalOlPage,
+        action: {
+            label: "Tambah Jadwal OL",
+            signalKey: "jadwalOl",
+        },
+    },
+    {
         key: "report",
         label: "Report",
         description: "Laporan data rekrutmen",
@@ -486,6 +501,10 @@ export function getMenuParentKeyByChildKey(childKey) {
         return null;
     }
 
+    if (childKey === "jadwal-ol") {
+        return null;
+    }
+
     return null;
 }
 
@@ -509,6 +528,7 @@ export function isMenuActive(menu, activeMenu) {
             menu.key === "permintaan-kandidat") ||
         (activeMenu === "review-management" &&
             menu.key === "review-management") ||
+        (activeMenu === "jadwal-ol" && menu.key === "jadwal-ol") ||
         (activeMenu === "report-data-pelamar" && menu.key === "report") ||
         (activeMenu === "report-hasil-test-zoom" && menu.key === "report") ||
         (activeMenu === "report-hasil-test-mmpi" && menu.key === "report") ||

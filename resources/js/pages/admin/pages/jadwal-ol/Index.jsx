@@ -1,32 +1,41 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-export default function InterviewerPage({ actionSignals }) {
-    const [dataInterviewer, setDataInterviewer] = useState([]);
-    const [dataJabatan, setDataJabatan] = useState([]);
-    const [dataDivisi, setDataDivisi] = useState([]);
+export default function JadwalOlPage({ actionSignals }) {
+    const [dataJadwal, setDataJadwal] = useState([]);
+    const [dataKandidat, setDataKandidat] = useState([]);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [statusLoadingId, setStatusLoadingId] = useState(null);
 
     const [search, setSearch] = useState("");
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
     const [sortConfig, setSortConfig] = useState({
-        key: "nama",
-        direction: "asc",
+        key: "tanggal_ol",
+        direction: "desc",
     });
 
     const [form, setForm] = useState({
-        nama: "",
-        no_wa: "",
-        jabatan_id: "",
-        divisi_id: "",
+        hasil_review_management_id: "",
+        tanggal_ol: "",
+        jam_ol: "",
+        metode: "",
+        link: "",
+        pic: "",
+        catatan: "",
     });
 
-    const lastInterviewerSignalRef = useRef(actionSignals?.interviewer || 0);
+    const statusOptions = [
+        { id: "Menerima", label: "Menerima" },
+        { id: "Menolak", label: "Menolak" },
+        { id: "Tidak Melanjutkan", label: "Tidak Melanjutkan" },
+    ];
+
+    const lastSignalRef = useRef(actionSignals?.jadwalOl || 0);
 
     const getCsrfToken = () => {
         return document
@@ -38,10 +47,13 @@ export default function InterviewerPage({ actionSignals }) {
         setEditId(null);
 
         setForm({
-            nama: "",
-            no_wa: "",
-            jabatan_id: "",
-            divisi_id: "",
+            hasil_review_management_id: "",
+            tanggal_ol: "",
+            jam_ol: "",
+            metode: "",
+            link: "",
+            pic: "",
+            catatan: "",
         });
     };
 
@@ -49,118 +61,242 @@ export default function InterviewerPage({ actionSignals }) {
         setTableLoading(true);
 
         try {
-            const response = await fetch(
-                "/admin/rangkaian-interview/interviewer/list",
-                {
-                    headers: {
-                        Accept: "application/json",
-                    },
-                }
-            );
+            const response = await fetch("/admin/jadwal-ol/list", {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
 
             const result = await response.json();
 
             if (result.success) {
-                setDataInterviewer(result.data || []);
+                setDataJadwal(result.data || []);
             } else {
-                alert(result.message || "Gagal mengambil data interviewer.");
+                alert(result.message || "Gagal mengambil data Jadwal OL.");
             }
         } catch (error) {
-            console.error("Gagal mengambil data interviewer:", error);
-            alert("Terjadi kesalahan saat mengambil data interviewer.");
+            console.error("Gagal mengambil data Jadwal OL:", error);
+            alert("Terjadi kesalahan saat mengambil data Jadwal OL.");
         } finally {
             setTableLoading(false);
         }
     };
 
-    const fetchOptions = async () => {
+    const fetchKandidat = async () => {
         try {
-            const response = await fetch(
-                "/admin/rangkaian-interview/interviewer/options",
-                {
-                    headers: {
-                        Accept: "application/json",
-                    },
-                }
-            );
+            const response = await fetch("/admin/jadwal-ol/candidates", {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
 
             const result = await response.json();
 
             if (result.success) {
-                setDataJabatan(result.data?.jabatan || []);
-                setDataDivisi(result.data?.divisi || []);
+                setDataKandidat(result.data || []);
             } else {
-                alert(result.message || "Gagal mengambil data option.");
+                alert(result.message || "Gagal mengambil kandidat diterima.");
             }
         } catch (error) {
-            console.error("Gagal mengambil data option:", error);
-            alert("Terjadi kesalahan saat mengambil data option.");
+            console.error("Gagal mengambil kandidat diterima:", error);
+            alert("Terjadi kesalahan saat mengambil kandidat diterima.");
         }
     };
 
     useEffect(() => {
         fetchData();
-        fetchOptions();
+        fetchKandidat();
     }, []);
 
     useEffect(() => {
-        const currentSignal = actionSignals?.interviewer || 0;
+        const currentSignal = actionSignals?.jadwalOl || 0;
 
-        if (currentSignal > lastInterviewerSignalRef.current) {
+        if (currentSignal > lastSignalRef.current) {
             resetForm();
+            fetchKandidat();
             setModalOpen(true);
         }
 
-        lastInterviewerSignalRef.current = currentSignal;
-    }, [actionSignals?.interviewer]);
+        lastSignalRef.current = currentSignal;
+    }, [actionSignals?.jadwalOl]);
 
     useEffect(() => {
         setCurrentPage(1);
     }, [search, entriesPerPage]);
 
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+
+        setForm((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const closeModal = () => {
+        setModalOpen(false);
+        resetForm();
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setLoading(true);
+
+        try {
+            const url = editId
+                ? `/admin/jadwal-ol/${editId}`
+                : "/admin/jadwal-ol";
+
+            const method = editId ? "PUT" : "POST";
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                },
+                body: JSON.stringify(form),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                alert(result.message || "Data Jadwal OL gagal disimpan.");
+                return;
+            }
+
+            alert(result.message || "Data Jadwal OL berhasil disimpan.");
+            closeModal();
+            fetchData();
+            fetchKandidat();
+        } catch (error) {
+            console.error("Gagal menyimpan Jadwal OL:", error);
+            alert("Terjadi kesalahan saat menyimpan Jadwal OL.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (item) => {
+        setEditId(item.id);
+
+        setForm({
+            hasil_review_management_id: item.hasil_review_management_id || "",
+            tanggal_ol: item.tanggal_ol || "",
+            jam_ol: item.jam_ol || "",
+            metode: item.metode || "",
+            link: item.link || "",
+            pic: item.pic || "",
+            catatan: item.catatan || "",
+        });
+
+        fetchKandidat();
+        setModalOpen(true);
+    };
+
+    const handleStatusChange = async (item, statusValue) => {
+        setStatusLoadingId(item.id);
+
+        try {
+            const response = await fetch(`/admin/jadwal-ol/${item.id}/status`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    status_jadwal: statusValue,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                alert(result.message || "Status OL gagal diperbarui.");
+                return;
+            }
+
+            setDataJadwal((prev) =>
+                prev.map((row) =>
+                    row.id === item.id
+                        ? {
+                              ...row,
+                              status_jadwal: statusValue,
+                          }
+                        : row
+                )
+            );
+        } catch (error) {
+            console.error("Gagal memperbarui Status OL:", error);
+            alert("Terjadi kesalahan saat memperbarui Status OL.");
+        } finally {
+            setStatusLoadingId(null);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        const confirmDelete = confirm("Yakin ingin menghapus Jadwal OL ini?");
+
+        if (!confirmDelete) return;
+
+        try {
+            const response = await fetch(`/admin/jadwal-ol/${id}`, {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": getCsrfToken(),
+                },
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(result.message || "Jadwal OL berhasil dihapus.");
+                fetchData();
+                fetchKandidat();
+            } else {
+                alert(result.message || "Jadwal OL gagal dihapus.");
+            }
+        } catch (error) {
+            console.error("Gagal menghapus Jadwal OL:", error);
+            alert("Terjadi kesalahan saat menghapus Jadwal OL.");
+        }
+    };
+
     const filteredData = useMemo(() => {
         const keyword = search.toLowerCase().trim();
 
         if (!keyword) {
-            return dataInterviewer;
+            return dataJadwal;
         }
 
-        return dataInterviewer.filter((item) => {
-            const nama = String(item.nama || "").toLowerCase();
-            const noWa = String(item.no_wa || "").toLowerCase();
-            const jabatan = String(item.jabatan?.nama || "").toLowerCase();
-            const divisi = String(item.divisi?.nama || "").toLowerCase();
+        return dataJadwal.filter((item) => {
+            const kandidat = String(item.kandidat_label || "").toLowerCase();
+            const tanggal = String(item.tanggal_ol || "").toLowerCase();
+            const jam = String(item.jam_ol || "").toLowerCase();
+            const metode = String(item.metode || "").toLowerCase();
+            const pic = String(item.pic || "").toLowerCase();
+            const status = String(item.status_jadwal || "").toLowerCase();
 
             return (
-                nama.includes(keyword) ||
-                noWa.includes(keyword) ||
-                jabatan.includes(keyword) ||
-                divisi.includes(keyword)
+                kandidat.includes(keyword) ||
+                tanggal.includes(keyword) ||
+                jam.includes(keyword) ||
+                metode.includes(keyword) ||
+                pic.includes(keyword) ||
+                status.includes(keyword)
             );
         });
-    }, [dataInterviewer, search]);
+    }, [dataJadwal, search]);
 
     const sortedData = useMemo(() => {
         const data = [...filteredData];
 
         data.sort((a, b) => {
-            let valueA = String(a[sortConfig.key] || "").toLowerCase();
-            let valueB = String(b[sortConfig.key] || "").toLowerCase();
-
-            if (sortConfig.key === "no_wa") {
-                valueA = String(a.no_wa || "").toLowerCase();
-                valueB = String(b.no_wa || "").toLowerCase();
-            }
-
-            if (sortConfig.key === "jabatan") {
-                valueA = String(a.jabatan?.nama || "").toLowerCase();
-                valueB = String(b.jabatan?.nama || "").toLowerCase();
-            }
-
-            if (sortConfig.key === "divisi") {
-                valueA = String(a.divisi?.nama || "").toLowerCase();
-                valueB = String(b.divisi?.nama || "").toLowerCase();
-            }
+            const valueA = String(a[sortConfig.key] || "").toLowerCase();
+            const valueB = String(b[sortConfig.key] || "").toLowerCase();
 
             if (valueA < valueB) {
                 return sortConfig.direction === "asc" ? -1 : 1;
@@ -237,102 +373,25 @@ export default function InterviewerPage({ actionSignals }) {
         return sortConfig.direction === "asc" ? "↑" : "↓";
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
+    const kandidatOptions = useMemo(() => {
+        const selectedCurrent = dataJadwal
+            .filter(
+                (item) =>
+                    item.hasil_review_management_id ===
+                    form.hasil_review_management_id
+            )
+            .map((item) => ({
+                id: item.hasil_review_management_id,
+                label: item.kandidat_label,
+            }));
 
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
+        const merged = [...selectedCurrent, ...dataKandidat];
 
-    const closeModal = () => {
-        setModalOpen(false);
-        resetForm();
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-
-        try {
-            const url = editId
-                ? `/admin/rangkaian-interview/interviewer/${editId}`
-                : "/admin/rangkaian-interview/interviewer";
-
-            const method = editId ? "PUT" : "POST";
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    "X-CSRF-TOKEN": getCsrfToken(),
-                },
-                body: JSON.stringify(form),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                alert(result.message || "Data gagal disimpan.");
-                return;
-            }
-
-            alert(result.message || "Data interviewer berhasil disimpan.");
-            closeModal();
-            fetchData();
-        } catch (error) {
-            console.error("Gagal menyimpan data interviewer:", error);
-            alert("Terjadi kesalahan saat menyimpan data interviewer.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleEdit = (item) => {
-        setEditId(item.id);
-
-        setForm({
-            nama: item.nama || "",
-            no_wa: item.no_wa || "",
-            jabatan_id: item.jabatan_id || "",
-            divisi_id: item.divisi_id || "",
-        });
-
-        setModalOpen(true);
-    };
-
-    const handleDelete = async (id) => {
-        const confirmDelete = confirm("Yakin ingin menghapus data interviewer ini?");
-
-        if (!confirmDelete) return;
-
-        try {
-            const response = await fetch(
-                `/admin/rangkaian-interview/interviewer/${id}`,
-                {
-                    method: "DELETE",
-                    headers: {
-                        Accept: "application/json",
-                        "X-CSRF-TOKEN": getCsrfToken(),
-                    },
-                }
-            );
-
-            const result = await response.json();
-
-            if (result.success) {
-                alert(result.message || "Data interviewer berhasil dihapus.");
-                fetchData();
-            } else {
-                alert(result.message || "Data gagal dihapus.");
-            }
-        } catch (error) {
-            console.error("Gagal menghapus data interviewer:", error);
-            alert("Terjadi kesalahan saat menghapus data interviewer.");
-        }
-    };
+        return merged.filter(
+            (item, index, self) =>
+                index === self.findIndex((value) => value.id === item.id)
+        );
+    }, [dataJadwal, dataKandidat, form.hasil_review_management_id]);
 
     return (
         <div className="space-y-6">
@@ -371,10 +430,8 @@ export default function InterviewerPage({ actionSignals }) {
                             <input
                                 type="text"
                                 value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                                placeholder="Cari interviewer..."
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Cari Jadwal OL..."
                                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
                             />
                         </div>
@@ -388,31 +445,45 @@ export default function InterviewerPage({ actionSignals }) {
                                 <TableHead>No</TableHead>
 
                                 <SortableTableHead
-                                    label="Nama Interviewer"
-                                    sortKey="nama"
+                                    label="Kandidat"
+                                    sortKey="kandidat_label"
                                     onSort={handleSort}
-                                    icon={sortIcon("nama")}
+                                    icon={sortIcon("kandidat_label")}
                                 />
 
                                 <SortableTableHead
-                                    label="No WA"
-                                    sortKey="no_wa"
+                                    label="Tanggal"
+                                    sortKey="tanggal_ol"
                                     onSort={handleSort}
-                                    icon={sortIcon("no_wa")}
+                                    icon={sortIcon("tanggal_ol")}
                                 />
 
                                 <SortableTableHead
-                                    label="Jabatan"
-                                    sortKey="jabatan"
+                                    label="Jam"
+                                    sortKey="jam_ol"
                                     onSort={handleSort}
-                                    icon={sortIcon("jabatan")}
+                                    icon={sortIcon("jam_ol")}
                                 />
 
                                 <SortableTableHead
-                                    label="Divisi"
-                                    sortKey="divisi"
+                                    label="Metode"
+                                    sortKey="metode"
                                     onSort={handleSort}
-                                    icon={sortIcon("divisi")}
+                                    icon={sortIcon("metode")}
+                                />
+
+                                <SortableTableHead
+                                    label="PIC"
+                                    sortKey="pic"
+                                    onSort={handleSort}
+                                    icon={sortIcon("pic")}
+                                />
+
+                                <SortableTableHead
+                                    label="Status OL"
+                                    sortKey="status_jadwal"
+                                    onSort={handleSort}
+                                    icon={sortIcon("status_jadwal")}
                                 />
 
                                 <TableHead align="right">Aksi</TableHead>
@@ -422,7 +493,7 @@ export default function InterviewerPage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="8" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -439,43 +510,70 @@ export default function InterviewerPage({ actionSignals }) {
                                         </td>
 
                                         <td className="px-6 py-5">
-                                            <div className="font-black text-slate-950">
-                                                {item.nama || "-"}
+                                            <div className="max-w-md text-sm font-black text-slate-900">
+                                                {item.kandidat_label || "-"}
                                             </div>
                                         </td>
 
+                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
+                                            {item.tanggal_ol || "-"}
+                                        </td>
+
+                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
+                                            {item.jam_ol || "-"}
+                                        </td>
+
+                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
+                                            {item.metode || "-"}
+                                        </td>
+
+                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
+                                            {item.pic || "-"}
+                                        </td>
+
                                         <td className="px-6 py-5">
-                                            {item.no_wa ? (
-                                                <a
-                                                    href={`https://wa.me/${normalizePhoneForWhatsapp(item.no_wa)}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700 transition hover:bg-emerald-100"
-                                                >
-                                                    {item.no_wa}
-                                                </a>
-                                            ) : (
-                                                <span className="text-sm font-bold text-slate-400">
-                                                    -
-                                                </span>
-                                            )}
-                                        </td>
+                                            <select
+                                                value={item.status_jadwal || ""}
+                                                disabled={statusLoadingId === item.id}
+                                                onChange={(event) =>
+                                                    handleStatusChange(
+                                                        item,
+                                                        event.target.value
+                                                    )
+                                                }
+                                                className="min-w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                <option value="">
+                                                    Pilih Status OL
+                                                </option>
 
-                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
-                                            {item.jabatan?.nama || "-"}
-                                        </td>
-
-                                        <td className="px-6 py-5 text-sm font-bold text-slate-600">
-                                            {item.divisi?.nama || "-"}
+                                                {statusOptions.map((status) => (
+                                                    <option
+                                                        key={status.id}
+                                                        value={status.id}
+                                                    >
+                                                        {status.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </td>
 
                                         <td className="px-6 py-5 text-right">
                                             <div className="flex justify-end gap-2">
+                                                {item.link && (
+                                                    <a
+                                                        href={item.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="rounded-2xl border border-emerald-100 bg-white px-4 py-2 text-xs font-black text-emerald-600 shadow-sm transition hover:bg-emerald-50"
+                                                    >
+                                                        Link
+                                                    </a>
+                                                )}
+
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        handleEdit(item)
-                                                    }
+                                                    onClick={() => handleEdit(item)}
                                                     className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
                                                 >
                                                     Edit
@@ -483,9 +581,7 @@ export default function InterviewerPage({ actionSignals }) {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        handleDelete(item.id)
-                                                    }
+                                                    onClick={() => handleDelete(item.id)}
                                                     className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
                                                 >
                                                     Hapus
@@ -496,18 +592,18 @@ export default function InterviewerPage({ actionSignals }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="8" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
-                                                ◉
+                                                ◷
                                             </div>
 
                                             <h3 className="mt-4 text-lg font-black text-slate-900">
-                                                Data interviewer tidak ditemukan
+                                                Jadwal OL tidak ditemukan
                                             </h3>
 
                                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                                Belum ada data interviewer atau kata kunci pencarian tidak cocok.
+                                                Belum ada Jadwal Offering Letter atau kata kunci pencarian tidak cocok.
                                             </p>
                                         </div>
                                     </td>
@@ -521,12 +617,6 @@ export default function InterviewerPage({ actionSignals }) {
                     <p className="text-sm font-bold text-slate-500">
                         Showing {showingFrom} to {showingTo} of{" "}
                         {sortedData.length} entries
-                        {search && (
-                            <span>
-                                {" "}
-                                filtered from {dataInterviewer.length} total entries
-                            </span>
-                        )}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -579,17 +669,17 @@ export default function InterviewerPage({ actionSignals }) {
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
                                     <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
-                                        Form Interviewer
+                                        Form Jadwal OL
                                     </div>
 
                                     <h2 className="mt-2 text-2xl font-black text-slate-950">
                                         {editId
-                                            ? "Edit Interviewer"
-                                            : "Tambah Interviewer"}
+                                            ? "Edit Jadwal OL"
+                                            : "Tambah Jadwal OL"}
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Lengkapi data interviewer.
+                                        Jadwalkan Offering Letter untuk kandidat yang diterima.
                                     </p>
                                 </div>
 
@@ -603,44 +693,80 @@ export default function InterviewerPage({ actionSignals }) {
                             </div>
                         </div>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="space-y-5 px-6 py-6">
-                                <Input
-                                    label="Nama Interviewer"
-                                    name="nama"
-                                    value={form.nama}
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex min-h-0 flex-1 flex-col"
+                        >
+                            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                                <SelectInput
+                                    label="Kandidat Diterima"
+                                    name="hasil_review_management_id"
+                                    value={form.hasil_review_management_id}
                                     onChange={handleChange}
-                                    placeholder="Contoh: Dr Teddy"
+                                    options={kandidatOptions}
+                                    placeholder="Pilih kandidat diterima"
                                     required
                                 />
 
-                                <Input
-                                    label="No WA"
-                                    name="no_wa"
-                                    value={form.no_wa}
-                                    onChange={handleChange}
-                                    placeholder="Contoh: 081234567890"
-                                    type="number"
-                                    min="0"
-                                    inputMode="numeric"
-                                />
+                                <div className="grid gap-5 md:grid-cols-2">
+                                    <Input
+                                        label="Tanggal OL"
+                                        name="tanggal_ol"
+                                        type="date"
+                                        value={form.tanggal_ol}
+                                        onChange={handleChange}
+                                        required
+                                    />
 
-                                <SelectInput
-                                    label="Jabatan"
-                                    name="jabatan_id"
-                                    value={form.jabatan_id}
-                                    onChange={handleChange}
-                                    options={dataJabatan}
-                                    placeholder="Pilih jabatan"
-                                />
+                                    <Input
+                                        label="Jam OL"
+                                        name="jam_ol"
+                                        type="time"
+                                        value={form.jam_ol}
+                                        onChange={handleChange}
+                                        required
+                                    />
+                                </div>
 
-                                <SelectInput
-                                    label="Divisi"
-                                    name="divisi_id"
-                                    value={form.divisi_id}
+                                <div className="grid gap-5 md:grid-cols-2">
+                                    <SelectInput
+                                        label="Metode"
+                                        name="metode"
+                                        value={form.metode}
+                                        onChange={handleChange}
+                                        options={[
+                                            { id: "Online", label: "Online" },
+                                            { id: "Offline", label: "Offline" },
+                                        ]}
+                                        placeholder="Pilih metode"
+                                        required
+                                    />
+
+                                    <Input
+                                        label="PIC"
+                                        name="pic"
+                                        value={form.pic}
+                                        onChange={handleChange}
+                                        placeholder="Nama PIC"
+                                    />
+                                </div>
+
+                                {form.metode === "Online" && (
+                                    <Input
+                                        label="Link"
+                                        name="link"
+                                        value={form.link}
+                                        onChange={handleChange}
+                                        placeholder="Link meeting jika online"
+                                    />
+                                )}
+
+                                <Textarea
+                                    label="Catatan"
+                                    name="catatan"
+                                    value={form.catatan}
                                     onChange={handleChange}
-                                    options={dataDivisi}
-                                    placeholder="Pilih divisi"
+                                    placeholder="Catatan tambahan"
                                 />
                             </div>
 
@@ -710,8 +836,6 @@ function Input({
     type = "text",
     required = false,
     placeholder = "",
-    min,
-    inputMode,
 }) {
     return (
         <div>
@@ -727,30 +851,38 @@ function Input({
                 onChange={onChange}
                 required={required}
                 placeholder={placeholder}
-                min={min}
-                inputMode={inputMode}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
             />
         </div>
     );
 }
 
-function normalizePhoneForWhatsapp(value) {
-    const number = String(value || "").replace(/[^\d]/g, "");
+function Textarea({
+    label,
+    name,
+    value,
+    onChange,
+    required = false,
+    placeholder = "",
+}) {
+    return (
+        <div>
+            <label className="mb-2 block text-sm font-black text-slate-700">
+                {label}
+                {required && <span className="text-rose-500"> *</span>}
+            </label>
 
-    if (!number) {
-        return "";
-    }
-
-    if (number.startsWith("0")) {
-        return `62${number.slice(1)}`;
-    }
-
-    if (number.startsWith("62")) {
-        return number;
-    }
-
-    return number;
+            <textarea
+                name={name}
+                value={value}
+                onChange={onChange}
+                required={required}
+                placeholder={placeholder}
+                rows={4}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            />
+        </div>
+    );
 }
 
 function SelectInput({
@@ -760,24 +892,27 @@ function SelectInput({
     onChange,
     options,
     placeholder = "Pilih data",
+    required = false,
 }) {
     return (
         <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
                 {label}
+                {required && <span className="text-rose-500"> *</span>}
             </label>
 
             <select
                 name={name}
                 value={value}
                 onChange={onChange}
+                required={required}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
             >
                 <option value="">{placeholder}</option>
 
                 {options.map((item) => (
                     <option key={item.id} value={item.id}>
-                        {item.nama}
+                        {item.label || item.nama || item.id}
                     </option>
                 ))}
             </select>

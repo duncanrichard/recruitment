@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class JadwalTestZoom extends Model
@@ -14,16 +15,27 @@ class JadwalTestZoom extends Model
 
     protected $table = 'jadwal_test_zoom';
 
-    public $incrementing = false;
+    protected $primaryKey = 'id';
 
     protected $keyType = 'string';
 
+    public $incrementing = false;
+
     protected $fillable = [
         'data_riwayat_diri_id',
+
+        'group_key',
+        'sesi',
+
         'jadwal',
+        'jadwal_mulai',
+        'jadwal_selesai',
+
         'kehadiran',
         'hasil_test',
+
         'link_zoom',
+
         'created_by',
         'updated_by',
         'deleted_by',
@@ -31,6 +43,8 @@ class JadwalTestZoom extends Model
 
     protected $casts = [
         'jadwal' => 'datetime',
+        'jadwal_mulai' => 'datetime',
+        'jadwal_selesai' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
@@ -39,6 +53,24 @@ class JadwalTestZoom extends Model
         return $this->belongsTo(
             DataRiwayatDiri::class,
             'data_riwayat_diri_id',
+            'id'
+        );
+    }
+
+    public function pelamar(): BelongsTo
+    {
+        return $this->belongsTo(
+            DataRiwayatDiri::class,
+            'data_riwayat_diri_id',
+            'id'
+        );
+    }
+
+    public function daftarHadirTestZoom(): HasMany
+    {
+        return $this->hasMany(
+            DaftarHadirTestZoom::class,
+            'jadwal_test_zoom_id',
             'id'
         );
     }

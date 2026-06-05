@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\RangkaianInterview;
 use App\Http\Controllers\Controller;
 use App\Models\Interviewer;
 use App\Models\JadwalInterview;
+use App\Models\JadwalInterviewKandidat;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -145,12 +146,16 @@ class JadwalInterviewController extends Controller
                 ->where('jadwal_interview_id', $jadwalInterview->id)
                 ->delete();
 
+            JadwalInterviewKandidat::query()
+                ->where('jadwal_interview_id', $jadwalInterview->id)
+                ->delete();
+
             $jadwalInterview->delete();
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'Data jadwal interview berhasil dihapus.',
+            'message' => 'Data jadwal interview dan kandidatnya berhasil dihapus.',
         ]);
     }
 }

@@ -21,6 +21,7 @@ class InterviewerController extends Controller
             ->select([
                 'id',
                 'nama',
+                'no_wa',
                 'jabatan_id',
                 'divisi_id',
                 'created_at',
@@ -64,14 +65,35 @@ class InterviewerController extends Controller
                 'max:255',
                 Rule::unique('interviewers', 'nama')->whereNull('deleted_at'),
             ],
+            'no_wa' => [
+                'nullable',
+                'string',
+                'max:50',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
             'jabatan_id' => ['nullable', 'uuid', 'exists:jabatan,id'],
             'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
+        ], [
+            'nama.required' => 'Nama interviewer wajib diisi.',
+            'nama.unique' => 'Nama interviewer sudah digunakan.',
+            'no_wa.regex' => 'Format No WA tidak valid.',
+            'no_wa.max' => 'No WA maksimal 50 karakter.',
+            'jabatan_id.uuid' => 'Data jabatan tidak valid.',
+            'jabatan_id.exists' => 'Data jabatan tidak ditemukan.',
+            'divisi_id.uuid' => 'Data divisi tidak valid.',
+            'divisi_id.exists' => 'Data divisi tidak ditemukan.',
         ]);
 
         $interviewer = Interviewer::create([
             'nama' => $validated['nama'],
+            'no_wa' => $validated['no_wa'] ?? null,
             'jabatan_id' => $validated['jabatan_id'] ?? null,
             'divisi_id' => $validated['divisi_id'] ?? null,
+        ]);
+
+        $interviewer->load([
+            'jabatan:id,nama',
+            'divisi:id,nama',
         ]);
 
         return response()->json([
@@ -94,14 +116,35 @@ class InterviewerController extends Controller
                     ->ignore($interviewer->id, 'id')
                     ->whereNull('deleted_at'),
             ],
+            'no_wa' => [
+                'nullable',
+                'string',
+                'max:50',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
             'jabatan_id' => ['nullable', 'uuid', 'exists:jabatan,id'],
             'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
+        ], [
+            'nama.required' => 'Nama interviewer wajib diisi.',
+            'nama.unique' => 'Nama interviewer sudah digunakan.',
+            'no_wa.regex' => 'Format No WA tidak valid.',
+            'no_wa.max' => 'No WA maksimal 50 karakter.',
+            'jabatan_id.uuid' => 'Data jabatan tidak valid.',
+            'jabatan_id.exists' => 'Data jabatan tidak ditemukan.',
+            'divisi_id.uuid' => 'Data divisi tidak valid.',
+            'divisi_id.exists' => 'Data divisi tidak ditemukan.',
         ]);
 
         $interviewer->update([
             'nama' => $validated['nama'],
+            'no_wa' => $validated['no_wa'] ?? null,
             'jabatan_id' => $validated['jabatan_id'] ?? null,
             'divisi_id' => $validated['divisi_id'] ?? null,
+        ]);
+
+        $interviewer->load([
+            'jabatan:id,nama',
+            'divisi:id,nama',
         ]);
 
         return response()->json([

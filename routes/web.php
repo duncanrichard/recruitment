@@ -56,4 +56,5 @@ Route::middleware('auth')->group(function () {
     require __DIR__ . '/report_hasil_test_zoom.php';
     require __DIR__ . '/report_hasil_test_mmpi.php';
     require __DIR__ . '/report_interview_kandidat.php';
+    require __DIR__ . '/jadwal_offering_letter.php';
 });

@@ -4,6 +4,16 @@ export default function DataPelamarPage({
     actionSignals,
     onOpenDetailPelamar,
 }) {
+    const getTodayDate = () => {
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    };
+
+    const today = getTodayDate();
     const [dataPelamar, setDataPelamar] = useState([]);
     const [dataPosisi, setDataPosisi] = useState([]);
     const [dataPerusahaan, setDataPerusahaan] = useState([]);
@@ -15,7 +25,15 @@ export default function DataPelamarPage({
 
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [sendingMessage, setSendingMessage] = useState(false);
     const [alamatSama, setAlamatSama] = useState(false);
+
+    const [tanggalSkriningMulai, setTanggalSkriningMulai] = useState("");
+    const [tanggalSkriningSelesai, setTanggalSkriningSelesai] = useState("");
+    const [appliedTanggalSkrining, setAppliedTanggalSkrining] = useState({
+        tanggal_skrining_mulai: "",
+        tanggal_skrining_selesai: "",
+    });
 
     const isFirstActionSignalRender = useRef(true);
 
@@ -77,25 +95,75 @@ export default function DataPelamarPage({
         });
     };
 
-    const fetchJson = async (url) => {
+    const parseJsonResponse = async (response) => {
+        const text = await response.text();
+
+        if (!text) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            console.error("Response bukan JSON:", text);
+
+            return {
+                success: false,
+                message: "Response server tidak valid.",
+                raw: text,
+            };
+        }
+    };
+
+    const fetchJson = async (url, options = {}) => {
         const response = await fetch(url, {
+            credentials: "same-origin",
+            ...options,
             headers: {
                 Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                ...(options.headers || {}),
             },
         });
 
-        return response.json();
+        const result = await parseJsonResponse(response);
+
+        if (!response.ok) {
+            throw {
+                response,
+                result,
+            };
+        }
+
+        return result;
     };
 
-    const fetchData = async () => {
+    const fetchData = async (filters = appliedTanggalSkrining) => {
         try {
-            const result = await fetchJson("/admin/data-pelamar/list");
+            const params = new URLSearchParams();
+
+            if (filters?.tanggal_skrining_mulai) {
+                params.append("tanggal_skrining_mulai", filters.tanggal_skrining_mulai);
+            }
+
+            if (filters?.tanggal_skrining_selesai) {
+                params.append("tanggal_skrining_selesai", filters.tanggal_skrining_selesai);
+            }
+
+            const url = params.toString()
+                ? `/admin/data-pelamar/list?${params.toString()}`
+                : "/admin/data-pelamar/list";
+
+            const result = await fetchJson(url);
 
             if (result.success) {
                 setDataPelamar(result.data || []);
+            } else {
+                alert(result.message || "Gagal mengambil data pelamar.");
             }
         } catch (error) {
             console.error("Gagal mengambil data pelamar:", error);
+            alert(error?.result?.message || "Gagal mengambil data pelamar.");
         }
     };
 
@@ -403,6 +471,138 @@ export default function DataPelamarPage({
         }
     };
 
+    const handleFilterTanggalSkrining = (event) => {
+        event.preventDefault();
+
+        if (
+            tanggalSkriningMulai &&
+            tanggalSkriningSelesai &&
+            tanggalSkriningSelesai < tanggalSkriningMulai
+        ) {
+            alert("Tanggal skrining selesai tidak boleh lebih kecil dari tanggal mulai.");
+            return;
+        }
+
+        const nextFilter = {
+            tanggal_skrining_mulai: tanggalSkriningMulai,
+            tanggal_skrining_selesai: tanggalSkriningSelesai,
+        };
+
+        setAppliedTanggalSkrining(nextFilter);
+        fetchData(nextFilter);
+    };
+
+    const handleResetTanggalSkrining = () => {
+        const nextFilter = {
+            tanggal_skrining_mulai: "",
+            tanggal_skrining_selesai: "",
+        };
+
+        setTanggalSkriningMulai("");
+        setTanggalSkriningSelesai("");
+        setAppliedTanggalSkrining(nextFilter);
+        fetchData(nextFilter);
+    };
+
+    const handleSetTanggalSkriningHariIni = () => {
+        const nextFilter = {
+            tanggal_skrining_mulai: today,
+            tanggal_skrining_selesai: today,
+        };
+
+        setTanggalSkriningMulai(today);
+        setTanggalSkriningSelesai(today);
+        setAppliedTanggalSkrining(nextFilter);
+        fetchData(nextFilter);
+    };
+
+    const handleKirimPesanSkrining = async (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        if (sendingMessage) {
+            return;
+        }
+
+        if (!tanggalSkriningMulai || !tanggalSkriningSelesai) {
+            alert("Pilih tanggal skrining mulai dan selesai terlebih dahulu.");
+            return;
+        }
+
+        if (tanggalSkriningSelesai < tanggalSkriningMulai) {
+            alert("Tanggal skrining selesai tidak boleh lebih kecil dari tanggal mulai.");
+            return;
+        }
+
+        const confirmSend = confirm(
+            `Kirim pesan WhatsApp ke semua pelamar dengan tanggal skrining ${tanggalSkriningMulai} sampai ${tanggalSkriningSelesai}?`
+        );
+
+        if (!confirmSend) return;
+
+        setSendingMessage(true);
+
+        try {
+            const response = await fetch("/admin/data-pelamar/kirim-pesan-skrining", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRF-TOKEN": getCsrfToken() || "",
+                },
+                body: JSON.stringify({
+                    tanggal_skrining_mulai: tanggalSkriningMulai,
+                    tanggal_skrining_selesai: tanggalSkriningSelesai,
+                    message_template:
+                        "Halo {nama},\n\n" +
+                        "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n" +
+                        "Tanggal skrining Anda: {tanggal_skrining}.\n\n" +
+                        "Mohon untuk selalu mengecek link pendaftaran Anda dan melengkapi seluruh data diri sesuai informasi yang diminta pada formulir.\n" +
+                        "Link pendaftaran Anda:\n{url_pendaftaran}\n\n" +
+                        "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n" +
+                        "Terima kasih.\n" +
+                        "Tim Rekrutmen",
+                }),
+            });
+
+            const result = await parseJsonResponse(response);
+
+            if (!response.ok || !result.success) {
+                const fonnteMessage =
+                    result?.fonnte_response?.reason ||
+                    result?.fonnte_response?.detail ||
+                    result?.fonnte_response?.message ||
+                    result?.error ||
+                    result?.message ||
+                    "Pesan skrining gagal dikirim. Pastikan tombol ini memanggil endpoint dengan method POST.";
+
+                alert(fonnteMessage);
+                return;
+            }
+
+            alert(
+                `${result.message || "Pesan skrining berhasil dikirim."}
+Total data: ${result.total_data || 0}
+Total dikirim: ${result.total_dikirim || 0}
+Dilewati: ${result.total_dilewati || 0}`
+            );
+
+            fetchData(appliedTanggalSkrining);
+        } catch (error) {
+            console.error("Gagal mengirim pesan skrining:", error);
+
+            const message =
+                error?.result?.message ||
+                "Terjadi kesalahan saat mengirim pesan skrining.";
+
+            alert(message);
+        } finally {
+            setSendingMessage(false);
+        }
+    };
+
     const getNamaPosisi = (posisiId, item = null) => {
         if (item?.posisi?.nama_posisi) {
             return item.posisi.nama_posisi;
@@ -686,15 +886,73 @@ export default function DataPelamarPage({
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h3 className="text-lg font-black text-slate-950">
-                            Data Pelamar
-                        </h3>
-                        <p className="mt-1 text-sm font-medium text-slate-500">
-                            Daftar data pelamar yang sudah dibuat oleh admin.
-                        </p>
+                <div className="flex flex-col gap-5 border-b border-slate-100 px-6 py-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                            <h3 className="text-lg font-black text-slate-950">
+                                Data Pelamar
+                            </h3>
+                            <p className="mt-1 text-sm font-medium text-slate-500">
+                                Daftar data pelamar yang sudah dibuat oleh admin.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleSetTanggalSkriningHariIni}
+                            className="w-fit rounded-2xl border border-cyan-100 bg-cyan-50 px-5 py-3 text-sm font-black text-cyan-700 transition hover:bg-cyan-100"
+                        >
+                            Filter Hari Ini
+                        </button>
                     </div>
+
+                    <form
+                        onSubmit={handleFilterTanggalSkrining}
+                        className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] lg:items-end"
+                    >
+                        <DateFilterInput
+                            label="Tanggal Skrining Mulai"
+                            value={tanggalSkriningMulai}
+                            onChange={setTanggalSkriningMulai}
+                        />
+
+                        <DateFilterInput
+                            label="Tanggal Skrining Selesai"
+                            value={tanggalSkriningSelesai}
+                            onChange={setTanggalSkriningSelesai}
+                        />
+
+                        <button
+                            type="submit"
+                            className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700"
+                        >
+                            Filter
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleResetTanggalSkrining}
+                            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
+                        >
+                            Reset
+                        </button>
+
+                        <button
+                            type="button"
+                            disabled={sendingMessage}
+                            onClick={handleKirimPesanSkrining}
+                            className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {sendingMessage ? "Mengirim..." : "Kirim Pesan WA"}
+                        </button>
+                    </form>
+
+                    {(appliedTanggalSkrining.tanggal_skrining_mulai ||
+                        appliedTanggalSkrining.tanggal_skrining_selesai) && (
+                        <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-700">
+                            Filter aktif tanggal skrining: {appliedTanggalSkrining.tanggal_skrining_mulai || "-"} sampai {appliedTanggalSkrining.tanggal_skrining_selesai || "-"}
+                        </div>
+                    )}
                 </div>
 
                 <DataTable
@@ -1017,6 +1275,23 @@ export default function DataPelamarPage({
                 </div>
             )}
         </div>
+    );
+}
+
+function DateFilterInput({ label, value, onChange }) {
+    return (
+        <label className="block">
+            <span className="mb-2 block text-sm font-black text-slate-700">
+                {label}
+            </span>
+
+            <input
+                type="date"
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            />
+        </label>
     );
 }
 

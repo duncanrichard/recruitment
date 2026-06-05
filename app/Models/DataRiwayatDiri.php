@@ -12,6 +12,8 @@ class DataRiwayatDiri extends Model
 {
     protected $table = 'data_riwayat_diri';
 
+    protected $primaryKey = 'id';
+
     protected $keyType = 'string';
 
     public $incrementing = false;
@@ -31,12 +33,10 @@ class DataRiwayatDiri extends Model
         'tanggal_skrining',
         'alamat_ktp',
         'alamat_domisili',
-
         'provinsi_id',
         'kabupaten_id',
         'kecamatan_id',
         'kelurahan_id',
-
         'kewarganegaraan_id',
         'status_pernikahan_id',
         'no_wa',
@@ -159,8 +159,13 @@ class DataRiwayatDiri extends Model
         return $this->hasMany(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')
             ->orderByDesc('jadwal');
     }
-     public function jadwalInterviewKandidat()
+
+    public function jadwalInterviewKandidat(): HasMany
     {
-        return $this->hasMany(JadwalInterviewKandidat::class, 'data_riwayat_diri_id');
+        return $this->hasMany(
+            JadwalInterviewKandidat::class,
+            'data_riwayat_diri_id',
+            'id'
+        );
     }
 }

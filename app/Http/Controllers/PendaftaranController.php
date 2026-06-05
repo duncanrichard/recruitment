@@ -920,7 +920,7 @@ public function masterPendidikan(): JsonResponse
             'periode_kerja_akhir' => ['nullable', 'date', 'after_or_equal:periode_kerja_awal'],
             'gaji_terakhir' => ['nullable', 'numeric', 'min:0', 'max:999999999999999999.99'],
 
-            'status_pekerjaan' => ['nullable', 'string', 'max:100'],
+            'status_pekerjaan' => ['required', 'string', 'max:100'],
             'posisi_pekerjaan' => ['nullable', 'string', 'max:255'],
             'bidang_pekerjaan' => ['nullable', 'string', 'max:255'],
             'lokasi_perusahaan' => ['nullable', 'string', 'max:255'],
@@ -944,6 +944,7 @@ public function masterPendidikan(): JsonResponse
             'nama_refrensi_kerabat' => ['nullable', 'string', 'max:255'],
             'telp_refrensi_kerabat' => ['nullable', 'string', 'max:50'],
         ], [
+            'status_pekerjaan.required' => 'Status pekerjaan wajib diisi.',
             'periode_kerja_awal.date' => 'Periode kerja awal harus berupa tanggal yang valid.',
             'periode_kerja_akhir.date' => 'Periode kerja akhir harus berupa tanggal yang valid.',
             'periode_kerja_akhir.after_or_equal' => 'Periode kerja akhir tidak boleh lebih kecil dari periode kerja awal.',

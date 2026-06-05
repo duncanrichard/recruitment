@@ -31,15 +31,52 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/data-pelamar/sumber-informasi/list', [DataPelamarController::class, 'sumberInformasiList'])
         ->name('data-pelamar.sumber-informasi.list');
 
+    /*
+    |--------------------------------------------------------------------------
+    | Kirim Pesan Fonnte
+    |--------------------------------------------------------------------------
+    | Route POST untuk tombol "Kirim Pesan WA" dari React.
+    */
+    Route::post('/data-pelamar/kirim-pesan-skrining', [DataPelamarController::class, 'kirimPesanSkrining'])
+        ->name('data-pelamar.kirim-pesan-skrining');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Optional GET
+    |--------------------------------------------------------------------------
+    | Supaya kalau URL dibuka manual di browser tidak error 405.
+    */
+    Route::get('/data-pelamar/kirim-pesan-skrining', function () {
+        return response()->json([
+            'success' => false,
+            'message' => 'Endpoint ini hanya untuk mengirim pesan melalui tombol Kirim Pesan WA. Gunakan method POST.',
+        ], 405);
+    })->name('data-pelamar.kirim-pesan-skrining.get');
+
     Route::post('/data-pelamar', [DataPelamarController::class, 'store'])
         ->name('data-pelamar.store');
 
+    Route::get('/data-pelamar/{id}/detail', [DataPelamarController::class, 'detail'])
+        ->whereUuid('id')
+        ->name('data-pelamar.detail');
+
     Route::get('/data-pelamar/{id}/detail-data', [DataPelamarController::class, 'detailData'])
+        ->whereUuid('id')
         ->name('data-pelamar.detail-data');
 
-    Route::delete('/data-pelamar/{id}', [DataPelamarController::class, 'destroy'])
-        ->name('data-pelamar.destroy');
+    Route::get('/data-pelamar/{id}', [DataPelamarController::class, 'show'])
+        ->whereUuid('id')
+        ->name('data-pelamar.show');
+
+    Route::put('/data-pelamar/{id}', [DataPelamarController::class, 'update'])
+        ->whereUuid('id')
+        ->name('data-pelamar.update');
+
+    Route::patch('/data-pelamar/{id}', [DataPelamarController::class, 'update'])
+        ->whereUuid('id')
+        ->name('data-pelamar.patch');
 
     Route::delete('/data-pelamar/{id}', [DataPelamarController::class, 'destroy'])
+        ->whereUuid('id')
         ->name('data-pelamar.destroy');
 });

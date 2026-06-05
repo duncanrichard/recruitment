@@ -15,6 +15,16 @@ use Illuminate\Validation\Rule;
 
 class ReviewManagementController extends Controller
 {
+    private array $statusReviewOptions = [
+        'Diterima',
+        'Gagal',
+    ];
+
+    private array $hasilInterviewReviewOptions = [
+        'Lolos Interview',
+        'Dipertimbangkan',
+    ];
+
     private array $pelamarRelations = [
         'pendidikan',
         'agama',
@@ -277,37 +287,37 @@ class ReviewManagementController extends Controller
         $tanggalMulai = $validated['tanggal_mulai'] ?? now()->toDateString();
         $tanggalSelesai = $validated['tanggal_selesai'] ?? now()->toDateString();
 
-        $data = JadwalInterviewKandidat::query()
+        $data = HasilReviewManagement::query()
             ->with([
-                'reviewManagement',
-                'jadwalInterview:id,judul_interview,jadwal_interview',
-                'kandidat' => function ($query) {
+                'hasilInterview.jadwalInterview:id,judul_interview,jadwal_interview',
+                'hasilInterview.kandidat' => function ($query) {
                     $query->with($this->safePelamarRelations());
                 },
             ])
-            ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
+            ->whereHas('hasilInterview', function ($query) {
+                $query->whereIn('hasil_interview', $this->hasilInterviewReviewOptions);
+            })
+            ->whereHas('hasilInterview.jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
                 $query
                     ->whereDate('jadwal_interview', '>=', $tanggalMulai)
                     ->whereDate('jadwal_interview', '<=', $tanggalSelesai);
             })
-            ->whereIn('hasil_interview', [
-                'Lolos Interview',
-                'Dipertimbangkan',
-            ])
             ->latest()
             ->get()
-            ->map(function ($item) {
-                $kandidat = $item->kandidat;
-                $jadwalInterview = $item->jadwalInterview;
+            ->map(function (HasilReviewManagement $review) {
+                $item = $review->hasilInterview;
+                $kandidat = $item?->kandidat;
+                $jadwalInterview = $item?->jadwalInterview;
 
                 if ($kandidat) {
                     $kandidat = $this->appendExtraData($kandidat);
                 }
 
                 return [
-                    'id' => $item->id,
-                    'jadwal_interview_id' => $item->jadwal_interview_id,
-                    'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
+                    'id' => $item?->id,
+                    'hasil_interview_id' => $item?->id,
+                    'jadwal_interview_id' => $item?->jadwal_interview_id,
+                    'data_riwayat_diri_id' => $item?->data_riwayat_diri_id,
 
                     'judul_interview' => $jadwalInterview?->judul_interview,
                     'tanggal_interview' => $jadwalInterview?->jadwal_interview,
@@ -321,15 +331,15 @@ class ReviewManagementController extends Controller
                     'posisi_label' => $kandidat?->posisi_label,
                     'perusahaan_label' => $kandidat?->perusahaan_label,
 
-                    'status_kehadiran' => $item->status_kehadiran,
-                    'hasil_interview' => $item->hasil_interview,
-                    'catatan' => $item->catatan,
-                    'created_at' => $item->created_at,
-                    'updated_at' => $item->updated_at,
+                    'status_kehadiran' => $item?->status_kehadiran,
+                    'hasil_interview' => $item?->hasil_interview,
+                    'catatan' => $item?->catatan,
+                    'created_at' => $review->created_at,
+                    'updated_at' => $review->updated_at,
 
-                    'review_management_id' => $item->reviewManagement?->id,
-                    'review_management' => $item->reviewManagement?->review_management,
-                    'status_review' => $item->reviewManagement?->status,
+                    'review_management_id' => $review->id,
+                    'review_management' => $review->review_management,
+                    'status_review' => $review->status,
 
                     'detail_kandidat' => $kandidat,
                 ];
@@ -359,18 +369,15 @@ class ReviewManagementController extends Controller
                 'string',
             ],
             'status' => [
-                'required',
+                'nullable',
                 'string',
-                Rule::in(['Diterima', 'Gagal']),
+                Rule::in($this->statusReviewOptions),
             ],
         ]);
 
         $jadwalKandidat = JadwalInterviewKandidat::query()
             ->where('id', $validated['hasil_interview_id'])
-            ->whereIn('hasil_interview', [
-                'Lolos Interview',
-                'Dipertimbangkan',
-            ])
+            ->whereIn('hasil_interview', $this->hasilInterviewReviewOptions)
             ->first();
 
         if (!$jadwalKandidat) {
@@ -386,7 +393,7 @@ class ReviewManagementController extends Controller
             ],
             [
                 'review_management' => $validated['review_management'] ?? null,
-                'status' => $validated['status'],
+                'status' => $validated['status'] ?? null,
             ]
         );
 
@@ -400,7 +407,6 @@ class ReviewManagementController extends Controller
     public function show(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
         $hasilReviewManagement->load([
-            'hasilInterview.reviewManagement',
             'hasilInterview.jadwalInterview:id,judul_interview,jadwal_interview',
             'hasilInterview.kandidat' => function ($query) {
                 $query->with($this->safePelamarRelations());
@@ -427,15 +433,15 @@ class ReviewManagementController extends Controller
                 'string',
             ],
             'status' => [
-                'required',
+                'nullable',
                 'string',
-                Rule::in(['Diterima', 'Gagal']),
+                Rule::in($this->statusReviewOptions),
             ],
         ]);
 
         $hasilReviewManagement->update([
             'review_management' => $validated['review_management'] ?? null,
-            'status' => $validated['status'],
+            'status' => $validated['status'] ?? null,
         ]);
 
         return response()->json([
@@ -447,11 +453,14 @@ class ReviewManagementController extends Controller
 
     public function destroy(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
-        $hasilReviewManagement->delete();
+        $hasilReviewManagement->update([
+            'review_management' => null,
+            'status' => null,
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Review management berhasil dihapus.',
+            'message' => 'Review management berhasil dikosongkan.',
         ]);
     }
 

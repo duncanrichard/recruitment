@@ -24,6 +24,10 @@ export default function JadwalInterviewPage({ actionSignals }) {
         interviewer_ids: [],
     });
 
+    const lastJadwalInterviewSignalRef = useRef(
+        actionSignals?.jadwalInterview || 0
+    );
+
     const getCsrfToken = () => {
         return document
             .querySelector('meta[name="csrf-token"]')
@@ -149,10 +153,14 @@ export default function JadwalInterviewPage({ actionSignals }) {
     }, []);
 
     useEffect(() => {
-        if (actionSignals?.jadwalInterview > 0) {
+        const currentSignal = actionSignals?.jadwalInterview || 0;
+
+        if (currentSignal > lastJadwalInterviewSignalRef.current) {
             resetForm();
             setModalOpen(true);
         }
+
+        lastJadwalInterviewSignalRef.current = currentSignal;
     }, [actionSignals?.jadwalInterview]);
 
     useEffect(() => {

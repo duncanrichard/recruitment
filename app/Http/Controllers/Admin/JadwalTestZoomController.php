@@ -22,37 +22,39 @@ class JadwalTestZoomController extends Controller
                 'dataRiwayatDiri.posisi:id,nama_posisi',
                 'dataRiwayatDiri.perusahaan:id,nama_perusahaan',
             ])
+            ->latest('jadwal_mulai')
             ->latest('jadwal')
             ->get();
 
         $data = $rows
             ->groupBy(function ($item) {
-                return $this->makeGroupKey($item->jadwal);
+                return $this->makeGroupKeyFromItem($item);
             })
             ->map(function ($items, $groupKey) {
                 $first = $items->first();
-                $jadwal = $this->parseDateTime($first?->jadwal);
+                $jadwalMulai = $this->getJadwalMulai($first);
+                $jadwalSelesai = $this->getJadwalSelesai($first);
+                $sesi = $this->getSesi($first);
 
                 return [
                     'id' => $groupKey,
                     'group_key' => $groupKey,
 
-                    'tanggal_test' => $jadwal?->toDateString(),
-                    'tanggal_test_label' => $jadwal
-                        ? $jadwal->translatedFormat('d F Y')
+                    'sesi' => $sesi,
+                    'sesi_label' => $sesi,
+
+                    'tanggal_test' => $jadwalMulai?->toDateString(),
+                    'tanggal_test_label' => $jadwalMulai
+                        ? $jadwalMulai->translatedFormat('d F Y')
                         : '-',
 
-                    'jam_test' => $jadwal
-                        ? $jadwal->format('H:i')
-                        : '-',
+                    'jam_test' => $this->formatJamRange($jadwalMulai, $jadwalSelesai),
 
-                    'jadwal' => $jadwal
-                        ? $jadwal->toDateTimeString()
-                        : null,
+                    'jadwal' => $jadwalMulai?->toDateTimeString(),
+                    'jadwal_mulai' => $jadwalMulai?->toDateTimeString(),
+                    'jadwal_selesai' => $jadwalSelesai?->toDateTimeString(),
 
-                    'jadwal_label' => $jadwal
-                        ? $jadwal->translatedFormat('d F Y H:i')
-                        : '-',
+                    'jadwal_label' => $this->formatJadwalLabel($jadwalMulai, $jadwalSelesai, $sesi),
 
                     'link_zoom' => $first?->link_zoom,
                     'link_zoom_label' => $first?->link_zoom ?: '-',
@@ -88,26 +90,32 @@ class JadwalTestZoomController extends Controller
 
     public function detail(string $groupKey): JsonResponse
     {
-        $jadwal = $this->dateTimeFromGroupKey($groupKey);
+        $rows = $this->rowsByGroupKey($groupKey);
 
-        if (!$jadwal) {
+        if ($rows->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Group jadwal tidak valid.',
-            ], 422);
+                'message' => 'Data jadwal tidak ditemukan.',
+            ], 404);
         }
 
-        $rows = $this->jadwalDetailQuery()
-            ->where('jadwal', $jadwal->toDateTimeString())
-            ->get()
+        $rows = $rows
             ->sortBy(function ($item) {
                 return strtolower($item->dataRiwayatDiri->nama_lengkap ?? '');
             })
             ->values();
 
+        $first = $rows->first();
+
         return response()->json([
             'success' => true,
-            'data' => $this->formatDetailGroup($rows, $jadwal, $groupKey),
+            'data' => $this->formatDetailGroup(
+                $rows,
+                $this->getJadwalMulai($first),
+                $this->getJadwalSelesai($first),
+                $this->getSesi($first),
+                $groupKey
+            ),
         ]);
     }
 
@@ -123,7 +131,13 @@ class JadwalTestZoomController extends Controller
         }
 
         $rows = $this->jadwalDetailQuery()
-            ->whereDate('jadwal', $tanggalCarbon->toDateString())
+            ->whereDate('jadwal_mulai', $tanggalCarbon->toDateString())
+            ->orWhere(function ($query) use ($tanggalCarbon) {
+                $query
+                    ->whereNull('jadwal_mulai')
+                    ->whereDate('jadwal', $tanggalCarbon->toDateString());
+            })
+            ->latest('jadwal_mulai')
             ->latest('jadwal')
             ->get()
             ->sortBy(function ($item) {
@@ -133,13 +147,18 @@ class JadwalTestZoomController extends Controller
 
         $data = $rows
             ->groupBy(function ($item) {
-                return $this->makeGroupKey($item->jadwal);
+                return $this->makeGroupKeyFromItem($item);
             })
             ->map(function ($items, $groupKey) {
                 $first = $items->first();
-                $jadwal = $this->parseDateTime($first?->jadwal);
 
-                return $this->formatDetailGroup($items, $jadwal, $groupKey);
+                return $this->formatDetailGroup(
+                    $items,
+                    $this->getJadwalMulai($first),
+                    $this->getJadwalSelesai($first),
+                    $this->getSesi($first),
+                    $groupKey
+                );
             })
             ->values();
 
@@ -194,49 +213,34 @@ class JadwalTestZoomController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $this->mergeLinkZoom($request);
+        $this->mergeScheduleInputs($request);
 
         $validated = $request->validate([
-            'tanggal_skrining' => [
-                'required',
-                'date',
-            ],
-            'data_riwayat_diri_ids' => [
-                'required',
-                'array',
-                'min:1',
-            ],
+            'tanggal_skrining' => ['required', 'date'],
+
+            'data_riwayat_diri_ids' => ['required', 'array', 'min:1'],
             'data_riwayat_diri_ids.*' => [
                 'required',
                 'uuid',
                 Rule::exists('data_riwayat_diri', 'id'),
             ],
-            'jadwal' => [
-                'required',
-                'date',
-            ],
-            'link_zoom' => [
-                'nullable',
-                'url',
-                'max:2048',
-            ],
-        ], [
-            'tanggal_skrining.required' => 'Tanggal skrining wajib dipilih.',
-            'tanggal_skrining.date' => 'Format tanggal skrining tidak valid.',
 
-            'data_riwayat_diri_ids.required' => 'Minimal satu pelamar wajib dipilih.',
-            'data_riwayat_diri_ids.array' => 'Format data pelamar tidak valid.',
-            'data_riwayat_diri_ids.min' => 'Minimal satu pelamar wajib dipilih.',
-            'data_riwayat_diri_ids.*.required' => 'Data pelamar tidak valid.',
-            'data_riwayat_diri_ids.*.uuid' => 'Data pelamar tidak valid.',
-            'data_riwayat_diri_ids.*.exists' => 'Data pelamar tidak ditemukan.',
+            'sesi' => ['required', 'string', 'max:100'],
+            'jadwal_mulai' => ['required', 'date'],
+            'jadwal_selesai' => ['required', 'date', 'after:jadwal_mulai'],
 
-            'jadwal.required' => 'Jadwal Zoom wajib diisi.',
-            'jadwal.date' => 'Format jadwal Zoom tidak valid.',
+            'link_zoom' => ['nullable', 'url', 'max:2048'],
+        ], $this->validationMessages());
 
-            'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
-            'link_zoom.max' => 'Link Zoom terlalu panjang.',
-        ]);
+        $jadwalMulai = Carbon::parse($validated['jadwal_mulai']);
+        $jadwalSelesai = Carbon::parse($validated['jadwal_selesai']);
+
+        if ($jadwalMulai->lessThanOrEqualTo(now())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal mulai Zoom tidak boleh menggunakan jam yang sudah lewat.',
+            ], 422);
+        }
 
         $tanggalSkrining = Carbon::parse($validated['tanggal_skrining'])->toDateString();
 
@@ -275,13 +279,25 @@ class JadwalTestZoomController extends Controller
             ], 422);
         }
 
-        $created = DB::transaction(function () use ($pelamarBelumDijadwalkan, $validated) {
+        $groupKey = $this->makeGroupKey($validated['sesi'], $jadwalMulai, $jadwalSelesai);
+
+        $created = DB::transaction(function () use (
+            $pelamarBelumDijadwalkan,
+            $validated,
+            $jadwalMulai,
+            $jadwalSelesai,
+            $groupKey
+        ) {
             $items = [];
 
             foreach ($pelamarBelumDijadwalkan as $pelamarId) {
                 $items[] = JadwalTestZoom::query()->create([
                     'data_riwayat_diri_id' => $pelamarId,
-                    'jadwal' => Carbon::parse($validated['jadwal'])->toDateTimeString(),
+                    'sesi' => $validated['sesi'],
+                    'group_key' => $groupKey,
+                    'jadwal' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_mulai' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_selesai' => $jadwalSelesai->toDateTimeString(),
                     'link_zoom' => $validated['link_zoom'] ?? null,
                 ]);
             }
@@ -296,7 +312,7 @@ class JadwalTestZoomController extends Controller
                 'dataRiwayatDiri.perusahaan',
             ])
             ->whereIn('id', collect($created)->pluck('id')->toArray())
-            ->latest('jadwal')
+            ->latest('jadwal_mulai')
             ->get();
 
         $jumlahSkip = count($pelamarSudahDijadwalkan);
@@ -311,7 +327,7 @@ class JadwalTestZoomController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $this->mergeLinkZoom($request);
+        $this->mergeScheduleInputs($request);
 
         $data = JadwalTestZoom::query()->findOrFail($id);
 
@@ -321,26 +337,23 @@ class JadwalTestZoomController extends Controller
                 'uuid',
                 Rule::exists('data_riwayat_diri', 'id'),
             ],
-            'jadwal' => [
-                'required',
-                'date',
-            ],
-            'link_zoom' => [
-                'nullable',
-                'url',
-                'max:2048',
-            ],
-        ], [
-            'data_riwayat_diri_id.required' => 'Pelamar wajib dipilih.',
-            'data_riwayat_diri_id.uuid' => 'Data pelamar tidak valid.',
-            'data_riwayat_diri_id.exists' => 'Pelamar tidak ditemukan.',
 
-            'jadwal.required' => 'Jadwal Zoom wajib diisi.',
-            'jadwal.date' => 'Format jadwal Zoom tidak valid.',
+            'sesi' => ['required', 'string', 'max:100'],
+            'jadwal_mulai' => ['required', 'date'],
+            'jadwal_selesai' => ['required', 'date', 'after:jadwal_mulai'],
 
-            'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
-            'link_zoom.max' => 'Link Zoom terlalu panjang.',
-        ]);
+            'link_zoom' => ['nullable', 'url', 'max:2048'],
+        ], $this->validationMessages());
+
+        $jadwalMulai = Carbon::parse($validated['jadwal_mulai']);
+        $jadwalSelesai = Carbon::parse($validated['jadwal_selesai']);
+
+        if ($jadwalMulai->lessThanOrEqualTo(now())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal mulai Zoom tidak boleh menggunakan jam yang sudah lewat.',
+            ], 422);
+        }
 
         $pelamarSudahPunyaJadwal = JadwalTestZoom::query()
             ->where('data_riwayat_diri_id', $validated['data_riwayat_diri_id'])
@@ -354,25 +367,40 @@ class JadwalTestZoomController extends Controller
             ], 422);
         }
 
-        $oldJadwal = $this->parseDateTime($data->jadwal);
-        $newJadwal = Carbon::parse($validated['jadwal'])->toDateTimeString();
+        $oldGroupKey = $this->makeGroupKeyFromItem($data);
+        $newGroupKey = $this->makeGroupKey($validated['sesi'], $jadwalMulai, $jadwalSelesai);
+        $newLinkZoom = $validated['link_zoom'] ?? null;
 
-        DB::transaction(function () use ($data, $validated, $oldJadwal, $newJadwal) {
+        DB::transaction(function () use (
+            $data,
+            $validated,
+            $oldGroupKey,
+            $newGroupKey,
+            $jadwalMulai,
+            $jadwalSelesai,
+            $newLinkZoom
+        ) {
             $data->forceFill([
                 'data_riwayat_diri_id' => $validated['data_riwayat_diri_id'],
-                'jadwal' => $newJadwal,
-                'link_zoom' => $validated['link_zoom'] ?? null,
+                'sesi' => $validated['sesi'],
+                'group_key' => $newGroupKey,
+                'jadwal' => $jadwalMulai->toDateTimeString(),
+                'jadwal_mulai' => $jadwalMulai->toDateTimeString(),
+                'jadwal_selesai' => $jadwalSelesai->toDateTimeString(),
+                'link_zoom' => $newLinkZoom,
             ])->save();
 
-            if ($oldJadwal) {
-                JadwalTestZoom::query()
-                    ->where('id', '!=', $data->id)
-                    ->where('jadwal', $oldJadwal->toDateTimeString())
-                    ->update([
-                        'jadwal' => $newJadwal,
-                        'link_zoom' => $validated['link_zoom'] ?? null,
-                    ]);
-            }
+            JadwalTestZoom::query()
+                ->where('id', '!=', $data->id)
+                ->where('group_key', $oldGroupKey)
+                ->update([
+                    'sesi' => $validated['sesi'],
+                    'group_key' => $newGroupKey,
+                    'jadwal' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_mulai' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_selesai' => $jadwalSelesai->toDateTimeString(),
+                    'link_zoom' => $newLinkZoom,
+                ]);
         });
 
         $freshData = $data->fresh([
@@ -390,38 +418,9 @@ class JadwalTestZoomController extends Controller
 
     public function updateGroup(Request $request, string $groupKey): JsonResponse
     {
-        $this->mergeLinkZoom($request);
+        $this->mergeScheduleInputs($request);
 
-        $oldJadwal = $this->dateTimeFromGroupKey($groupKey);
-
-        if (!$oldJadwal) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Group jadwal tidak valid.',
-            ], 422);
-        }
-
-        $validated = $request->validate([
-            'jadwal' => [
-                'required',
-                'date',
-            ],
-            'link_zoom' => [
-                'nullable',
-                'url',
-                'max:2048',
-            ],
-        ], [
-            'jadwal.required' => 'Jadwal Zoom wajib diisi.',
-            'jadwal.date' => 'Format jadwal Zoom tidak valid.',
-
-            'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
-            'link_zoom.max' => 'Link Zoom terlalu panjang.',
-        ]);
-
-        $rows = JadwalTestZoom::query()
-            ->where('jadwal', $oldJadwal->toDateTimeString())
-            ->get();
+        $rows = $this->rowsByGroupKey($groupKey);
 
         if ($rows->isEmpty()) {
             return response()->json([
@@ -430,22 +429,48 @@ class JadwalTestZoomController extends Controller
             ], 404);
         }
 
-        $newJadwal = Carbon::parse($validated['jadwal'])->toDateTimeString();
+        $validated = $request->validate([
+            'sesi' => ['required', 'string', 'max:100'],
+            'jadwal_mulai' => ['required', 'date'],
+            'jadwal_selesai' => ['required', 'date', 'after:jadwal_mulai'],
+            'link_zoom' => ['nullable', 'url', 'max:2048'],
+        ], $this->validationMessages());
+
+        $jadwalMulai = Carbon::parse($validated['jadwal_mulai']);
+        $jadwalSelesai = Carbon::parse($validated['jadwal_selesai']);
+
+        if ($jadwalMulai->lessThanOrEqualTo(now())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal mulai Zoom tidak boleh menggunakan jam yang sudah lewat.',
+            ], 422);
+        }
+
+        $newGroupKey = $this->makeGroupKey($validated['sesi'], $jadwalMulai, $jadwalSelesai);
         $newLinkZoom = $validated['link_zoom'] ?? null;
 
-        DB::transaction(function () use ($oldJadwal, $newJadwal, $newLinkZoom) {
+        DB::transaction(function () use (
+            $groupKey,
+            $validated,
+            $jadwalMulai,
+            $jadwalSelesai,
+            $newGroupKey,
+            $newLinkZoom
+        ) {
             JadwalTestZoom::query()
-                ->where('jadwal', $oldJadwal->toDateTimeString())
+                ->where('group_key', $groupKey)
                 ->update([
-                    'jadwal' => $newJadwal,
+                    'sesi' => $validated['sesi'],
+                    'group_key' => $newGroupKey,
+                    'jadwal' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_mulai' => $jadwalMulai->toDateTimeString(),
+                    'jadwal_selesai' => $jadwalSelesai->toDateTimeString(),
                     'link_zoom' => $newLinkZoom,
                 ]);
         });
 
-        $newGroupKey = $this->makeGroupKey($newJadwal);
-
         $freshRows = $this->jadwalDetailQuery()
-            ->where('jadwal', $newJadwal)
+            ->where('group_key', $newGroupKey)
             ->get()
             ->sortBy(function ($item) {
                 return strtolower($item->dataRiwayatDiri->nama_lengkap ?? '');
@@ -457,7 +482,9 @@ class JadwalTestZoomController extends Controller
             'message' => 'Group jadwal test Zoom berhasil diperbarui.',
             'data' => $this->formatDetailGroup(
                 $freshRows,
-                Carbon::parse($newJadwal),
+                $jadwalMulai,
+                $jadwalSelesai,
+                $validated['sesi'],
                 $newGroupKey
             ),
         ]);
@@ -484,18 +511,7 @@ class JadwalTestZoomController extends Controller
 
     public function destroyGroup(string $groupKey): JsonResponse
     {
-        $jadwal = $this->dateTimeFromGroupKey($groupKey);
-
-        if (!$jadwal) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Group jadwal tidak valid.',
-            ], 422);
-        }
-
-        $rows = JadwalTestZoom::query()
-            ->where('jadwal', $jadwal->toDateTimeString())
-            ->get();
+        $rows = $this->rowsByGroupKey($groupKey);
 
         if ($rows->isEmpty()) {
             return response()->json([
@@ -505,9 +521,9 @@ class JadwalTestZoomController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($jadwal) {
+            DB::transaction(function () use ($groupKey) {
                 JadwalTestZoom::query()
-                    ->where('jadwal', $jadwal->toDateTimeString())
+                    ->where('group_key', $groupKey)
                     ->delete();
             });
 
@@ -533,7 +549,28 @@ class JadwalTestZoomController extends Controller
             ]);
     }
 
-    private function formatDetailGroup($rows, ?Carbon $jadwal, string $groupKey): array
+    private function rowsByGroupKey(string $groupKey)
+    {
+        $rows = $this->jadwalDetailQuery()
+            ->where('group_key', $groupKey)
+            ->get();
+
+        if ($rows->isNotEmpty()) {
+            return $rows;
+        }
+
+        $jadwal = $this->dateTimeFromOldGroupKey($groupKey);
+
+        if (!$jadwal) {
+            return collect();
+        }
+
+        return $this->jadwalDetailQuery()
+            ->where('jadwal', $jadwal->toDateTimeString())
+            ->get();
+    }
+
+    private function formatDetailGroup($rows, ?Carbon $jadwalMulai, ?Carbon $jadwalSelesai, string $sesi, string $groupKey): array
     {
         $first = $rows->first();
 
@@ -541,22 +578,21 @@ class JadwalTestZoomController extends Controller
             'id' => $groupKey,
             'group_key' => $groupKey,
 
-            'tanggal_test' => $jadwal?->toDateString(),
-            'tanggal_test_label' => $jadwal
-                ? $jadwal->translatedFormat('d F Y')
+            'sesi' => $sesi,
+            'sesi_label' => $sesi,
+
+            'tanggal_test' => $jadwalMulai?->toDateString(),
+            'tanggal_test_label' => $jadwalMulai
+                ? $jadwalMulai->translatedFormat('d F Y')
                 : '-',
 
-            'jam_test' => $jadwal
-                ? $jadwal->format('H:i')
-                : '-',
+            'jam_test' => $this->formatJamRange($jadwalMulai, $jadwalSelesai),
 
-            'jadwal' => $jadwal
-                ? $jadwal->toDateTimeString()
-                : null,
+            'jadwal' => $jadwalMulai?->toDateTimeString(),
+            'jadwal_mulai' => $jadwalMulai?->toDateTimeString(),
+            'jadwal_selesai' => $jadwalSelesai?->toDateTimeString(),
 
-            'jadwal_label' => $jadwal
-                ? $jadwal->translatedFormat('d F Y H:i')
-                : '-',
+            'jadwal_label' => $this->formatJadwalLabel($jadwalMulai, $jadwalSelesai, $sesi),
 
             'link_zoom' => $first?->link_zoom,
             'link_zoom_label' => $first?->link_zoom ?: '-',
@@ -584,17 +620,24 @@ class JadwalTestZoomController extends Controller
 
     private function formatJadwalItem(JadwalTestZoom $item): array
     {
-        $jadwal = $this->parseDateTime($item->jadwal);
+        $jadwalMulai = $this->getJadwalMulai($item);
+        $jadwalSelesai = $this->getJadwalSelesai($item);
+        $sesi = $this->getSesi($item);
         $kehadiran = $this->normalizeKehadiran($item->kehadiran ?? null);
 
         return [
             'id' => $item->id,
             'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
 
-            'jadwal' => $jadwal?->toDateTimeString(),
-            'jadwal_label' => $jadwal
-                ? $jadwal->translatedFormat('d F Y H:i')
-                : '-',
+            'sesi' => $sesi,
+            'sesi_label' => $sesi,
+
+            'jadwal' => $jadwalMulai?->toDateTimeString(),
+            'jadwal_mulai' => $jadwalMulai?->toDateTimeString(),
+            'jadwal_selesai' => $jadwalSelesai?->toDateTimeString(),
+
+            'jadwal_label' => $this->formatJadwalLabel($jadwalMulai, $jadwalSelesai, $sesi),
+            'jam_test' => $this->formatJamRange($jadwalMulai, $jadwalSelesai),
 
             'link_zoom' => $item->link_zoom,
             'link_zoom_label' => $item->link_zoom ?: '-',
@@ -606,18 +649,132 @@ class JadwalTestZoomController extends Controller
         ];
     }
 
-    private function makeGroupKey($value): string
+    private function mergeScheduleInputs(Request $request): void
     {
-        $date = $this->parseDateTime($value);
+        $linkZoom = $request->input('link_zoom')
+            ?: $request->input('url_link')
+            ?: $request->input('link_url')
+            ?: $request->input('zoom_link')
+            ?: null;
 
-        if (!$date) {
-            return 'jadwal_tidak_valid';
-        }
+        $jadwalMulai = $request->input('jadwal_mulai')
+            ?: $request->input('jadwal')
+            ?: null;
 
-        return $date->format('Y-m-d_H-i-s');
+        $jadwalSelesai = $request->input('jadwal_selesai')
+            ?: $request->input('jadwal_akhir')
+            ?: null;
+
+        $sesi = $request->input('sesi')
+            ?: $request->input('nama_sesi')
+            ?: 'Sesi 1';
+
+        $request->merge([
+            'link_zoom' => $linkZoom ? trim($linkZoom) : null,
+            'sesi' => trim((string) $sesi),
+            'jadwal_mulai' => $jadwalMulai,
+            'jadwal_selesai' => $jadwalSelesai,
+            'jadwal' => $jadwalMulai,
+        ]);
     }
 
-    private function dateTimeFromGroupKey(string $groupKey): ?Carbon
+    private function validationMessages(): array
+    {
+        return [
+            'tanggal_skrining.required' => 'Tanggal skrining wajib dipilih.',
+            'tanggal_skrining.date' => 'Format tanggal skrining tidak valid.',
+
+            'data_riwayat_diri_ids.required' => 'Minimal satu pelamar wajib dipilih.',
+            'data_riwayat_diri_ids.array' => 'Format data pelamar tidak valid.',
+            'data_riwayat_diri_ids.min' => 'Minimal satu pelamar wajib dipilih.',
+            'data_riwayat_diri_ids.*.required' => 'Data pelamar tidak valid.',
+            'data_riwayat_diri_ids.*.uuid' => 'Data pelamar tidak valid.',
+            'data_riwayat_diri_ids.*.exists' => 'Data pelamar tidak ditemukan.',
+
+            'data_riwayat_diri_id.required' => 'Pelamar wajib dipilih.',
+            'data_riwayat_diri_id.uuid' => 'Data pelamar tidak valid.',
+            'data_riwayat_diri_id.exists' => 'Pelamar tidak ditemukan.',
+
+            'sesi.required' => 'Sesi jadwal wajib diisi.',
+            'sesi.max' => 'Sesi jadwal maksimal 100 karakter.',
+
+            'jadwal_mulai.required' => 'Jadwal mulai Zoom wajib diisi.',
+            'jadwal_mulai.date' => 'Format jadwal mulai Zoom tidak valid.',
+
+            'jadwal_selesai.required' => 'Jadwal akhir Zoom wajib diisi.',
+            'jadwal_selesai.date' => 'Format jadwal akhir Zoom tidak valid.',
+            'jadwal_selesai.after' => 'Jadwal akhir Zoom harus lebih besar dari jadwal mulai.',
+
+            'link_zoom.url' => 'Format Link Zoom tidak valid. Gunakan URL lengkap, contoh: https://zoom.us/j/xxxx.',
+            'link_zoom.max' => 'Link Zoom terlalu panjang.',
+        ];
+    }
+
+    private function makeGroupKeyFromItem($item): string
+    {
+        if (!empty($item?->group_key)) {
+            return (string) $item->group_key;
+        }
+
+        return $this->makeGroupKey(
+            $this->getSesi($item),
+            $this->getJadwalMulai($item),
+            $this->getJadwalSelesai($item)
+        );
+    }
+
+    private function makeGroupKey(string $sesi, ?Carbon $jadwalMulai, ?Carbon $jadwalSelesai): string
+    {
+        $mulai = $jadwalMulai?->format('YmdHis') ?: 'mulai';
+        $selesai = $jadwalSelesai?->format('YmdHis') ?: 'selesai';
+        $sesiKey = substr(md5(strtolower(trim($sesi))), 0, 10);
+
+        return "{$mulai}_{$selesai}_{$sesiKey}";
+    }
+
+    private function getSesi($item): string
+    {
+        $sesi = trim((string) ($item?->sesi ?? ''));
+
+        return $sesi !== '' ? $sesi : 'Sesi 1';
+    }
+
+    private function getJadwalMulai($item): ?Carbon
+    {
+        return $this->parseDateTime($item?->jadwal_mulai ?? $item?->jadwal ?? null);
+    }
+
+    private function getJadwalSelesai($item): ?Carbon
+    {
+        $mulai = $this->getJadwalMulai($item);
+        $selesai = $this->parseDateTime($item?->jadwal_selesai ?? null);
+
+        return $selesai ?: $mulai;
+    }
+
+    private function formatJamRange(?Carbon $mulai, ?Carbon $selesai): string
+    {
+        if (!$mulai) {
+            return '-';
+        }
+
+        if (!$selesai || $selesai->equalTo($mulai)) {
+            return $mulai->format('H:i');
+        }
+
+        return $mulai->format('H:i') . ' - ' . $selesai->format('H:i');
+    }
+
+    private function formatJadwalLabel(?Carbon $mulai, ?Carbon $selesai, string $sesi): string
+    {
+        if (!$mulai) {
+            return '-';
+        }
+
+        return trim($sesi) . ' • ' . $mulai->translatedFormat('d F Y') . ' • ' . $this->formatJamRange($mulai, $selesai);
+    }
+
+    private function dateTimeFromOldGroupKey(string $groupKey): ?Carbon
     {
         $normalized = str_replace('_', ' ', $groupKey);
 
@@ -658,19 +815,6 @@ class JadwalTestZoomController extends Controller
         } catch (\Throwable $e) {
             return null;
         }
-    }
-
-    private function mergeLinkZoom(Request $request): void
-    {
-        $linkZoom = $request->input('link_zoom')
-            ?: $request->input('url_link')
-            ?: $request->input('link_url')
-            ?: $request->input('zoom_link')
-            ?: null;
-
-        $request->merge([
-            'link_zoom' => $linkZoom ? trim($linkZoom) : null,
-        ]);
     }
 
     private function normalizeKehadiran($value): ?string

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\RangkaianInterview;
 
 use App\Http\Controllers\Controller;
+use App\Models\HasilReviewManagement;
 use App\Models\JadwalInterview;
 use App\Models\JadwalInterviewKandidat;
 use Illuminate\Http\Request;
@@ -33,6 +34,11 @@ class InterviewKandidatController extends Controller
         'Dipertimbangkan',
     ];
 
+    private array $hasilInterviewMasukReviewManagement = [
+        'Lolos Interview',
+        'Dipertimbangkan',
+    ];
+
     public function list(Request $request)
     {
         $validated = $request->validate([
@@ -45,11 +51,12 @@ class InterviewKandidatController extends Controller
 
         $rows = JadwalInterviewKandidat::query()
             ->with([
-                'jadwalInterview:id,judul_interview,jadwal_interview',
+                'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar',
             ])
             ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
                 $query
+                    ->whereNull('deleted_at')
                     ->whereDate('jadwal_interview', '>=', $tanggalMulai)
                     ->whereDate('jadwal_interview', '<=', $tanggalSelesai);
             })
@@ -91,10 +98,13 @@ class InterviewKandidatController extends Controller
     {
         $items = JadwalInterviewKandidat::query()
             ->with([
-                'jadwalInterview:id,judul_interview,jadwal_interview',
+                'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar',
             ])
             ->where('jadwal_interview_id', $jadwalInterviewId)
+            ->whereHas('jadwalInterview', function ($query) {
+                $query->whereNull('deleted_at');
+            })
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -131,6 +141,7 @@ class InterviewKandidatController extends Controller
 
         $data = JadwalInterview::query()
             ->select('id', 'judul_interview', 'jadwal_interview')
+            ->whereNull('deleted_at')
             ->where(function ($query) use ($includeJadwalInterviewId) {
                 $query->where('jadwal_interview', '>=', now());
 
@@ -152,17 +163,23 @@ class InterviewKandidatController extends Controller
     {
         $includeJadwalInterviewId = $request->query('include_jadwal_interview_id');
 
-        $data = DB::table('data_riwayat_diri')
+        $query = DB::table('data_riwayat_diri')
             ->join(
                 'daftar_hadir_test_mmpi',
                 'daftar_hadir_test_mmpi.data_riwayat_diri_id',
                 '=',
                 'data_riwayat_diri.id'
             )
-            ->whereRaw('LOWER(daftar_hadir_test_mmpi.hasil_test) = ?', ['lolos'])
-            ->whereNotExists(function ($query) use ($includeJadwalInterviewId) {
-                $query->select(DB::raw(1))
+            ->whereNull('daftar_hadir_test_mmpi.deleted_at')
+            ->whereRaw("LOWER(TRIM(COALESCE(daftar_hadir_test_mmpi.hasil_test, ''))) = ?", ['lolos'])
+            ->whereNotExists(function ($subQuery) use ($includeJadwalInterviewId) {
+                $subQuery->select(DB::raw(1))
                     ->from('jadwal_interview_kandidat as jik')
+                    ->join('jadwal_interview as ji', function ($join) {
+                        $join
+                            ->on('ji.id', '=', 'jik.jadwal_interview_id')
+                            ->whereNull('ji.deleted_at');
+                    })
                     ->whereColumn('jik.data_riwayat_diri_id', 'data_riwayat_diri.id')
                     ->where(function ($statusQuery) {
                         $statusQuery
@@ -171,9 +188,15 @@ class InterviewKandidatController extends Controller
                     });
 
                 if (!empty($includeJadwalInterviewId)) {
-                    $query->where('jik.jadwal_interview_id', '!=', $includeJadwalInterviewId);
+                    $subQuery->where('jik.jadwal_interview_id', '!=', $includeJadwalInterviewId);
                 }
-            })
+            });
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('data_riwayat_diri.deleted_at');
+        }
+
+        $data = $query
             ->select([
                 'data_riwayat_diri.id',
                 'data_riwayat_diri.nama_lengkap',
@@ -188,6 +211,7 @@ class InterviewKandidatController extends Controller
             ->get()
             ->map(function ($item) {
                 $item->posisi_dilamar = $this->getNamaPosisi($item->posisi_yang_dilamar ?? null);
+
                 return $item;
             });
 
@@ -201,7 +225,13 @@ class InterviewKandidatController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'jadwal_interview_id' => ['required', 'uuid', 'exists:jadwal_interview,id'],
+            'jadwal_interview_id' => [
+                'required',
+                'uuid',
+                Rule::exists('jadwal_interview', 'id')->where(function ($query) {
+                    $query->whereNull('deleted_at');
+                }),
+            ],
             'kandidat_ids' => ['required', 'array', 'min:1'],
             'kandidat_ids.*' => ['required', 'uuid', 'exists:data_riwayat_diri,id'],
         ]);
@@ -250,21 +280,46 @@ class InterviewKandidatController extends Controller
     public function update(Request $request, string $jadwalInterviewId)
     {
         $validated = $request->validate([
-            'jadwal_interview_id' => ['required', 'uuid', 'exists:jadwal_interview,id'],
+            'jadwal_interview_id' => [
+                'required',
+                'uuid',
+                Rule::exists('jadwal_interview', 'id')->where(function ($query) {
+                    $query->whereNull('deleted_at');
+                }),
+            ],
             'kandidat_ids' => ['required', 'array', 'min:1'],
             'kandidat_ids.*' => ['required', 'uuid', 'exists:data_riwayat_diri,id'],
         ]);
+
+        if ((string) $validated['jadwal_interview_id'] !== (string) $jadwalInterviewId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal interview tidak sesuai.',
+            ], 422);
+        }
+
+        $this->validateJadwalInterviewBelumLewat($jadwalInterviewId);
 
         $kandidatIds = collect($validated['kandidat_ids'])->unique()->values();
 
         $this->validateKandidatLolosMmpi($kandidatIds->all());
         $this->validateKandidatBelumPunyaJadwalAktif($kandidatIds->all(), $jadwalInterviewId);
 
-        DB::transaction(function () use ($jadwalInterviewId, $validated, $kandidatIds) {
-            JadwalInterviewKandidat::query()
+        DB::transaction(function () use ($jadwalInterviewId, $kandidatIds) {
+            $deletedIds = JadwalInterviewKandidat::query()
                 ->where('jadwal_interview_id', $jadwalInterviewId)
                 ->whereNotIn('data_riwayat_diri_id', $kandidatIds)
-                ->delete();
+                ->pluck('id');
+
+            if ($deletedIds->isNotEmpty()) {
+                HasilReviewManagement::query()
+                    ->whereIn('hasil_interview_id', $deletedIds)
+                    ->delete();
+
+                JadwalInterviewKandidat::query()
+                    ->whereIn('id', $deletedIds)
+                    ->delete();
+            }
 
             $existingKandidatIds = JadwalInterviewKandidat::query()
                 ->where('jadwal_interview_id', $jadwalInterviewId)
@@ -273,10 +328,10 @@ class InterviewKandidatController extends Controller
             $newKandidatIds = $kandidatIds->diff($existingKandidatIds)->values();
 
             if ($newKandidatIds->isNotEmpty()) {
-                $rows = $newKandidatIds->map(function ($kandidatId) use ($validated) {
+                $rows = $newKandidatIds->map(function ($kandidatId) use ($jadwalInterviewId) {
                     return [
                         'id' => (string) Str::uuid(),
-                        'jadwal_interview_id' => $validated['jadwal_interview_id'],
+                        'jadwal_interview_id' => $jadwalInterviewId,
                         'data_riwayat_diri_id' => $kandidatId,
                         'status_kehadiran' => null,
                         'hasil_interview' => null,
@@ -302,7 +357,9 @@ class InterviewKandidatController extends Controller
             'jadwal_interview' => ['required', 'date'],
         ]);
 
-        $jadwal = JadwalInterview::query()->findOrFail($jadwalInterviewId);
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->findOrFail($jadwalInterviewId);
 
         $jadwal->update([
             'jadwal_interview' => $validated['jadwal_interview'],
@@ -325,25 +382,40 @@ class InterviewKandidatController extends Controller
         $row = JadwalInterviewKandidat::query()
             ->where('jadwal_interview_id', $jadwalInterviewId)
             ->where('id', $pivotId)
+            ->whereHas('jadwalInterview', function ($query) {
+                $query->whereNull('deleted_at');
+            })
             ->firstOrFail();
 
-        $payload = [];
+        DB::transaction(function () use ($request, $validated, $row) {
+            $payload = [];
 
-        if ($request->has('status_kehadiran')) {
-            $payload['status_kehadiran'] = $validated['status_kehadiran'] ?? null;
-        }
+            if ($request->has('status_kehadiran')) {
+                $payload['status_kehadiran'] = $validated['status_kehadiran'] ?? null;
 
-        if ($request->has('hasil_interview')) {
-            $payload['hasil_interview'] = $validated['hasil_interview'] ?? null;
-        }
+                if (
+                    empty($validated['status_kehadiran']) ||
+                    $validated['status_kehadiran'] === 'Reschedule'
+                ) {
+                    $payload['hasil_interview'] = null;
+                }
+            }
 
-        if ($request->has('catatan')) {
-            $payload['catatan'] = $validated['catatan'] ?? null;
-        }
+            if ($request->has('hasil_interview')) {
+                $payload['hasil_interview'] = $validated['hasil_interview'] ?? null;
+            }
 
-        if (!empty($payload)) {
-            $row->update($payload);
-        }
+            if ($request->has('catatan')) {
+                $payload['catatan'] = $validated['catatan'] ?? null;
+            }
+
+            if (!empty($payload)) {
+                $row->update($payload);
+                $row->refresh();
+            }
+
+            $this->syncHasilReviewManagement($row);
+        });
 
         return response()->json([
             'success' => true,
@@ -353,9 +425,21 @@ class InterviewKandidatController extends Controller
 
     public function destroy(string $jadwalInterviewId)
     {
-        JadwalInterviewKandidat::query()
-            ->where('jadwal_interview_id', $jadwalInterviewId)
-            ->delete();
+        DB::transaction(function () use ($jadwalInterviewId) {
+            $pivotIds = JadwalInterviewKandidat::query()
+                ->where('jadwal_interview_id', $jadwalInterviewId)
+                ->pluck('id');
+
+            if ($pivotIds->isNotEmpty()) {
+                HasilReviewManagement::query()
+                    ->whereIn('hasil_interview_id', $pivotIds)
+                    ->delete();
+
+                JadwalInterviewKandidat::query()
+                    ->whereIn('id', $pivotIds)
+                    ->delete();
+            }
+        });
 
         return response()->json([
             'success' => true,
@@ -365,10 +449,18 @@ class InterviewKandidatController extends Controller
 
     public function destroyKandidat(string $jadwalInterviewId, string $pivotId)
     {
-        JadwalInterviewKandidat::query()
-            ->where('jadwal_interview_id', $jadwalInterviewId)
-            ->where('id', $pivotId)
-            ->delete();
+        DB::transaction(function () use ($jadwalInterviewId, $pivotId) {
+            $row = JadwalInterviewKandidat::query()
+                ->where('jadwal_interview_id', $jadwalInterviewId)
+                ->where('id', $pivotId)
+                ->firstOrFail();
+
+            HasilReviewManagement::query()
+                ->where('hasil_interview_id', $row->id)
+                ->delete();
+
+            $row->delete();
+        });
 
         return response()->json([
             'success' => true,
@@ -376,17 +468,41 @@ class InterviewKandidatController extends Controller
         ]);
     }
 
+    private function syncHasilReviewManagement(JadwalInterviewKandidat $row): void
+    {
+        $hasilInterview = trim((string) $row->hasil_interview);
+
+        if (in_array($hasilInterview, $this->hasilInterviewMasukReviewManagement, true)) {
+            HasilReviewManagement::query()->updateOrCreate(
+                [
+                    'hasil_interview_id' => $row->id,
+                ],
+                [
+                    'review_management' => null,
+                    'status' => null,
+                ]
+            );
+
+            return;
+        }
+
+        HasilReviewManagement::query()
+            ->where('hasil_interview_id', $row->id)
+            ->delete();
+    }
+
     private function validateJadwalInterviewBelumLewat(string $jadwalInterviewId): void
     {
         $jadwal = JadwalInterview::query()
             ->select('id', 'jadwal_interview')
+            ->whereNull('deleted_at')
             ->where('id', $jadwalInterviewId)
             ->first();
 
         if (!$jadwal) {
             abort(response()->json([
                 'success' => false,
-                'message' => 'Jadwal interview tidak ditemukan.',
+                'message' => 'Jadwal interview tidak ditemukan atau sudah dihapus.',
             ], 404));
         }
 
@@ -411,6 +527,9 @@ class InterviewKandidatController extends Controller
     {
         $query = JadwalInterviewKandidat::query()
             ->whereIn('data_riwayat_diri_id', $kandidatIds)
+            ->whereHas('jadwalInterview', function ($jadwalQuery) {
+                $jadwalQuery->whereNull('deleted_at');
+            })
             ->where(function ($statusQuery) {
                 $statusQuery
                     ->whereNull('status_kehadiran')
@@ -421,9 +540,7 @@ class InterviewKandidatController extends Controller
             $query->where('jadwal_interview_id', '!=', $excludeJadwalInterviewId);
         }
 
-        $exists = $query->exists();
-
-        if ($exists) {
+        if ($query->exists()) {
             abort(response()->json([
                 'success' => false,
                 'message' => 'Ada kandidat yang masih memiliki jadwal interview aktif. Kandidat hanya bisa ditambahkan ulang jika statusnya Reschedule.',
@@ -440,8 +557,9 @@ class InterviewKandidatController extends Controller
                 '=',
                 'data_riwayat_diri.id'
             )
+            ->whereNull('daftar_hadir_test_mmpi.deleted_at')
             ->whereIn('data_riwayat_diri.id', $kandidatIds)
-            ->whereRaw('LOWER(daftar_hadir_test_mmpi.hasil_test) = ?', ['lolos'])
+            ->whereRaw("LOWER(TRIM(COALESCE(daftar_hadir_test_mmpi.hasil_test, ''))) = ?", ['lolos'])
             ->pluck('data_riwayat_diri.id')
             ->unique()
             ->values();

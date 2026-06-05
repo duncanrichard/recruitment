@@ -35,11 +35,11 @@ class MmpiController extends Controller
                 $join->on('dh.id', '=', 'jtm.daftar_hadir_test_zoom_id')
                     ->whereNull('dh.deleted_at');
             })
-            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtm.data_riwayat_diri_id')
-            ->leftJoin('jadwal_test_zoom as jtz', function ($join) {
+            ->join('jadwal_test_zoom as jtz', function ($join) {
                 $join->on('jtz.id', '=', 'dh.jadwal_test_zoom_id')
                     ->whereNull('jtz.deleted_at');
             })
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtm.data_riwayat_diri_id')
             ->whereNull('jtm.deleted_at');
 
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
@@ -61,9 +61,15 @@ class MmpiController extends Controller
                 'jtm.data_riwayat_diri_id',
                 'jtm.tanggal',
                 'jtm.created_at',
+
                 'dh.status_kehadiran',
                 'dh.hasil_test',
+
+                'jtz.id as jadwal_test_zoom_id',
                 'jtz.jadwal as jadwal_zoom',
+                'jtz.jadwal_mulai as jadwal_zoom_mulai',
+                'jtz.jadwal_selesai as jadwal_zoom_selesai',
+
                 DB::raw($pelamarColumns['nama'] . ' as nama'),
                 DB::raw($pelamarColumns['email'] . ' as email'),
                 DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
@@ -75,11 +81,28 @@ class MmpiController extends Controller
                 return [
                     'id' => $item->id,
                     'daftar_hadir_test_zoom_id' => $item->daftar_hadir_test_zoom_id,
+                    'jadwal_test_zoom_id' => $item->jadwal_test_zoom_id,
                     'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
-                    'tanggal' => $item->tanggal ? Carbon::parse($item->tanggal)->format('Y-m-d') : null,
-                    'jadwal_zoom' => $item->jadwal_zoom ? Carbon::parse($item->jadwal_zoom)->format('Y-m-d H:i:s') : null,
+
+                    'tanggal' => $item->tanggal
+                        ? Carbon::parse($item->tanggal)->format('Y-m-d')
+                        : null,
+
+                    'jadwal_zoom' => $item->jadwal_zoom
+                        ? Carbon::parse($item->jadwal_zoom)->format('Y-m-d H:i:s')
+                        : null,
+
+                    'jadwal_zoom_mulai' => $item->jadwal_zoom_mulai
+                        ? Carbon::parse($item->jadwal_zoom_mulai)->format('Y-m-d H:i:s')
+                        : null,
+
+                    'jadwal_zoom_selesai' => $item->jadwal_zoom_selesai
+                        ? Carbon::parse($item->jadwal_zoom_selesai)->format('Y-m-d H:i:s')
+                        : null,
+
                     'status_kehadiran' => $this->normalizeKehadiranValue($item->status_kehadiran),
                     'hasil_test' => $this->normalizeHasilTestValue($item->hasil_test),
+
                     'nama' => $item->nama ?: '-',
                     'email' => $item->email ?: '-',
                     'no_hp' => $item->no_hp ?: '-',
@@ -97,44 +120,39 @@ class MmpiController extends Controller
     {
         $pelamarColumns = $this->getPelamarColumns();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Kandidat untuk modal MMPI
-        |--------------------------------------------------------------------------
-        | Syarat kandidat tampil:
-        | 1. Hadir pada test Zoom.
-        | 2. Hasil test Zoom = lolos.
-        | 3. Belum pernah memiliki record jadwal_test_mmpi.
-        |
-        | Catatan:
-        | Tidak memakai whereNull(jtm.deleted_at) karena kandidat yang sudah pernah
-        | dibuatkan jadwal MMPI, walaupun soft deleted, tetap tidak ditampilkan
-        | kembali di modal sesuai kebutuhan: "jika sudah mendapatkan test mmpi
-        | tidak muncul di modal".
-        */
-        $items = DB::table('daftar_hadir_test_zoom as dh')
-            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dh.data_riwayat_diri_id')
-            ->leftJoin('jadwal_test_zoom as jtz', function ($join) {
+        $query = DB::table('daftar_hadir_test_zoom as dh')
+            ->join('jadwal_test_zoom as jtz', function ($join) {
                 $join->on('jtz.id', '=', 'dh.jadwal_test_zoom_id')
                     ->whereNull('jtz.deleted_at');
             })
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dh.data_riwayat_diri_id')
             ->whereNull('dh.deleted_at')
             ->whereRaw("LOWER(TRIM(COALESCE(dh.status_kehadiran, ''))) = 'hadir'")
             ->whereRaw("LOWER(TRIM(COALESCE(dh.hasil_test, ''))) = 'lolos'")
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('jadwal_test_mmpi as jtm')
-                    ->whereColumn('jtm.daftar_hadir_test_zoom_id', 'dh.id');
-            })
-            ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
-                $query->whereNull('drd.deleted_at');
-            })
+                    ->whereColumn('jtm.daftar_hadir_test_zoom_id', 'dh.id')
+                    ->whereNull('jtm.deleted_at');
+            });
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        $items = $query
             ->select([
                 'dh.id as daftar_hadir_test_zoom_id',
                 'dh.data_riwayat_diri_id',
+                'dh.tanggal_kehadiran',
                 'dh.status_kehadiran',
                 'dh.hasil_test',
+
+                'jtz.id as jadwal_test_zoom_id',
                 'jtz.jadwal as jadwal_zoom',
+                'jtz.jadwal_mulai as jadwal_zoom_mulai',
+                'jtz.jadwal_selesai as jadwal_zoom_selesai',
+
                 DB::raw($pelamarColumns['nama'] . ' as nama'),
                 DB::raw($pelamarColumns['email'] . ' as email'),
                 DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
@@ -143,11 +161,27 @@ class MmpiController extends Controller
             ->get()
             ->map(function ($item) {
                 return [
+                    'id' => $item->daftar_hadir_test_zoom_id,
                     'daftar_hadir_test_zoom_id' => $item->daftar_hadir_test_zoom_id,
+                    'jadwal_test_zoom_id' => $item->jadwal_test_zoom_id,
                     'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
+
+                    'tanggal_kehadiran' => $item->tanggal_kehadiran,
                     'status_kehadiran' => $this->normalizeKehadiranValue($item->status_kehadiran),
                     'hasil_test' => $this->normalizeHasilTestValue($item->hasil_test),
-                    'jadwal_zoom' => $item->jadwal_zoom ? Carbon::parse($item->jadwal_zoom)->format('Y-m-d H:i:s') : null,
+
+                    'jadwal_zoom' => $item->jadwal_zoom
+                        ? Carbon::parse($item->jadwal_zoom)->format('Y-m-d H:i:s')
+                        : null,
+
+                    'jadwal_zoom_mulai' => $item->jadwal_zoom_mulai
+                        ? Carbon::parse($item->jadwal_zoom_mulai)->format('Y-m-d H:i:s')
+                        : null,
+
+                    'jadwal_zoom_selesai' => $item->jadwal_zoom_selesai
+                        ? Carbon::parse($item->jadwal_zoom_selesai)->format('Y-m-d H:i:s')
+                        : null,
+
                     'nama' => $item->nama ?: '-',
                     'email' => $item->email ?: '-',
                     'no_hp' => $item->no_hp ?: '-',
@@ -165,13 +199,16 @@ class MmpiController extends Controller
     {
         $validated = $request->validate([
             'tanggal' => ['required', 'date'],
+
             'items' => ['required', 'array', 'min:1'],
+
             'items.*.daftar_hadir_test_zoom_id' => [
                 'required',
                 'uuid',
                 Rule::exists('daftar_hadir_test_zoom', 'id')
                     ->where(fn ($query) => $query->whereNull('deleted_at')),
             ],
+
             'items.*.data_riwayat_diri_id' => [
                 'required',
                 'uuid',
@@ -179,13 +216,23 @@ class MmpiController extends Controller
             ],
         ], [
             'tanggal.required' => 'Tanggal test MMPI wajib diisi.',
+            'tanggal.date' => 'Format tanggal test MMPI tidak valid.',
+
             'items.required' => 'Pilih minimal satu kandidat.',
+            'items.array' => 'Format data kandidat tidak valid.',
             'items.min' => 'Pilih minimal satu kandidat.',
+
             'items.*.daftar_hadir_test_zoom_id.required' => 'Data daftar hadir Zoom wajib diisi.',
+            'items.*.daftar_hadir_test_zoom_id.uuid' => 'Data daftar hadir Zoom tidak valid.',
+            'items.*.daftar_hadir_test_zoom_id.exists' => 'Data daftar hadir Zoom tidak ditemukan atau sudah dihapus.',
+
             'items.*.data_riwayat_diri_id.required' => 'Data kandidat wajib diisi.',
+            'items.*.data_riwayat_diri_id.uuid' => 'Data kandidat tidak valid.',
+            'items.*.data_riwayat_diri_id.exists' => 'Data kandidat tidak ditemukan.',
         ]);
 
         $tanggal = Carbon::parse($validated['tanggal'])->toDateString();
+
         $items = collect($validated['items'])
             ->unique('daftar_hadir_test_zoom_id')
             ->values();
@@ -195,15 +242,26 @@ class MmpiController extends Controller
 
         DB::transaction(function () use ($items, $tanggal, &$created, &$skipped) {
             foreach ($items as $item) {
-                $daftarHadir = DB::table('daftar_hadir_test_zoom')
-                    ->where('id', $item['daftar_hadir_test_zoom_id'])
-                    ->whereNull('deleted_at')
+                $daftarHadir = DB::table('daftar_hadir_test_zoom as dh')
+                    ->join('jadwal_test_zoom as jtz', function ($join) {
+                        $join->on('jtz.id', '=', 'dh.jadwal_test_zoom_id')
+                            ->whereNull('jtz.deleted_at');
+                    })
+                    ->where('dh.id', $item['daftar_hadir_test_zoom_id'])
+                    ->whereNull('dh.deleted_at')
+                    ->select([
+                        'dh.id',
+                        'dh.data_riwayat_diri_id',
+                        'dh.status_kehadiran',
+                        'dh.hasil_test',
+                        'dh.jadwal_test_zoom_id',
+                    ])
                     ->first();
 
                 if (!$daftarHadir) {
                     $skipped[] = [
                         'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
-                        'reason' => 'Data daftar hadir Zoom tidak ditemukan.',
+                        'reason' => 'Data daftar hadir Zoom atau jadwal Zoom sudah dihapus.',
                     ];
                     continue;
                 }
@@ -227,15 +285,9 @@ class MmpiController extends Controller
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Jangan buat ulang jika sudah pernah mendapat jadwal MMPI
-                |--------------------------------------------------------------------------
-                | Mengecek dengan withTrashed agar record soft delete tetap dianggap
-                | sudah pernah dijadwalkan dan tidak dibuat ulang.
-                */
-                $exists = JadwalTestMmpi::withTrashed()
+                $exists = JadwalTestMmpi::query()
                     ->where('daftar_hadir_test_zoom_id', $item['daftar_hadir_test_zoom_id'])
+                    ->whereNull('deleted_at')
                     ->exists();
 
                 if ($exists) {
@@ -248,8 +300,8 @@ class MmpiController extends Controller
 
                 $created[] = JadwalTestMmpi::query()->create([
                     'id' => (string) Str::uuid(),
-                    'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
-                    'data_riwayat_diri_id' => $item['data_riwayat_diri_id'],
+                    'daftar_hadir_test_zoom_id' => $daftarHadir->id,
+                    'data_riwayat_diri_id' => $daftarHadir->data_riwayat_diri_id,
                     'tanggal' => $tanggal,
                 ]);
             }
@@ -259,7 +311,7 @@ class MmpiController extends Controller
             'success' => count($created) > 0,
             'message' => count($created) > 0
                 ? count($created) . ' jadwal test MMPI berhasil dibuat.'
-                : 'Tidak ada jadwal test MMPI yang dibuat. Kandidat yang dipilih mungkin sudah mendapatkan jadwal MMPI.',
+                : 'Tidak ada jadwal test MMPI yang dibuat. Kandidat mungkin sudah mendapatkan jadwal MMPI atau data Zoom sudah dihapus.',
             'created_count' => count($created),
             'skipped_count' => count($skipped),
             'skipped' => $skipped,
@@ -269,11 +321,24 @@ class MmpiController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $jadwal = JadwalTestMmpi::query()->findOrFail($id);
-        $jadwal->delete();
+
+        DB::transaction(function () use ($jadwal) {
+            if (Schema::hasTable('daftar_hadir_test_mmpi')) {
+                DB::table('daftar_hadir_test_mmpi')
+                    ->where('jadwal_test_mmpi_id', $jadwal->id)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'deleted_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            $jadwal->delete();
+        });
 
         return response()->json([
             'success' => true,
-            'message' => 'Jadwal test MMPI berhasil dihapus. Kandidat tidak akan muncul lagi di modal karena sudah pernah mendapatkan jadwal MMPI.',
+            'message' => 'Jadwal test MMPI berhasil dihapus.',
         ]);
     }
 
@@ -345,11 +410,11 @@ class MmpiController extends Controller
         $normalized = strtolower(trim((string) $value));
         $normalized = str_replace([' ', '-'], '_', $normalized);
 
-        if (in_array($normalized, ['lolos', '1', 'true', 'ya', 'yes'], true)) {
+        if (in_array($normalized, ['lolos', 'lulus', 'passed', 'pass', '1', 'true', 'ya', 'yes'], true)) {
             return 'lolos';
         }
 
-        if (in_array($normalized, ['gagal', '0', 'false', 'tidak', 'no'], true)) {
+        if (in_array($normalized, ['gagal', 'tidak_lolos', 'tidaklolos', 'tidak', 'failed', 'fail', '0', 'false', 'no'], true)) {
             return 'gagal';
         }
 

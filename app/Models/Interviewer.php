@@ -20,6 +20,7 @@ class Interviewer extends Model
 
     protected $fillable = [
         'nama',
+        'no_wa',
         'jabatan_id',
         'divisi_id',
     ];

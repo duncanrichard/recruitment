@@ -33,7 +33,7 @@ export default function ReviewManagementPage() {
     const [form, setForm] = useState({
         hasil_interview_id: "",
         review_management: "",
-        status: "Diterima",
+        status: "",
     });
 
     const getCsrfToken = () => {
@@ -135,9 +135,9 @@ export default function ReviewManagementPage() {
         setSelectedItem(item);
 
         setForm({
-            hasil_interview_id: item.id,
+            hasil_interview_id: item.hasil_interview_id || item.id || "",
             review_management: item.review_management || "",
-            status: item.status_review || "Diterima",
+            status: item.status_review || "",
         });
 
         setModalOpen(true);
@@ -150,7 +150,7 @@ export default function ReviewManagementPage() {
         setForm({
             hasil_interview_id: "",
             review_management: "",
-            status: "Diterima",
+            status: "",
         });
     };
 
@@ -245,6 +245,12 @@ export default function ReviewManagementPage() {
         setLoading(true);
 
         try {
+            const payload = {
+                ...form,
+                status: form.status || null,
+                review_management: form.review_management || null,
+            };
+
             const response = await fetch("/admin/review-management/review", {
                 method: "POST",
                 headers: {
@@ -252,7 +258,7 @@ export default function ReviewManagementPage() {
                     Accept: "application/json",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             const result = await response.json();
@@ -279,7 +285,7 @@ export default function ReviewManagementPage() {
             return;
         }
 
-        const confirmDelete = confirm("Yakin ingin menghapus review management ini?");
+        const confirmDelete = confirm("Yakin ingin mengosongkan review management ini?");
 
         if (!confirmDelete) return;
 
@@ -298,15 +304,15 @@ export default function ReviewManagementPage() {
             const result = await response.json();
 
             if (!response.ok || !result.success) {
-                alert(result.message || "Review management gagal dihapus.");
+                alert(result.message || "Review management gagal dikosongkan.");
                 return;
             }
 
-            alert(result.message || "Review management berhasil dihapus.");
+            alert(result.message || "Review management berhasil dikosongkan.");
             fetchData(appliedFilter);
         } catch (error) {
-            console.error("Gagal menghapus review management:", error);
-            alert("Terjadi kesalahan saat menghapus review management.");
+            console.error("Gagal mengosongkan review management:", error);
+            alert("Terjadi kesalahan saat mengosongkan review management.");
         }
     };
 
@@ -527,7 +533,7 @@ export default function ReviewManagementPage() {
                             ) : paginatedData.length > 0 ? (
                                 paginatedData.map((item, index) => (
                                     <tr
-                                        key={item.id}
+                                        key={item.review_management_id || item.id}
                                         className={`group transition ${rowColorClass(
                                             item.hasil_interview
                                         )}`}
@@ -597,7 +603,7 @@ export default function ReviewManagementPage() {
                                                     item.status_review
                                                 )}`}
                                             >
-                                                {item.status_review || "Belum Review"}
+                                                {item.status_review || "Belum Dipilih"}
                                             </span>
                                         </td>
 
@@ -619,7 +625,7 @@ export default function ReviewManagementPage() {
                                                         }
                                                         className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
                                                     >
-                                                        Hapus
+                                                        Kosongkan
                                                     </button>
                                                 )}
                                             </div>
@@ -639,7 +645,7 @@ export default function ReviewManagementPage() {
                                             </h3>
 
                                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                                Belum ada kandidat dengan hasil interview Lolos Interview atau Dipertimbangkan pada tanggal interview ini.
+                                                Belum ada data di tabel hasil_review_management pada tanggal interview ini.
                                             </p>
                                         </div>
                                     </td>
@@ -703,9 +709,7 @@ export default function ReviewManagementPage() {
                                     </div>
 
                                     <h2 className="mt-2 text-2xl font-black text-slate-950">
-                                        {selectedItem?.review_management_id
-                                            ? "Edit Review"
-                                            : "Tambah Review"}
+                                        Edit Review
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
@@ -744,85 +748,28 @@ export default function ReviewManagementPage() {
 
                                         <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-5">
                                             <div className="grid gap-3 sm:grid-cols-2">
-                                                <DetailItem
-                                                    label="Nama Lengkap"
-                                                    value={pelamar?.nama_lengkap}
-                                                />
-                                                <DetailItem
-                                                    label="Nama Panggil"
-                                                    value={pelamar?.nama_panggil}
-                                                />
-                                                <DetailItem
-                                                    label="Email"
-                                                    value={pelamar?.email}
-                                                />
-                                                <DetailItem
-                                                    label="No. WA"
-                                                    value={pelamar?.no_wa}
-                                                />
-                                                <DetailItem
-                                                    label="Posisi Dilamar"
-                                                    value={pelamar?.posisi_label}
-                                                />
-                                                <DetailItem
-                                                    label="Perusahaan"
-                                                    value={pelamar?.perusahaan_label}
-                                                />
-                                                <DetailItem
-                                                    label="Pendidikan"
-                                                    value={pelamar?.pendidikan_label}
-                                                />
-                                                <DetailItem
-                                                    label="Jurusan"
-                                                    value={pelamar?.jurusan}
-                                                />
-                                                <DetailItem
-                                                    label="Institusi"
-                                                    value={pelamar?.nama_institusi}
-                                                />
-                                                <DetailItem
-                                                    label="Agama"
-                                                    value={pelamar?.agama_label}
-                                                />
-                                                <DetailItem
-                                                    label="Tanggal Lahir"
-                                                    value={formatDate(pelamar?.tanggal_lahir)}
-                                                />
-                                                <DetailItem
-                                                    label="Tanggal Skrining"
-                                                    value={formatDate(pelamar?.tanggal_skrining)}
-                                                />
-                                                <DetailItem
-                                                    label="Kewarganegaraan"
-                                                    value={pelamar?.kewarganegaraan_label}
-                                                />
-                                                <DetailItem
-                                                    label="Status Pernikahan"
-                                                    value={pelamar?.status_pernikahan_label}
-                                                />
-                                                <DetailItem
-                                                    label="Golongan Darah"
-                                                    value={pelamar?.gol_darah || pelamar?.golongan_darah}
-                                                />
-                                                <DetailItem
-                                                    label="Tinggi / Berat"
-                                                    value={`${pelamar?.tinggi_badan || "-"} cm / ${pelamar?.berat_badan || "-"} kg`}
-                                                />
+                                                <DetailItem label="Nama Lengkap" value={pelamar?.nama_lengkap} />
+                                                <DetailItem label="Nama Panggil" value={pelamar?.nama_panggil} />
+                                                <DetailItem label="Email" value={pelamar?.email} />
+                                                <DetailItem label="No. WA" value={pelamar?.no_wa} />
+                                                <DetailItem label="Posisi Dilamar" value={pelamar?.posisi_label} />
+                                                <DetailItem label="Perusahaan" value={pelamar?.perusahaan_label} />
+                                                <DetailItem label="Pendidikan" value={pelamar?.pendidikan_label} />
+                                                <DetailItem label="Jurusan" value={pelamar?.jurusan} />
+                                                <DetailItem label="Institusi" value={pelamar?.nama_institusi} />
+                                                <DetailItem label="Agama" value={pelamar?.agama_label} />
+                                                <DetailItem label="Tanggal Lahir" value={formatDate(pelamar?.tanggal_lahir)} />
+                                                <DetailItem label="Tanggal Skrining" value={formatDate(pelamar?.tanggal_skrining)} />
+                                                <DetailItem label="Kewarganegaraan" value={pelamar?.kewarganegaraan_label} />
+                                                <DetailItem label="Status Pernikahan" value={pelamar?.status_pernikahan_label} />
+                                                <DetailItem label="Golongan Darah" value={pelamar?.gol_darah || pelamar?.golongan_darah} />
+                                                <DetailItem label="Tinggi / Berat" value={`${pelamar?.tinggi_badan || "-"} cm / ${pelamar?.berat_badan || "-"} kg`} />
                                             </div>
 
                                             <div className="mt-4 grid gap-3">
-                                                <DetailItem
-                                                    label="Alamat KTP"
-                                                    value={pelamar?.alamat_ktp}
-                                                />
-                                                <DetailItem
-                                                    label="Alamat Domisili"
-                                                    value={pelamar?.alamat_domisili}
-                                                />
-                                                <DetailItem
-                                                    label="Sumber Informasi"
-                                                    value={pelamar?.sumber_informasi_label}
-                                                />
+                                                <DetailItem label="Alamat KTP" value={pelamar?.alamat_ktp} />
+                                                <DetailItem label="Alamat Domisili" value={pelamar?.alamat_domisili} />
+                                                <DetailItem label="Sumber Informasi" value={pelamar?.sumber_informasi_label} />
                                             </div>
                                         </div>
 
@@ -893,26 +840,11 @@ export default function ReviewManagementPage() {
 
                                         <div className="rounded-3xl border border-slate-200 bg-white p-5">
                                             <div className="grid gap-3">
-                                                <DetailItem
-                                                    label="Judul Interview"
-                                                    value={selectedItem?.judul_interview}
-                                                />
-                                                <DetailItem
-                                                    label="Tanggal Interview"
-                                                    value={getTanggalInterview(selectedItem)}
-                                                />
-                                                <DetailItem
-                                                    label="Hasil Interview"
-                                                    value={selectedItem?.hasil_interview}
-                                                />
-                                                <DetailItem
-                                                    label="Status Kehadiran"
-                                                    value={selectedItem?.status_kehadiran}
-                                                />
-                                                <DetailItem
-                                                    label="Catatan Interview"
-                                                    value={selectedItem?.catatan}
-                                                />
+                                                <DetailItem label="Judul Interview" value={selectedItem?.judul_interview} />
+                                                <DetailItem label="Tanggal Interview" value={getTanggalInterview(selectedItem)} />
+                                                <DetailItem label="Hasil Interview" value={selectedItem?.hasil_interview} />
+                                                <DetailItem label="Status Kehadiran" value={selectedItem?.status_kehadiran} />
+                                                <DetailItem label="Catatan Interview" value={selectedItem?.catatan} />
                                             </div>
                                         </div>
 
@@ -928,16 +860,16 @@ export default function ReviewManagementPage() {
 
                                         <div>
                                             <label className="mb-2 block text-sm font-black text-slate-700">
-                                                Status <span className="text-rose-500">*</span>
+                                                Status
                                             </label>
 
                                             <select
                                                 name="status"
                                                 value={form.status}
                                                 onChange={handleChange}
-                                                required
                                                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
                                             >
+                                                <option value="">Pilih Status</option>
                                                 <option value="Diterima">Diterima</option>
                                                 <option value="Gagal">Gagal</option>
                                             </select>

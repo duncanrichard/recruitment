@@ -27,6 +27,39 @@ class JadwalInterviewKandidat extends Model
         'catatan',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (JadwalInterviewKandidat $model) {
+            if (!$model->wasChanged('hasil_interview')) {
+                return;
+            }
+
+            $hasilInterview = trim((string) $model->hasil_interview);
+
+            if (in_array($hasilInterview, ['Lolos Interview', 'Dipertimbangkan'], true)) {
+                $model->reviewManagement()->firstOrCreate([
+                    'hasil_interview_id' => $model->id,
+                ], [
+                    'review_management' => null,
+                    'status' => null,
+                ]);
+
+                return;
+            }
+
+            if (
+                $hasilInterview === '' ||
+                $hasilInterview === 'Tidak Lolos Interview'
+            ) {
+                $model->reviewManagement()->delete();
+            }
+        });
+
+        static::deleting(function (JadwalInterviewKandidat $model) {
+            $model->reviewManagement()->delete();
+        });
+    }
+
     public function jadwalInterview(): BelongsTo
     {
         return $this->belongsTo(

@@ -23,12 +23,18 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         tanggal_skrining: "",
         data_riwayat_diri_ids: [],
         data_riwayat_diri_id: "",
+        sesi: "Sesi 1",
         jadwal: "",
+        jadwal_mulai: "",
+        jadwal_selesai: "",
         link_zoom: "",
     });
 
     const [groupForm, setGroupForm] = useState({
+        sesi: "Sesi 1",
         jadwal: "",
+        jadwal_mulai: "",
+        jadwal_selesai: "",
         link_zoom: "",
     });
 
@@ -200,7 +206,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
             tanggal_skrining: "",
             data_riwayat_diri_ids: [],
             data_riwayat_diri_id: "",
+            sesi: "Sesi 1",
             jadwal: "",
+            jadwal_mulai: "",
+            jadwal_selesai: "",
             link_zoom: "",
         });
     };
@@ -223,7 +232,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 ? [item.data_riwayat_diri_id]
                 : [],
             data_riwayat_diri_id: item?.data_riwayat_diri_id || "",
-            jadwal: toDateTimeLocalValue(item?.jadwal),
+            sesi: item?.sesi || item?.sesi_label || detailData?.sesi || "Sesi 1",
+            jadwal: toDateTimeLocalValue(item?.jadwal_mulai || item?.jadwal),
+            jadwal_mulai: toDateTimeLocalValue(item?.jadwal_mulai || item?.jadwal),
+            jadwal_selesai: toDateTimeLocalValue(item?.jadwal_selesai || item?.jadwal),
             link_zoom: item?.link_zoom || detailData?.link_zoom || "",
         });
 
@@ -250,7 +262,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
 
         setEditingGroup(item);
         setGroupForm({
-            jadwal: toDateTimeLocalValue(item?.jadwal),
+            sesi: item?.sesi || item?.sesi_label || "Sesi 1",
+            jadwal: toDateTimeLocalValue(item?.jadwal_mulai || item?.jadwal),
+            jadwal_mulai: toDateTimeLocalValue(item?.jadwal_mulai || item?.jadwal),
+            jadwal_selesai: toDateTimeLocalValue(item?.jadwal_selesai || item?.jadwal),
             link_zoom: item?.link_zoom || "",
         });
         setGroupModalOpen(true);
@@ -260,7 +275,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         setGroupModalOpen(false);
         setEditingGroup(null);
         setGroupForm({
+            sesi: "Sesi 1",
             jadwal: "",
+            jadwal_mulai: "",
+            jadwal_selesai: "",
             link_zoom: "",
         });
     };
@@ -271,12 +289,33 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         setGroupForm((prev) => ({
             ...prev,
             [name]: value,
+            ...(name === "jadwal_mulai" ? { jadwal: value } : {}),
         }));
     };
 
     const validateGroupForm = () => {
-        if (!groupForm.jadwal) {
-            alert("Jadwal Zoom wajib diisi.");
+        if (!String(groupForm.sesi || "").trim()) {
+            alert("Sesi jadwal wajib diisi.");
+            return false;
+        }
+
+        if (!groupForm.jadwal_mulai) {
+            alert("Jadwal mulai Zoom wajib diisi.");
+            return false;
+        }
+
+        if (!groupForm.jadwal_selesai) {
+            alert("Jadwal akhir Zoom wajib diisi.");
+            return false;
+        }
+
+        if (isPastOrCurrentDateTime(groupForm.jadwal_mulai)) {
+            alert("Jadwal mulai Zoom tidak boleh menggunakan jam yang sudah lewat. Silakan pilih jam setelah waktu sekarang.");
+            return false;
+        }
+
+        if (!isEndAfterStart(groupForm.jadwal_mulai, groupForm.jadwal_selesai)) {
+            alert("Jadwal akhir Zoom harus lebih besar dari jadwal mulai.");
             return false;
         }
 
@@ -318,7 +357,10 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         "X-CSRF-TOKEN": getCsrfToken(),
                     },
                     body: JSON.stringify({
-                        jadwal: groupForm.jadwal,
+                        sesi: groupForm.sesi?.trim() || "Sesi 1",
+                        jadwal: groupForm.jadwal_mulai,
+                        jadwal_mulai: groupForm.jadwal_mulai,
+                        jadwal_selesai: groupForm.jadwal_selesai,
                         link_zoom: groupForm.link_zoom?.trim() || null,
                     }),
                 }
@@ -444,12 +486,33 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         setForm((prev) => ({
             ...prev,
             [name]: value,
+            ...(name === "jadwal_mulai" ? { jadwal: value } : {}),
         }));
     };
 
     const validateForm = () => {
-        if (!form.jadwal) {
-            alert("Jadwal Zoom wajib diisi.");
+        if (!String(form.sesi || "").trim()) {
+            alert("Sesi jadwal wajib diisi.");
+            return false;
+        }
+
+        if (!form.jadwal_mulai) {
+            alert("Jadwal mulai Zoom wajib diisi.");
+            return false;
+        }
+
+        if (!form.jadwal_selesai) {
+            alert("Jadwal akhir Zoom wajib diisi.");
+            return false;
+        }
+
+        if (isPastOrCurrentDateTime(form.jadwal_mulai)) {
+            alert("Jadwal mulai Zoom tidak boleh menggunakan jam yang sudah lewat. Silakan pilih jam setelah waktu sekarang.");
+            return false;
+        }
+
+        if (!isEndAfterStart(form.jadwal_mulai, form.jadwal_selesai)) {
+            alert("Jadwal akhir Zoom harus lebih besar dari jadwal mulai.");
             return false;
         }
 
@@ -505,13 +568,19 @@ export default function JadwalTestZoomPage({ actionSignals }) {
             const payload = editingData
                 ? {
                       data_riwayat_diri_id: form.data_riwayat_diri_id,
-                      jadwal: form.jadwal,
+                      sesi: form.sesi?.trim() || "Sesi 1",
+                      jadwal: form.jadwal_mulai,
+                      jadwal_mulai: form.jadwal_mulai,
+                      jadwal_selesai: form.jadwal_selesai,
                       link_zoom: form.link_zoom?.trim() || null,
                   }
                 : {
                       tanggal_skrining: form.tanggal_skrining,
                       data_riwayat_diri_ids: form.data_riwayat_diri_ids,
-                      jadwal: form.jadwal,
+                      sesi: form.sesi?.trim() || "Sesi 1",
+                      jadwal: form.jadwal_mulai,
+                      jadwal_mulai: form.jadwal_mulai,
+                      jadwal_selesai: form.jadwal_selesai,
                       link_zoom: form.link_zoom?.trim() || null,
                   };
 
@@ -598,11 +667,20 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 ),
             },
             {
+                key: "sesi",
+                label: "Sesi",
+                render: (item) => (
+                    <span className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700">
+                        {item?.sesi_label || item?.sesi || "Sesi 1"}
+                    </span>
+                ),
+            },
+            {
                 key: "jam_test",
                 label: "Jam",
                 render: (item) => (
                     <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-700">
-                        {item?.jam_test || formatTime(item?.jadwal)}
+                        {item?.jam_test || formatJamRange(item?.jadwal_mulai || item?.jadwal, item?.jadwal_selesai)}
                     </span>
                 ),
             },
@@ -754,7 +832,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         </h3>
 
                         <p className="mt-1 text-sm font-medium text-slate-500">
-                            Data sudah digroup berdasarkan tanggal dan jam test.
+                            Data sudah digroup berdasarkan tanggal, sesi, dan jam test.
                             Klik Detail untuk melihat semua pelamar pada jadwal
                             tersebut.
                         </p>
@@ -764,7 +842,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                 <DataTable
                     data={dataJadwal}
                     columns={columns}
-                    searchPlaceholder="Cari tanggal test, jam, group, jumlah, status kehadiran..."
+                    searchPlaceholder="Cari tanggal test, sesi, jam, group, jumlah, status kehadiran..."
                     emptyTitle="Jadwal Zoom tidak ditemukan"
                     emptyDescription="Belum ada jadwal Zoom atau kata kunci pencarian tidak cocok."
                     getSearchText={(item) =>
@@ -772,8 +850,12 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                             item?.group_key,
                             item?.tanggal_test,
                             item?.tanggal_test_label,
+                            item?.sesi,
+                            item?.sesi_label,
                             item?.jam_test,
                             item?.jadwal,
+                            item?.jadwal_mulai,
+                            item?.jadwal_selesai,
                             item?.jadwal_label,
                             item?.link_zoom,
                             item?.total_pelamar,
@@ -966,20 +1048,54 @@ function JadwalFormModal({
                                 </div>
                             )}
 
-                            <div>
-                                <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Jadwal Zoom{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Sesi <span className="text-rose-500">*</span>
+                                    </label>
 
-                                <input
-                                    type="datetime-local"
-                                    name="jadwal"
-                                    value={form.jadwal}
-                                    onChange={handleChange}
-                                    required
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
-                                />
+                                    <input
+                                        type="text"
+                                        name="sesi"
+                                        value={form.sesi}
+                                        onChange={handleChange}
+                                        placeholder="Contoh: Sesi 1"
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Jadwal Mulai <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <input
+                                        type="datetime-local"
+                                        name="jadwal_mulai"
+                                        value={form.jadwal_mulai}
+                                        onChange={handleChange}
+                                        min={getMinDateTimeLocalValue()}
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Jadwal Akhir <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <input
+                                        type="datetime-local"
+                                        name="jadwal_selesai"
+                                        value={form.jadwal_selesai}
+                                        onChange={handleChange}
+                                        min={form.jadwal_mulai || getMinDateTimeLocalValue()}
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -1087,24 +1203,57 @@ function GroupEditModal({
                         </div>
 
                         <div className="mt-5 grid gap-5">
-                            <div>
-                                <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Jadwal Zoom{" "}
-                                    <span className="text-rose-500">*</span>
-                                </label>
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Sesi <span className="text-rose-500">*</span>
+                                    </label>
 
-                                <input
-                                    type="datetime-local"
-                                    name="jadwal"
-                                    value={form.jadwal}
-                                    onChange={onChange}
-                                    required
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-                                />
+                                    <input
+                                        type="text"
+                                        name="sesi"
+                                        value={form.sesi}
+                                        onChange={onChange}
+                                        placeholder="Contoh: Sesi 1"
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    />
+                                </div>
 
-                                <p className="mt-2 text-xs font-semibold text-slate-500">
-                                    Jika jadwal diubah, semua pelamar pada group
-                                    jadwal ini ikut berubah.
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Jadwal Mulai <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <input
+                                        type="datetime-local"
+                                        name="jadwal_mulai"
+                                        value={form.jadwal_mulai}
+                                        onChange={onChange}
+                                        min={getMinDateTimeLocalValue()}
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-black text-slate-700">
+                                        Jadwal Akhir <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <input
+                                        type="datetime-local"
+                                        name="jadwal_selesai"
+                                        value={form.jadwal_selesai}
+                                        onChange={onChange}
+                                        min={form.jadwal_mulai || getMinDateTimeLocalValue()}
+                                        required
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    />
+                                </div>
+
+                                <p className="md:col-span-3 text-xs font-semibold text-slate-500">
+                                    Jika sesi atau jadwal diubah, semua pelamar pada group jadwal ini ikut berubah.
                                 </p>
                             </div>
 
@@ -1279,6 +1428,9 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                     Tanggal Skrining
                                                 </th>
                                                 <th className="whitespace-nowrap px-5 py-4 text-left text-xs font-black uppercase tracking-wide text-slate-500">
+                                                    Sesi
+                                                </th>
+                                                <th className="whitespace-nowrap px-5 py-4 text-left text-xs font-black uppercase tracking-wide text-slate-500">
                                                     Link Zoom
                                                 </th>
                                                 <th className="whitespace-nowrap px-5 py-4 text-left text-xs font-black uppercase tracking-wide text-slate-500">
@@ -1357,6 +1509,12 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                             </td>
 
                                                             <td className="whitespace-nowrap px-5 py-4">
+                                                                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700">
+                                                                    {item?.sesi_label || item?.sesi || detailData?.sesi || "Sesi 1"}
+                                                                </span>
+                                                            </td>
+
+                                                            <td className="whitespace-nowrap px-5 py-4">
                                                                 {item?.link_zoom ? (
                                                                     <a
                                                                         href={item.link_zoom}
@@ -1412,7 +1570,7 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                 })
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={9} className="px-6 py-14">
+                                                    <td colSpan={10} className="px-6 py-14">
                                                         <div className="text-center">
                                                             <h3 className="text-lg font-black text-slate-900">
                                                                 Tidak ada pelamar
@@ -2031,6 +2189,32 @@ function Select2Multi({
     );
 }
 
+function isEndAfterStart(startValue, endValue) {
+    const startDate = new Date(startValue);
+    const endDate = new Date(endValue);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        return false;
+    }
+
+    return endDate.getTime() > startDate.getTime();
+}
+
+function formatJamRange(startValue, endValue) {
+    const start = formatTime(startValue);
+    const end = formatTime(endValue);
+
+    if (!start || start === "-") {
+        return "-";
+    }
+
+    if (!end || end === "-" || end === start) {
+        return start;
+    }
+
+    return `${start} - ${end}`;
+}
+
 function normalizeDate(value) {
     if (!value) return "";
 
@@ -2085,6 +2269,31 @@ function formatDateTime(value) {
         hour: "2-digit",
         minute: "2-digit",
     });
+}
+
+function getMinDateTimeLocalValue() {
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60 * 1000);
+
+    return localDate.toISOString().slice(0, 16);
+}
+
+function isPastOrCurrentDateTime(value) {
+    if (!value) {
+        return false;
+    }
+
+    const selectedDate = new Date(value);
+    const now = new Date();
+
+    if (Number.isNaN(selectedDate.getTime())) {
+        return false;
+    }
+
+    selectedDate.setSeconds(0, 0);
+    now.setSeconds(0, 0);
+
+    return selectedDate.getTime() <= now.getTime();
 }
 
 function toDateTimeLocalValue(value) {

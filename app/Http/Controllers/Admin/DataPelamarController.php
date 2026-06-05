@@ -17,10 +17,24 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class DataPelamarController extends Controller
 {
+    private string $fonnteToken = '6DZTEcgCbaCobfLaDcGG';
+
+    /**
+     * WA tidak bisa membuka link 127.0.0.1 / localhost.
+     * Isi dengan domain publik aplikasi Anda, contoh:
+     * private ?string $publicBaseUrl = 'https://rekrutmen.domainanda.com';
+     * atau saat testing pakai ngrok:
+     * private ?string $publicBaseUrl = 'https://xxxx.ngrok-free.app';
+     */
+    private ?string $publicBaseUrl = null;
+
     private array $relations = [
         'pendidikan',
         'agama',
@@ -276,10 +290,25 @@ class DataPelamarController extends Controller
         ]);
     }
 
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $data = DataRiwayatDiri::query()
-            ->with($this->safeRelations())
+        $validated = $request->validate([
+            'tanggal_skrining_mulai' => ['nullable', 'date'],
+            'tanggal_skrining_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_skrining_mulai'],
+        ]);
+
+        $query = DataRiwayatDiri::query()
+            ->with($this->safeRelations());
+
+        if (!empty($validated['tanggal_skrining_mulai'])) {
+            $query->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai']);
+        }
+
+        if (!empty($validated['tanggal_skrining_selesai'])) {
+            $query->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai']);
+        }
+
+        $data = $query
             ->latest()
             ->get()
             ->map(function ($item) {
@@ -288,8 +317,163 @@ class DataPelamarController extends Controller
 
         return response()->json([
             'success' => true,
+            'message' => 'Data pelamar berhasil diambil.',
+            'filter' => [
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'] ?? null,
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'] ?? null,
+            ],
             'data' => $data,
         ]);
+    }
+
+
+    public function kirimPesanSkrining(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tanggal_skrining_mulai' => ['required', 'date'],
+            'tanggal_skrining_selesai' => ['required', 'date', 'after_or_equal:tanggal_skrining_mulai'],
+            'message_template' => ['nullable', 'string', 'max:5000'],
+        ], [
+            'tanggal_skrining_mulai.required' => 'Tanggal skrining mulai wajib diisi.',
+            'tanggal_skrining_selesai.required' => 'Tanggal skrining selesai wajib diisi.',
+            'tanggal_skrining_selesai.after_or_equal' => 'Tanggal skrining selesai tidak boleh lebih kecil dari tanggal mulai.',
+        ]);
+
+        $pelamars = DataRiwayatDiri::query()
+            ->with($this->safeRelations())
+            ->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai'])
+            ->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai'])
+            ->orderBy('tanggal_skrining', 'asc')
+            ->orderBy('nama_lengkap', 'asc')
+            ->get()
+            ->map(function ($item) {
+                return $this->appendExtraData($item);
+            });
+
+        if ($pelamars->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada pelamar pada tanggal skrining tersebut.',
+                'total_pelamar' => 0,
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'skipped' => [],
+            ], 404);
+        }
+
+        $messages = [];
+        $skipped = [];
+
+        foreach ($pelamars as $pelamar) {
+            $target = $this->normalizeWhatsappNumber($pelamar->no_wa ?? null);
+            $urlPendaftaran = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
+
+            if (!$target) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'pendaftaran_url' => $urlPendaftaran,
+                    'reason' => 'Nomor WhatsApp kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$urlPendaftaran) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'pendaftaran_url' => null,
+                    'reason' => 'URL pendaftaran tidak tersedia karena token kandidat kosong.',
+                ];
+
+                continue;
+            }
+
+            $messages[] = [
+                'target' => $target,
+                'message' => $this->buildPesanSkrining(
+                    $pelamar,
+                    $validated['message_template'] ?? null
+                ),
+                'delay' => '2',
+            ];
+        }
+
+        if (empty($messages)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp dan token pendaftaran kandidat sudah tersedia.',
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+                'total_pelamar' => $pelamars->count(),
+                'total_dikirim' => 0,
+                'total_dilewati' => count($skipped),
+                'skipped' => $skipped,
+            ], 422);
+        }
+
+        try {
+            /*
+             * Catatan:
+             * - withoutVerifying() dipakai untuk menghindari error lokal seperti:
+             *   cURL error 60: SSL certificate problem.
+             * - Di server production yang sertifikat CA-nya sudah benar, bagian ini boleh dihapus.
+             * - Fonnte menerima pengiriman massal melalui parameter "data" berisi JSON array.
+             */
+            $response = Http::asForm()
+                ->withoutVerifying()
+                ->withHeaders([
+                    'Authorization' => $this->fonnteToken,
+                ])
+                ->timeout(120)
+                ->post('https://api.fonnte.com/send', [
+                    'data' => json_encode($messages),
+                    'countryCode' => '62',
+                    'typing' => 'false',
+                    'preview' => 'true',
+                ]);
+
+            $json = $response->json();
+            $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
+            $isSuccess = $response->successful() && (bool) $fonnteStatus;
+
+            return response()->json([
+                'success' => $isSuccess,
+                'message' => $isSuccess
+                    ? 'Pesan WhatsApp berhasil dikirim ke antrean Fonnte.'
+                    : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan WhatsApp gagal dikirim melalui Fonnte.'),
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+                'total_pelamar' => $pelamars->count(),
+                'total_dikirim' => count($messages),
+                'total_dilewati' => count($skipped),
+                'skipped' => $skipped,
+                'targets' => collect($messages)->pluck('target')->values(),
+                'fonnte_http_code' => $response->status(),
+                'fonnte_response' => $json ?: $response->body(),
+            ], $isSuccess ? 200 : 422);
+        } catch (\Throwable $e) {
+            Log::error('Gagal mengirim pesan Fonnte skrining', [
+                'message' => $e->getMessage(),
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte: ' . $e->getMessage(),
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+                'total_pelamar' => $pelamars->count(),
+                'total_dikirim' => 0,
+                'total_dilewati' => $pelamars->count(),
+                'skipped' => $skipped,
+            ], 500);
+        }
     }
 
     public function posisiList(): JsonResponse
@@ -644,6 +828,10 @@ class DataPelamarController extends Controller
             return null;
         }
 
+        if (!empty($this->publicBaseUrl)) {
+            return rtrim($this->publicBaseUrl, '/') . '/pendaftaran/' . $token;
+        }
+
         return route('pendaftaran.show', [
             'token' => $token,
         ]);
@@ -895,6 +1083,73 @@ class DataPelamarController extends Controller
         }
 
         return null;
+    }
+
+
+    private function buildPesanSkrining(DataRiwayatDiri $pelamar, ?string $template = null): string
+    {
+        $tanggalSkrining = $pelamar->tanggal_skrining
+            ? date('d F Y', strtotime($pelamar->tanggal_skrining))
+            : '-';
+
+        $nama = $pelamar->nama_panggil ?: ($pelamar->nama_lengkap ?: 'Kandidat');
+        $namaLengkap = $pelamar->nama_lengkap ?: $nama;
+        $posisi = $pelamar->posisi_label ?: '-';
+        $perusahaan = $pelamar->perusahaan_label ?: '-';
+        $url = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
+
+        $message = $template ?: "Halo {nama},\n\n"
+            . "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n"
+            . "Tanggal skrining Anda: {tanggal_skrining}.\n\n"
+            . "Mohon untuk selalu mengecek dan melengkapi data diri Anda melalui link pendaftaran berikut.\n"
+            . "Klik/buka link ini:\n"
+            . "{url_pendaftaran}\n\n"
+            . "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n"
+            . "Terima kasih.\n"
+            . "Tim Rekrutmen";
+
+        return strtr($message, [
+            '{nama}' => $nama,
+            '{nama_lengkap}' => $namaLengkap,
+            '{posisi}' => $posisi,
+            '{perusahaan}' => $perusahaan,
+            '{tanggal_skrining}' => $tanggalSkrining,
+            '{token}' => (string) ($pelamar->token ?? ''),
+            '{url_pendaftaran}' => (string) $url,
+            '{link_pendaftaran}' => (string) $url,
+        ]);
+    }
+
+    private function normalizeWhatsappNumber(?string $number): ?string
+    {
+        if (!$number) {
+            return null;
+        }
+
+        $number = trim($number);
+        $number = preg_replace('/[^0-9+]/', '', $number);
+
+        if ($number === '') {
+            return null;
+        }
+
+        if (Str::startsWith($number, '+')) {
+            $number = substr($number, 1);
+        }
+
+        if (Str::startsWith($number, '0')) {
+            $number = '62' . substr($number, 1);
+        }
+
+        if (Str::startsWith($number, '8')) {
+            $number = '62' . $number;
+        }
+
+        if (!preg_match('/^62[0-9]{8,15}$/', $number)) {
+            return null;
+        }
+
+        return $number;
     }
 
     private function safeRelations(): array

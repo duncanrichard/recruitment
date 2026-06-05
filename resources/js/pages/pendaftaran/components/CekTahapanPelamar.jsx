@@ -1,5 +1,57 @@
 import React, { useEffect, useMemo, useState } from "react";
-import InfoItem from "./InfoItem";
+
+const PESAN_LOLOS_SELEKSI = `SELAMAT!
+
+Anda dinyatakan lolos tahap psikotes dan dapat melanjutkan ke tahap seleksi berikutnya.
+
+Untuk informasi dan proses selanjutnya, silakan melakukan pengecekan secara berkala melalui website ini.
+
+Terima kasih dan semoga sukses pada tahap berikutnya.`;
+
+const PESAN_LOLOS_OFFERING_LETTER = `Selamat, Anda lolos tahap interview dan saat ini sedang dalam proses offering letter.
+
+Jadwal penyampaian offering letter akan kami informasikan lebih lanjut. Jika ada pertanyaan, silakan hubungi kami melalui WhatsApp.`;
+
+const PESAN_OFFERING_LETTER_MENERIMA = `Selamat, Anda telah menerima offering letter.
+
+Saat ini Anda dinyatakan siap untuk bekerja. Silakan mempersiapkan diri dan mengikuti arahan dari tim rekrutmen atau HR untuk proses onboarding dan informasi mulai bekerja.
+
+Terima kasih dan semoga sukses dalam perjalanan karier Anda bersama kami.`;
+
+const PESAN_OFFERING_LETTER_MENOLAK = `Terima kasih atas konfirmasi Anda.
+
+Kami menghargai keputusan Anda untuk menolak offering letter yang telah diberikan. Semoga keputusan ini menjadi pilihan terbaik dan semoga Anda mendapatkan kesempatan karier yang lebih sesuai di masa depan.
+
+Tetap semangat dan sukses selalu.`;
+
+const PESAN_OFFERING_LETTER_TIDAK_MELANJUTKAN = `Terima kasih sudah mengikuti proses seleksi sampai tahap offering letter.
+
+Kami menghargai waktu, usaha, dan keputusan Anda untuk tidak melanjutkan proses ini. Semoga pengalaman ini tetap memberi manfaat dan semoga Anda mendapatkan kesempatan terbaik dalam perjalanan karier berikutnya.
+
+Tetap semangat dan sukses selalu.`;
+
+const PESAN_TIDAK_LOLOS_SELEKSI = `Terima kasih telah mengikuti proses seleksi di perusahaan kami.
+
+Setelah melalui proses evaluasi, kami belum dapat melanjutkan Anda ke tahap berikutnya. Kami mengapresiasi waktu dan usaha yang telah diberikan.
+
+Semoga sukses dan lancar dalam perjalanan karier Anda ke depan. Terima kasih.`;
+
+
+function InfoItem({ label, value }) {
+    const safeValue = value === null || value === undefined || value === "" ? "-" : value;
+
+    return (
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm sm:p-4">
+            <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+                {label}
+            </p>
+
+            <p className="mt-1 break-words text-sm font-extrabold leading-6 text-slate-800">
+                {safeValue}
+            </p>
+        </div>
+    );
+}
 
 export default function CekTahapanPelamar({
     errors = {},
@@ -83,14 +135,14 @@ export default function CekTahapanPelamar({
     const dataHasil = hasilTahapan || hasil;
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50 px-4 py-10">
-            <div className="mx-auto max-w-5xl">
-                <div className="mb-8 text-center">
+        <main className="min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50 px-3 py-6 sm:px-4 sm:py-10">
+            <div className="mx-auto w-full max-w-5xl">
+                <div className="mb-6 text-center sm:mb-8">
                     <span className="inline-flex rounded-full bg-cyan-50 px-4 py-1 text-xs font-bold uppercase tracking-wide text-teal-700 ring-1 ring-cyan-100">
                         Cek Tahapan Seleksi
                     </span>
 
-                    <h1 className="mt-4 text-3xl font-black text-slate-950">
+                    <h1 className="mt-4 text-2xl font-black leading-tight text-slate-950 sm:text-3xl">
                         Status Pendaftaran Kandidat
                     </h1>
 
@@ -99,8 +151,8 @@ export default function CekTahapanPelamar({
                     </p>
                 </div>
 
-                <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
-                    <div className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-teal-900 px-6 py-6 text-white sm:px-8">
+                <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70 sm:rounded-[2rem]">
+                    <div className="border-b border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-teal-900 px-4 py-5 text-white sm:px-8 sm:py-6">
                         <h2 className="text-xl font-black">
                             Informasi Tahapan Seleksi
                         </h2>
@@ -133,7 +185,7 @@ export default function CekTahapanPelamar({
                     {!isLoading && errorData?.token && (
                         <div className="p-6 sm:p-8">
                             <div className="rounded-3xl border border-red-200 bg-red-50 p-5">
-                                <div className="flex items-start gap-4">
+                                <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-500 text-lg font-black text-white">
                                         !
                                     </div>
@@ -174,7 +226,7 @@ export default function CekTahapanPelamar({
                         />
                     )}
 
-                    <div className="border-t border-slate-100 bg-white px-6 py-5 sm:px-8">
+                    <div className="border-t border-slate-100 bg-white px-4 py-5 sm:px-8">
                         <button
                             type="button"
                             onClick={onBack}
@@ -200,6 +252,11 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         hasil,
         jadwalInterview
     );
+    const jadwalOfferingLetter = getJadwalOfferingLetterFromHasil(hasil, jadwalInterview);
+    const statusJadwalOfferingLetter = getStatusJadwalOfferingLetterFromHasil(
+        hasil,
+        jadwalOfferingLetter
+    );
 
     const completion = getKelengkapanForm(hasil);
     const bolehLanjutJadwalTestZoom = canAccessJadwalTestZoom(hasil);
@@ -218,6 +275,12 @@ function HasilTahapan({ hasil, token, onUpdated }) {
     const reviewGagal = interviewLanjutReview && statusReviewManagement === "gagal";
     const reviewProses = interviewLanjutReview && !statusReviewManagement;
 
+    const punyaJadwalOfferingLetter = Boolean(jadwalOfferingLetter);
+    const statusOl = normalizeStatusOl(statusJadwalOfferingLetter);
+    const olMenerima = statusOl === "menerima";
+    const olMenolak = statusOl === "menolak";
+    const olTidakMelanjutkan = statusOl === "tidak_melanjutkan";
+
     const tahapan = buildTahapanTampil(
         jadwalTest,
         hasilTest,
@@ -228,15 +291,27 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         bolehLanjutJadwalTestZoom,
         completion,
         pesanJadwalTestZoom,
-        statusReviewManagement
+        statusReviewManagement,
+        jadwalOfferingLetter,
+        statusJadwalOfferingLetter
     );
 
-    const statusUtama = reviewDiterima || reviewProses
-        ? "Lolos Interview"
+    const statusUtama = reviewDiterima && punyaJadwalOfferingLetter
+        ? olMenerima
+            ? "Offering Letter Diterima"
+            : olMenolak
+            ? "Offering Letter Ditolak"
+            : olTidakMelanjutkan
+            ? "Tidak Melanjutkan Offering Letter"
+            : "Jadwal Offering Letter"
+        : reviewDiterima
+        ? "Jadwal Offering Letter Pending"
+        : reviewProses
+        ? "Interview"
         : reviewGagal
         ? "Gagal Interview"
         : interviewGagal
-        ? "Tidak Lolos Interview"
+        ? "Gagal Interview"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Interview Reschedule"
         : jadwalInterview
@@ -257,10 +332,20 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Jadwal Test Zoom Tersedia"
         : "Administrasi";
 
-    const keteranganUtama = reviewDiterima || reviewProses
-        ? "Kandidat dinyatakan lolos pada tahap interview."
+    const keteranganUtama = reviewDiterima && punyaJadwalOfferingLetter
+        ? olMenerima
+            ? "Kandidat sudah menerima Offering Letter dan siap untuk bekerja."
+            : olMenolak
+            ? "Kandidat menolak Offering Letter."
+            : olTidakMelanjutkan
+            ? "Kandidat tidak melanjutkan proses Offering Letter."
+            : "Jadwal Offering Letter sudah tersedia."
+        : reviewDiterima
+        ? PESAN_LOLOS_OFFERING_LETTER
+        : reviewProses
+        ? "Kandidat sedang dalam proses Review Management."
         : reviewGagal
-        ? "Kandidat dinyatakan gagal pada tahap interview."
+        ? "Kandidat dinyatakan gagal pada tahap interview berdasarkan Review Management."
         : interviewGagal
         ? "Kandidat dinyatakan tidak lolos pada tahap interview."
         : jadwalInterview?.kehadiran === "reschedule"
@@ -283,33 +368,39 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         ? "Kandidat sudah mendapatkan jadwal test Zoom."
         : "Status seleksi kandidat saat ini berada pada tahap Administrasi.";
 
-    const saranUtama = reviewDiterima || reviewProses
-        ? "Selamat, Anda dinyatakan lolos pada proses seleksi."
+    const saranUtama = reviewDiterima
+        ? getSaranOfferingLetterFrontend(statusJadwalOfferingLetter)
+        : reviewProses
+        ? "Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management."
         : reviewGagal
-        ? "Terima kasih sudah mengikuti proses seleksi."
+        ? PESAN_TIDAK_LOLOS_SELEKSI
         : interviewGagal
-        ? "Terima kasih sudah mengikuti proses seleksi."
+        ? PESAN_TIDAK_LOLOS_SELEKSI
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Silakan pantau informasi jadwal interview terbaru dari tim rekrutmen."
         : jadwalInterview
-        ? "Silakan mengikuti interview sesuai jadwal yang sudah ditentukan."
+        ? PESAN_LOLOS_SELEKSI
         : hasilTestMmpi
         ? hasilTestMmpi === "lolos"
-            ? "Selamat, Anda lolos pada tahapan Test MMPI. Silakan pantau informasi jadwal interview dari tim rekrutmen."
-            : "Terima kasih sudah mengikuti proses seleksi."
+            ? PESAN_LOLOS_SELEKSI
+            : PESAN_TIDAK_LOLOS_SELEKSI
         : jadwalMmpi
-        ? "Silakan mengikuti test MMPI sesuai jadwal yang sudah ditentukan."
+        ? PESAN_LOLOS_SELEKSI
         : sudahAdaHasilTest
         ? hasilTest === "lolos"
-            ? "Silakan pantau informasi jadwal test MMPI dari tim rekrutmen."
-            : "Terima kasih sudah mengikuti proses seleksi."
+            ? PESAN_LOLOS_SELEKSI
+            : PESAN_TIDAK_LOLOS_SELEKSI
         : jadwalTerkunci
         ? pesanJadwalTestZoom
         : isTerjadwal
-        ? "Silakan mengikuti test Zoom sesuai jadwal yang sudah ditentukan."
+        ? PESAN_LOLOS_SELEKSI
         : "Silakan pantau halaman ini secara berkala untuk melihat perkembangan proses seleksi.";
 
-    const tahapTerakhir = reviewDiterima || reviewGagal || reviewProses || interviewGagal
+    const tahapTerakhir = reviewDiterima
+        ? "Jadwal Offering Letter"
+        : reviewGagal || interviewGagal
+        ? "Interview"
+        : reviewProses
         ? "Interview"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "Reschedule Interview"
@@ -328,11 +419,13 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         : "Administrasi";
 
     const warnaUtama = reviewDiterima
-        ? "emerald"
+        ? olMenolak || olTidakMelanjutkan
+            ? "amber"
+            : "emerald"
         : reviewGagal || interviewGagal
         ? "red"
         : reviewProses
-        ? "emerald"
+        ? "teal"
         : jadwalInterview?.kehadiran === "reschedule"
         ? "blue"
         : jadwalInterview
@@ -354,15 +447,15 @@ function HasilTahapan({ hasil, token, onUpdated }) {
         : "teal";
 
     return (
-        <div className="border-t border-slate-100 bg-slate-50 p-6 sm:p-8">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="border-t border-slate-100 bg-slate-50 p-3 sm:p-8">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="mb-6 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
                             Hasil Pengecekan
                         </p>
 
-                        <h3 className={`mt-2 text-2xl font-black ${getTextColor(warnaUtama)}`}>
+                        <h3 className={`mt-2 break-words text-xl font-black leading-tight sm:text-2xl ${getTextColor(warnaUtama)}`}>
                             {statusUtama}
                         </h3>
 
@@ -371,14 +464,14 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                         </p>
                     </div>
 
-                    <span className={`w-fit rounded-full px-4 py-2 text-xs font-bold ${getBadgeColor(warnaUtama)}`}>
+                    <span className={`w-fit max-w-full rounded-full px-3 py-2 text-xs font-bold leading-relaxed sm:px-4 ${getBadgeColor(warnaUtama)}`}>
                         Tahap Terakhir: {tahapTerakhir}
                     </span>
                 </div>
 
                 {jadwalTerkunci && (
                     <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-                        <div className="flex items-start gap-4">
+                        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500 text-lg font-black text-white">
                                 !
                             </div>
@@ -392,7 +485,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                                     {pesanJadwalTestZoom}
                                 </p>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <InfoItem
                                         label="Kelengkapan Form"
                                         value={`${completion.completedSteps} dari ${completion.totalSteps} tahapan`}
@@ -413,7 +506,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-4 rounded-3xl border border-slate-100 bg-slate-50 p-5 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 rounded-3xl border border-slate-100 bg-slate-50 p-3 sm:gap-4 sm:p-5 md:grid-cols-2 lg:grid-cols-4">
                     <InfoItem
                         label="Nama Pelamar"
                         value={hasil?.nama_pelamar || hasil?.nama_lengkap || "-"}
@@ -439,8 +532,8 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                     />
                 </div>
 
-                <div className={`mt-6 rounded-3xl border p-5 ${getBoxColor(warnaUtama)}`}>
-                    <div className="flex items-start gap-4">
+                <div className={`mt-6 rounded-3xl border p-4 sm:p-5 ${getBoxColor(warnaUtama)}`}>
+                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-black text-white ${getCircleColor(warnaUtama)}`}>
                             !
                         </div>
@@ -450,7 +543,7 @@ function HasilTahapan({ hasil, token, onUpdated }) {
                                 Informasi Seleksi
                             </h4>
 
-                            <p className={`mt-2 text-sm leading-6 ${getDescriptionColor(warnaUtama)}`}>
+                            <p className={`mt-2 whitespace-pre-line text-sm leading-6 ${getDescriptionColor(warnaUtama)}`}>
                                 {saranUtama}
                             </p>
                         </div>
@@ -493,10 +586,16 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
     const isProses = status.includes("proses");
     const isTerjadwal = status.includes("jadwal") || status.includes("terjadwal");
     const isTerkunci = status.includes("terkunci") || item?.disabled === true;
+    const hasOfferingLetterDetail = Boolean(
+        item?.jadwal_offering_letter || item?.jadwalOfferingLetter
+    );
+    const showSaran = Boolean(item?.saran) &&
+        String(item?.saran || "").trim() !== String(item?.keterangan || "").trim() &&
+        !hasOfferingLetterDetail;
 
     return (
         <div
-            className={`relative flex gap-4 rounded-3xl border p-4 shadow-sm ${
+            className={`relative flex min-w-0 flex-col gap-3 rounded-3xl border p-3 shadow-sm sm:flex-row sm:gap-4 sm:p-4 ${
                 isGagal
                     ? "border-red-200 bg-red-50"
                     : isTerkunci
@@ -511,7 +610,7 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
             }`}
         >
             <div
-                className={`z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black text-white shadow-lg ${
+                className={`z-10 flex h-10 w-10 shrink-0 sm:h-11 sm:w-11 items-center justify-center rounded-full text-sm font-black text-white shadow-lg ${
                     isGagal
                         ? "bg-red-600 shadow-red-100"
                         : isTerkunci
@@ -528,7 +627,7 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                 {isGagal ? "×" : isTerkunci ? "!" : isTerjadwal ? "📅" : isLolos ? "✓" : index + 1}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 break-words">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h5
                         className={`font-black ${
@@ -564,7 +663,7 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                 </div>
 
                 <p
-                    className={`mt-2 text-sm leading-6 ${
+                    className={`mt-2 whitespace-pre-line text-sm leading-6 ${
                         isGagal
                             ? "text-red-800"
                             : isTerkunci
@@ -577,9 +676,9 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                     {item?.keterangan || "-"}
                 </p>
 
-                {item?.saran && (
+                {showSaran && (
                     <p
-                        className={`mt-2 text-sm font-semibold leading-6 ${
+                        className={`mt-2 whitespace-pre-line text-sm font-semibold leading-6 ${
                             isGagal
                                 ? "text-red-800"
                                 : isTerkunci
@@ -612,6 +711,12 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                 {(item?.jadwal_interview || item?.jadwalInterview) && (
                     <JadwalInterviewDalamTahapan
                         jadwalInterview={item.jadwal_interview || item.jadwalInterview}
+                    />
+                )}
+
+                {(item?.jadwal_offering_letter || item?.jadwalOfferingLetter) && (
+                    <JadwalOfferingLetterDalamTahapan
+                        jadwalOl={item.jadwal_offering_letter || item.jadwalOfferingLetter}
                     />
                 )}
             </div>
@@ -766,14 +871,14 @@ function JadwalTestDalamTahapan({
 
     return (
         <div
-            className={`mt-4 rounded-2xl border p-4 ${
+            className={`mt-4 rounded-2xl border p-3 sm:p-4 ${
                 jadwalDisabled
                     ? "border-amber-200 bg-amber-50"
                     : "border-blue-200 bg-white"
             }`}
         >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 flex-1 break-words">
                     <p
                         className={`text-sm font-black ${
                             jadwalDisabled ? "text-amber-900" : "text-blue-900"
@@ -860,7 +965,7 @@ function JadwalTestDalamTahapan({
                                 href={linkZoom}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-3 inline-flex rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700"
+                                className="mt-3 inline-flex w-full justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 sm:w-auto"
                             >
                                 Buka Link Zoom
                             </a>
@@ -878,12 +983,12 @@ function JadwalTestDalamTahapan({
                     )}
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                     <button
                         type="button"
                         disabled={saving || jadwalDisabled || !bolehIsiKehadiran || sudahMengisiKehadiran}
                         onClick={() => submitKehadiran("hadir")}
-                        className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="w-full rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
                         {saving ? "Menyimpan..." : "Hadir"}
                     </button>
@@ -892,7 +997,7 @@ function JadwalTestDalamTahapan({
                         type="button"
                         disabled={saving || jadwalDisabled || !bolehIsiKehadiran || sudahMengisiKehadiran}
                         onClick={() => submitKehadiran("tidak_hadir")}
-                        className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
                         {saving ? "Menyimpan..." : "Tidak Hadir"}
                     </button>
@@ -1007,15 +1112,15 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
 
     return (
         <div className="mt-4 rounded-2xl border border-indigo-200 bg-white p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-4">
+            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0 flex-1 break-words">
+                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-black text-white">
                             📝
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                            <p className="text-sm font-black text-indigo-900">
+                        <div className="min-w-0 flex-1 break-words">
+                            <p className="break-words text-sm font-black text-indigo-900">
                                 Jadwal Test MMPI: {tanggal}
                             </p>
 
@@ -1079,12 +1184,12 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
                 </div>
 
                 {(bolehIsiKehadiran || sudahMengisiKehadiran) && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                         <button
                             type="button"
                             disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
                             onClick={() => submitKehadiran("hadir")}
-                            className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                         >
                             {saving ? "Menyimpan..." : "Hadir"}
                         </button>
@@ -1093,7 +1198,7 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
                             type="button"
                             disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
                             onClick={() => submitKehadiran("tidak_hadir")}
-                            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                         >
                             {saving ? "Menyimpan..." : "Tidak Hadir"}
                         </button>
@@ -1123,13 +1228,13 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
 
     return (
         <div className="mt-4 rounded-2xl border border-purple-200 bg-white p-4">
-            <div className="flex items-start gap-4">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple-600 text-lg font-black text-white">
                     🎙️
                 </div>
 
-                <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-purple-900">
+                <div className="min-w-0 flex-1 break-words">
+                    <p className="break-words text-sm font-black text-purple-900">
                         Jadwal Interview: {tanggal}
                     </p>
 
@@ -1178,6 +1283,93 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
     );
 }
 
+
+function JadwalOfferingLetterDalamTahapan({ jadwalOl }) {
+    const normalized = normalizeJadwalOfferingLetter(jadwalOl);
+
+    if (!normalized) return null;
+
+    const tanggal = getJadwalTanggal(normalized);
+    const jam = getJadwalJam(normalized);
+    const status = normalized.status_jadwal || "Pending";
+    const statusOl = normalizeStatusOl(status);
+    const pesan = getSaranOfferingLetterFrontend(status);
+    const hasLink = Boolean(normalized.link && normalized.link !== "-");
+
+    const statusClass =
+        statusOl === "menerima"
+            ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
+            : statusOl === "menolak" || statusOl === "tidak_melanjutkan"
+            ? "bg-amber-100 text-amber-700 ring-1 ring-amber-200"
+            : "bg-blue-100 text-blue-700 ring-1 ring-blue-200";
+
+    return (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+            <div className="p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-sm font-black text-white shadow-sm">
+                            OL
+                        </div>
+
+                        <div className="min-w-0 flex-1 break-words">
+                            <p className="text-sm font-black leading-6 text-emerald-900">
+                                Jadwal Offering Letter: {tanggal}
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold leading-6 text-emerald-700">
+                                {jam && jam !== "-" && jam !== "00.00" && jam !== "00:00"
+                                    ? `Pukul ${jam} WIB`
+                                    : "Silakan mengikuti informasi dari tim rekrutmen."}
+                            </p>
+                        </div>
+                    </div>
+
+                    <span className={`w-fit shrink-0 rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${statusClass}`}>
+                        {status}
+                    </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <InfoItem label="Metode" value={normalized.metode || "-"} />
+                    <InfoItem label="PIC" value={normalized.pic || "-"} />
+                    <InfoItem label="Status Jadwal" value={status} />
+                    <InfoItem label="Link" value={normalized.link || "-"} />
+                </div>
+
+                {normalized.catatan && (
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                            Catatan Offering Letter
+                        </p>
+
+                        <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-700">
+                            {normalized.catatan}
+                        </p>
+                    </div>
+                )}
+
+                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                    <p className="whitespace-pre-line break-words text-sm font-bold leading-6 text-emerald-800">
+                        {pesan}
+                    </p>
+                </div>
+
+                {hasLink && (
+                    <a
+                        href={normalized.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-flex w-full justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-center text-sm font-black text-white transition hover:bg-emerald-700 sm:w-auto"
+                    >
+                        Buka Link Offering Letter
+                    </a>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function buildTahapanTampil(
     jadwalTest,
     hasilTest,
@@ -1188,7 +1380,9 @@ function buildTahapanTampil(
     bolehLanjutJadwalTestZoom = true,
     completion = {},
     pesanJadwalTestZoom = "",
-    statusReviewManagement = null
+    statusReviewManagement = null,
+    jadwalOfferingLetter = null,
+    statusJadwalOfferingLetter = null
 ) {
     const lockMessage =
         pesanJadwalTestZoom ||
@@ -1202,6 +1396,8 @@ function buildTahapanTampil(
     const interviewLanjutReview = Boolean(hasilInterview) && !interviewGagal;
     const reviewDiterima = interviewLanjutReview && statusReviewManagement === "diterima";
     const reviewGagal = interviewLanjutReview && statusReviewManagement === "gagal";
+    const reviewProses = interviewLanjutReview && !statusReviewManagement;
+    const punyaJadwalOfferingLetter = Boolean(jadwalOfferingLetter);
 
     const tahapan = [
         {
@@ -1250,12 +1446,9 @@ function buildTahapanTampil(
             status: hasilTest === "lolos" ? "Lolos" : "Gagal",
             keterangan:
                 hasilTest === "lolos"
-                    ? "Selamat, Anda dinyatakan lolos pada seleksi test Zoom."
-                    : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi test Zoom.",
-            saran:
-                hasilTest === "lolos"
-                    ? "Silakan pantau informasi jadwal test MMPI dari tim rekrutmen."
-                    : "Terima kasih sudah mengikuti proses seleksi.",
+                    ? PESAN_LOLOS_SELEKSI
+                    : PESAN_TIDAK_LOLOS_SELEKSI,
+            saran: null,
             hasil_test: hasilTest,
         });
 
@@ -1278,12 +1471,9 @@ function buildTahapanTampil(
                     status: hasilTestMmpi === "lolos" ? "Lolos" : "Gagal",
                     keterangan:
                         hasilTestMmpi === "lolos"
-                            ? "Selamat, Anda dinyatakan lolos pada seleksi test MMPI."
-                            : "Mohon maaf, Anda dinyatakan belum lolos pada seleksi test MMPI.",
-                    saran:
-                        hasilTestMmpi === "lolos"
-                            ? "Silakan pantau informasi jadwal interview dari tim rekrutmen."
-                            : "Terima kasih sudah mengikuti proses seleksi.",
+                            ? PESAN_LOLOS_SELEKSI
+                            : PESAN_TIDAK_LOLOS_SELEKSI,
+                    saran: null,
                     hasil_test_mmpi: hasilTestMmpi,
                     hasilTestMmpi: hasilTestMmpi,
                 });
@@ -1311,20 +1501,65 @@ function buildTahapanTampil(
                     });
 
                     if (hasilInterview) {
-                        tahapan.push({
-                            nama: "Hasil Interview",
-                            status: interviewGagal ? "Gagal" : "Lolos",
-                            keterangan: interviewGagal
-                                ? "Mohon maaf, Anda dinyatakan tidak lolos pada tahap interview."
-                                : "Selamat, Anda dinyatakan lolos pada tahap interview.",
-                            saran: interviewGagal
-                                ? "Terima kasih sudah mengikuti proses seleksi."
-                                : "Selamat, Anda dinyatakan lolos pada proses seleksi.",
-                            hasil_interview: hasilInterview,
-                            hasilInterview: hasilInterview,
-                        });
+                        const reviewManagementText =
+                            jadwalInterview?.review_management ||
+                            jadwalInterview?.reviewManagement ||
+                            null;
 
+                        if (interviewGagal) {
+                            tahapan.push({
+                                nama: "Interview",
+                                status: "Gagal Interview",
+                                keterangan: PESAN_TIDAK_LOLOS_SELEKSI,
+                                saran: null,
+                                hasil_interview: hasilInterview,
+                                hasilInterview: hasilInterview,
+                                review_management: reviewManagementText,
+                                reviewManagement: reviewManagementText,
+                                status_review_management: statusReviewManagement,
+                                statusReviewManagement: statusReviewManagement,
+                            });
+                        }
 
+                        if (interviewLanjutReview) {
+                            tahapan.push({
+                                nama: "Interview",
+                                status: reviewProses
+                                    ? "Review Management"
+                                    : reviewDiterima
+                                    ? "Lolos Interview"
+                                    : "Gagal Interview",
+                                keterangan: reviewProses
+                                    ? "Hasil interview sudah tersedia dan sedang diproses ke tahap Review Management."
+                                    : reviewDiterima
+                                    ? PESAN_LOLOS_SELEKSI
+                                    : PESAN_TIDAK_LOLOS_SELEKSI,
+                                saran: reviewProses
+                                    ? "Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management."
+                                    : null,
+                                hasil_interview: hasilInterview,
+                                hasilInterview: hasilInterview,
+                                review_management: reviewManagementText,
+                                reviewManagement: reviewManagementText,
+                                status_review_management: statusReviewManagement,
+                                statusReviewManagement: statusReviewManagement,
+                            });
+
+                            if (reviewDiterima) {
+                                tahapan.push({
+                                    nama: "Jadwal Offering Letter",
+                                    status: punyaJadwalOfferingLetter
+                                        ? statusJadwalOfferingLetter || "Pending"
+                                        : "Pending",
+                                    keterangan: punyaJadwalOfferingLetter
+                                        ? "Jadwal Offering Letter sudah tersedia."
+                                        : PESAN_LOLOS_OFFERING_LETTER,
+                                    saran: null,
+                                    jadwal_offering_letter: jadwalOfferingLetter,
+                                    jadwalOfferingLetter: jadwalOfferingLetter,
+                                });
+                            }
+                        }
                     }
                 }
             }
@@ -1404,6 +1639,150 @@ function getPesanJadwalTestZoom(hasil) {
 }
 
 
+
+
+function getJadwalOfferingLetterFromHasil(hasil, jadwalInterview = null) {
+    const direct =
+        hasil?.jadwal_offering_letter ||
+        hasil?.jadwalOfferingLetter ||
+        hasil?.offering_letter ||
+        hasil?.offeringLetter ||
+        jadwalInterview?.jadwal_offering_letter ||
+        jadwalInterview?.jadwalOfferingLetter ||
+        jadwalInterview?.offering_letter ||
+        jadwalInterview?.offeringLetter ||
+        hasil?.tahapan_seleksi?.jadwal_offering_letter ||
+        hasil?.tahapanSeleksi?.jadwalOfferingLetter ||
+        null;
+
+    if (direct) return normalizeJadwalOfferingLetter(direct);
+
+    const tahapan = Array.isArray(hasil?.tahapan)
+        ? hasil.tahapan
+        : Array.isArray(hasil?.tahapan_seleksi?.tahapan)
+        ? hasil.tahapan_seleksi.tahapan
+        : Array.isArray(hasil?.tahapanSeleksi?.tahapan)
+        ? hasil.tahapanSeleksi.tahapan
+        : [];
+
+    const itemOfferingLetter = tahapan.find((item) => {
+        const nama = String(item?.nama || "").toLowerCase();
+        return (
+            nama.includes("offering") ||
+            item?.jadwal_offering_letter ||
+            item?.jadwalOfferingLetter ||
+            item?.offering_letter ||
+            item?.offeringLetter
+        );
+    });
+
+    const nested =
+        itemOfferingLetter?.jadwal_offering_letter ||
+        itemOfferingLetter?.jadwalOfferingLetter ||
+        itemOfferingLetter?.offering_letter ||
+        itemOfferingLetter?.offeringLetter ||
+        null;
+
+    return nested ? normalizeJadwalOfferingLetter(nested) : null;
+}
+
+function getStatusJadwalOfferingLetterFromHasil(hasil, jadwalOl = null) {
+    const raw =
+        hasil?.status_jadwal_offering_letter ||
+        hasil?.statusJadwalOfferingLetter ||
+        hasil?.status_jadwal_ol ||
+        hasil?.statusJadwalOl ||
+        jadwalOl?.status_jadwal ||
+        jadwalOl?.statusJadwal ||
+        jadwalOl?.status ||
+        null;
+
+    return raw || null;
+}
+
+function normalizeJadwalOfferingLetter(jadwalOl) {
+    if (!jadwalOl) return null;
+
+    const status =
+        jadwalOl?.status_jadwal ||
+        jadwalOl?.statusJadwal ||
+        jadwalOl?.status ||
+        "Pending";
+
+    return {
+        ...jadwalOl,
+        id: jadwalOl?.id || jadwalOl?.jadwal_offering_letter_id || jadwalOl?.jadwalOfferingLetterId || null,
+        tanggal_ol:
+            jadwalOl?.tanggal_ol ||
+            jadwalOl?.tanggalOl ||
+            jadwalOl?.tanggal ||
+            jadwalOl?.jadwal ||
+            null,
+        tanggalOl:
+            jadwalOl?.tanggalOl ||
+            jadwalOl?.tanggal_ol ||
+            jadwalOl?.tanggal ||
+            jadwalOl?.jadwal ||
+            null,
+        jadwal:
+            jadwalOl?.jadwal ||
+            jadwalOl?.tanggal_ol ||
+            jadwalOl?.tanggalOl ||
+            jadwalOl?.tanggal ||
+            null,
+        jam_ol: jadwalOl?.jam_ol || jadwalOl?.jamOl || jadwalOl?.jam || null,
+        jamOl: jadwalOl?.jamOl || jadwalOl?.jam_ol || jadwalOl?.jam || null,
+        jam: jadwalOl?.jam || jadwalOl?.jam_ol || jadwalOl?.jamOl || null,
+        metode: jadwalOl?.metode || "-",
+        link: jadwalOl?.link || null,
+        pic: jadwalOl?.pic || null,
+        catatan: jadwalOl?.catatan || jadwalOl?.catatan_ol || jadwalOl?.catatanOl || null,
+        status_jadwal: status || "Pending",
+        statusJadwal: status || "Pending",
+    };
+}
+
+function normalizeStatusOl(value) {
+    if (value === null || value === undefined || value === "") return null;
+
+    const normalized = String(value).toLowerCase().trim().replace(/[\s-]+/g, "_");
+
+    if (["menerima", "terima", "diterima", "accept", "accepted"].includes(normalized)) {
+        return "menerima";
+    }
+
+    if (["menolak", "tolak", "ditolak", "reject", "rejected"].includes(normalized)) {
+        return "menolak";
+    }
+
+    if (["tidak_melanjutkan", "tidakmelanjutkan", "tidak_lanjut", "tidak_lanjutkan"].includes(normalized)) {
+        return "tidak_melanjutkan";
+    }
+
+    if (["pending", "menunggu", "proses", ""].includes(normalized)) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function getSaranOfferingLetterFrontend(statusJadwal) {
+    const status = normalizeStatusOl(statusJadwal);
+
+    if (status === "menerima") {
+        return PESAN_OFFERING_LETTER_MENERIMA;
+    }
+
+    if (status === "menolak") {
+        return PESAN_OFFERING_LETTER_MENOLAK;
+    }
+
+    if (status === "tidak_melanjutkan") {
+        return PESAN_OFFERING_LETTER_TIDAK_MELANJUTKAN;
+    }
+
+    return PESAN_LOLOS_OFFERING_LETTER;
+}
 
 function getJadwalInterviewFromHasil(hasil) {
     if (!hasil) return null;
@@ -1957,6 +2336,13 @@ function normalizeJadwalInterview(jadwalInterview) {
     const normalizedStatusReviewManagement = normalizeStatusReviewManagement(
         rawStatusReviewManagement
     );
+    const jadwalOfferingLetter = normalizeJadwalOfferingLetter(
+        jadwalInterview.jadwal_offering_letter ||
+            jadwalInterview.jadwalOfferingLetter ||
+            jadwalInterview.offering_letter ||
+            jadwalInterview.offeringLetter ||
+            null
+    );
 
     return {
         ...jadwalInterview,
@@ -1998,6 +2384,11 @@ function normalizeJadwalInterview(jadwalInterview) {
         statusReviewManagement: normalizedStatusReviewManagement,
         status_review: normalizedStatusReviewManagement,
         statusReview: normalizedStatusReviewManagement,
+
+        jadwal_offering_letter: jadwalOfferingLetter,
+        jadwalOfferingLetter: jadwalOfferingLetter,
+        status_jadwal_offering_letter: jadwalOfferingLetter?.status_jadwal || null,
+        statusJadwalOfferingLetter: jadwalOfferingLetter?.status_jadwal || null,
     };
 }
 

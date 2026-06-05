@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HasilReviewManagement extends Model
 {
@@ -29,6 +30,15 @@ class HasilReviewManagement extends Model
         return $this->belongsTo(
             JadwalInterviewKandidat::class,
             'hasil_interview_id',
+            'id'
+        );
+    }
+
+    public function jadwalOfferingLetter(): HasOne
+    {
+        return $this->hasOne(
+            JadwalOfferingLetter::class,
+            'hasil_review_management_id',
             'id'
         );
     }
