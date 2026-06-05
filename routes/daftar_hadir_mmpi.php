@@ -9,6 +9,17 @@ Route::prefix('admin/daftar-hadir/mmpi')
         Route::get('/groups', [MmpiController::class, 'groups'])->name('groups');
         Route::get('/list', [MmpiController::class, 'list'])->name('list');
         Route::get('/detail', [MmpiController::class, 'detail'])->name('detail');
-        Route::patch('/{jadwalTestMmpi}/kehadiran', [MmpiController::class, 'updateKehadiran'])->name('kehadiran');
-        Route::patch('/{jadwalTestMmpi}/hasil-test', [MmpiController::class, 'updateHasilTest'])->name('hasil-test');
+
+        Route::patch('/{jadwalTestMmpi}/kehadiran', [MmpiController::class, 'updateKehadiran'])
+            ->name('kehadiran');
+
+        Route::patch('/{jadwalTestMmpi}/hasil-test', [MmpiController::class, 'updateHasilTest'])
+            ->name('hasil-test');
+
+        /*
+         | Dipakai React saat upload file karena FormData dikirim dengan POST + _method=PATCH.
+         | Route PATCH di atas tetap aman untuk request lama yang masih JSON.
+         */
+        Route::post('/{jadwalTestMmpi}/hasil-test', [MmpiController::class, 'updateHasilTest'])
+            ->name('hasil-test.upload');
     });

@@ -19,6 +19,8 @@ class DataPerusahaan extends Model
     protected $fillable = [
         'kode',
         'nama_perusahaan',
+        'no_wa',
+        'token_api_wa',
         'created_by',
     ];
 

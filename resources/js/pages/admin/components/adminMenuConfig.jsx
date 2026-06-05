@@ -35,6 +35,7 @@ import ReportDataPelamarPage from "../pages/report-data-pelamar/Index";
 import ReportHasilTestZoomPage from "../pages/report-hasil-test-zoom/Index";
 import ReportHasilTestMmpiPage from "../pages/report-hasil-test-mmpi/Index";
 import ReportInterviewKandidatPage from "../pages/report-interview-kandidat/Index";
+import ReportOfferingLetterPage from "../pages/report-offering-letter/Index";
 
 import RolePage from "../account/role/Index";
 import UserPage from "../account/user/Index";
@@ -364,6 +365,13 @@ export const menuItems = [
                 icon: "▣",
                 component: ReportInterviewKandidatPage,
             },
+            {
+                key: "report-offering-letter",
+                label: "Offering Letter",
+                description: "Report jadwal dan status Offering Letter",
+                icon: "OL",
+                component: ReportOfferingLetterPage,
+            },
         ],
     },
     {
@@ -492,7 +500,8 @@ export function getMenuParentKeyByChildKey(childKey) {
         childKey === "report-data-pelamar" ||
         childKey === "report-hasil-test-zoom" ||
         childKey === "report-hasil-test-mmpi" ||
-        childKey === "report-interview-kandidat"
+        childKey === "report-interview-kandidat" ||
+        childKey === "report-offering-letter"
     ) {
         return "report";
     }
@@ -532,7 +541,8 @@ export function isMenuActive(menu, activeMenu) {
         (activeMenu === "report-data-pelamar" && menu.key === "report") ||
         (activeMenu === "report-hasil-test-zoom" && menu.key === "report") ||
         (activeMenu === "report-hasil-test-mmpi" && menu.key === "report") ||
-        (activeMenu === "report-interview-kandidat" && menu.key === "report")
+        (activeMenu === "report-interview-kandidat" && menu.key === "report") ||
+        (activeMenu === "report-offering-letter" && menu.key === "report")
     );
 }
 
@@ -554,6 +564,8 @@ export function isChildActive(child, activeMenu) {
         (activeMenu === "report-hasil-test-mmpi" &&
             child.key === "report-hasil-test-mmpi") ||
         (activeMenu === "report-interview-kandidat" &&
-            child.key === "report-interview-kandidat")
+            child.key === "report-interview-kandidat") ||
+        (activeMenu === "report-offering-letter" &&
+            child.key === "report-offering-letter")
     );
 }

@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class MmpiController extends Controller
@@ -153,25 +155,34 @@ class MmpiController extends Controller
             });
         }
 
+        $selects = [
+            'jmm.id as jadwal_test_mmpi_id',
+            'jmm.data_riwayat_diri_id',
+            'jmm.tanggal as tanggal_mmpi',
+            'dhm.id as daftar_hadir_test_mmpi_id',
+            'dhm.tanggal_kehadiran',
+            'dhm.status_kehadiran',
+            'dhm.hasil_test',
+            DB::raw($pelamarColumns['nama'] . ' as nama'),
+            DB::raw($pelamarColumns['email'] . ' as email'),
+            DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
+        ];
+
+        if (Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
+            $selects[] = 'dhm.file_hasil_test_mmpi';
+        } else {
+            $selects[] = DB::raw("NULL as file_hasil_test_mmpi");
+        }
+
         $items = $query
-            ->select([
-                'jmm.id as jadwal_test_mmpi_id',
-                'jmm.data_riwayat_diri_id',
-                'jmm.tanggal as tanggal_mmpi',
-                'dhm.id as daftar_hadir_test_mmpi_id',
-                'dhm.tanggal_kehadiran',
-                'dhm.status_kehadiran',
-                'dhm.hasil_test',
-                DB::raw($pelamarColumns['nama'] . ' as nama'),
-                DB::raw($pelamarColumns['email'] . ' as email'),
-                DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
-            ])
+            ->select($selects)
             ->orderBy('jmm.tanggal')
             ->orderBy($pelamarColumns['nama_order'])
             ->get()
             ->map(function ($item) {
                 $statusKehadiran = $this->normalizeKehadiranValue($item->status_kehadiran ?? null);
                 $hasilTest = $this->normalizeHasilTestValue($item->hasil_test ?? null);
+                $fileUrl = $this->normalizeFileUrl($item->file_hasil_test_mmpi ?? null);
 
                 return [
                     'id' => $item->jadwal_test_mmpi_id,
@@ -184,6 +195,8 @@ class MmpiController extends Controller
                     'status_kehadiran_label' => $this->labelKehadiran($statusKehadiran),
                     'hasil_test' => $hasilTest,
                     'hasil_test_label' => $this->labelHasilTest($hasilTest),
+                    'file_hasil_test_mmpi' => $fileUrl,
+                    'file_hasil_test_mmpi_url' => $fileUrl,
                     'nama' => $item->nama ?: '-',
                     'email' => $item->email ?: '-',
                     'no_hp' => $item->no_hp ?: '-',
@@ -213,10 +226,26 @@ class MmpiController extends Controller
     {
         $validated = $request->validate([
             'hasil_test' => ['required', Rule::in(['lolos', 'gagal'])],
+            'file_hasil_test_mmpi' => [
+                'nullable',
+                'file',
+                'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+                'max:5120',
+            ],
         ], [
             'hasil_test.required' => 'Hasil test wajib dipilih.',
             'hasil_test.in' => 'Hasil test tidak valid.',
+            'file_hasil_test_mmpi.file' => 'File hasil test MMPI tidak valid.',
+            'file_hasil_test_mmpi.mimes' => 'File harus berupa PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, atau PNG.',
+            'file_hasil_test_mmpi.max' => 'Ukuran file maksimal 5 MB.',
         ]);
+
+        if (!Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom file_hasil_test_mmpi belum tersedia. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
 
         $jadwal = JadwalTestMmpi::query()->findOrFail($jadwalTestMmpi);
 
@@ -238,14 +267,53 @@ class MmpiController extends Controller
             ], 422);
         }
 
+        $namaKandidat = $this->getNamaKandidatByJadwal($jadwal);
+        $fileUrl = $this->normalizeFileUrl($daftarHadir->file_hasil_test_mmpi ?? null);
+
+        if ($request->hasFile('file_hasil_test_mmpi')) {
+            $oldPath = $this->convertPublicUrlToStoragePath($fileUrl);
+
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $folderNamaKandidat = $this->sanitizeFolderName($namaKandidat ?: 'tanpa nama');
+            $extension = $request->file('file_hasil_test_mmpi')->getClientOriginalExtension();
+
+            $fileName = 'hasil-test-mmpi-' .
+                now()->format('Ymd-His') .
+                '-' .
+                Str::random(8) .
+                '.' .
+                $extension;
+
+            $storedPath = $request->file('file_hasil_test_mmpi')->storeAs(
+                "test mmpi/{$folderNamaKandidat}/dokumen",
+                $fileName,
+                'public'
+            );
+
+            $fileUrl = '/storage/' . $storedPath;
+        }
+
         $daftarHadir->update([
             'hasil_test' => $validated['hasil_test'],
+            'file_hasil_test_mmpi' => $fileUrl,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Hasil test MMPI berhasil diperbarui.',
-            'data' => $daftarHadir,
+            'data' => [
+                'id' => $daftarHadir->id,
+                'jadwal_test_mmpi_id' => $jadwal->id,
+                'daftar_hadir_test_mmpi_id' => $daftarHadir->id,
+                'status_kehadiran' => $this->normalizeKehadiranValue($daftarHadir->status_kehadiran),
+                'hasil_test' => $this->normalizeHasilTestValue($validated['hasil_test']),
+                'hasil_test_label' => $this->labelHasilTest($this->normalizeHasilTestValue($validated['hasil_test'])),
+                'file_hasil_test_mmpi' => $fileUrl,
+                'file_hasil_test_mmpi_url' => $fileUrl,
+            ],
         ]);
     }
 
@@ -337,6 +405,26 @@ class MmpiController extends Controller
         ];
     }
 
+    private function getNamaKandidatByJadwal(JadwalTestMmpi $jadwal): string
+    {
+        $namaColumn = $this->firstExistingColumn('data_riwayat_diri', [
+            'nama_lengkap',
+            'nama',
+            'nama_pelamar',
+        ]);
+
+        if (!$namaColumn) {
+            return 'tanpa nama';
+        }
+
+        $row = DB::table('data_riwayat_diri')
+            ->where('id', $jadwal->data_riwayat_diri_id)
+            ->select(DB::raw("{$namaColumn} as nama"))
+            ->first();
+
+        return $row?->nama ?: 'tanpa nama';
+    }
+
     private function firstExistingColumn(string $table, array $columns): ?string
     {
         foreach ($columns as $column) {
@@ -346,6 +434,76 @@ class MmpiController extends Controller
         }
 
         return null;
+    }
+
+    private function sanitizeFolderName(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '' || $value === '-') {
+            return 'tanpa-nama';
+        }
+
+        $value = preg_replace('/[\\\\\/:*?"<>|]+/', '', $value);
+        $value = preg_replace('/\s+/', ' ', $value);
+        $value = trim($value);
+
+        return $value !== '' ? $value : 'tanpa-nama';
+    }
+
+    private function normalizeFileUrl(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (!str_starts_with($value, 'http://') &&
+            !str_starts_with($value, 'https://') &&
+            !str_starts_with($value, '/storage/')
+        ) {
+            return '/storage/' . ltrim($value, '/');
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $path = parse_url($value, PHP_URL_PATH);
+
+            return $path ?: $value;
+        }
+
+        return $value;
+    }
+
+    private function convertPublicUrlToStoragePath(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        $url = $this->normalizeFileUrl($url);
+
+        if (!$url) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (!$path) {
+            return null;
+        }
+
+        $storagePrefix = '/storage/';
+
+        if (!str_starts_with($path, $storagePrefix)) {
+            return null;
+        }
+
+        return urldecode(substr($path, strlen($storagePrefix)));
     }
 
     private function normalizeKehadiranValue($value): ?string

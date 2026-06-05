@@ -19,6 +19,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
     const [form, setForm] = useState({
         kode: "",
         nama_perusahaan: "",
+        no_wa: "",
+        token_api_wa: "",
     });
 
     const currentSignal = actionSignals?.masterPerusahaan || 0;
@@ -36,6 +38,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
         setForm({
             kode: "",
             nama_perusahaan: "",
+            no_wa: "",
+            token_api_wa: "",
         });
     };
 
@@ -56,13 +60,14 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const response = await fetch("/admin/master-data/perusahaan/list", {
                 headers: {
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                 },
             });
 
             const result = await response.json();
 
             if (result.success) {
-                setDataPerusahaan(result.data || []);
+                setDataPerusahaan(Array.isArray(result.data) ? result.data : []);
             } else {
                 alert(result.message || "Gagal mengambil data perusahaan.");
             }
@@ -100,8 +105,15 @@ export default function DataPerusahaanPage({ actionSignals }) {
         return dataPerusahaan.filter((item) => {
             const kode = String(item.kode || "").toLowerCase();
             const namaPerusahaan = String(item.nama_perusahaan || "").toLowerCase();
+            const noWa = String(item.no_wa || "").toLowerCase();
+            const tokenApiWa = String(item.token_api_wa || "").toLowerCase();
 
-            return kode.includes(keyword) || namaPerusahaan.includes(keyword);
+            return (
+                kode.includes(keyword) ||
+                namaPerusahaan.includes(keyword) ||
+                noWa.includes(keyword) ||
+                tokenApiWa.includes(keyword)
+            );
         });
     }, [dataPerusahaan, search]);
 
@@ -187,8 +199,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
         return sortConfig.direction === "asc" ? "↑" : "↓";
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
+    const handleChange = (event) => {
+        const { name, value } = event.target;
 
         setForm((prev) => ({
             ...prev,
@@ -202,13 +214,15 @@ export default function DataPerusahaanPage({ actionSignals }) {
         setForm({
             kode: item.kode || "",
             nama_perusahaan: item.nama_perusahaan || "",
+            no_wa: item.no_wa || "",
+            token_api_wa: item.token_api_wa || "",
         });
 
         setModalOpen(true);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
         setLoading(true);
 
         try {
@@ -218,14 +232,21 @@ export default function DataPerusahaanPage({ actionSignals }) {
 
             const method = editId ? "PUT" : "POST";
 
+            const payload = {
+                nama_perusahaan: form.nama_perusahaan,
+                no_wa: form.no_wa,
+                token_api_wa: form.token_api_wa,
+            };
+
             const response = await fetch(url, {
                 method,
                 headers: {
                     "Content-Type": "application/json",
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             const result = await response.json();
@@ -256,6 +277,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                 method: "DELETE",
                 headers: {
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
             });
@@ -274,6 +296,18 @@ export default function DataPerusahaanPage({ actionSignals }) {
         }
     };
 
+    const maskToken = (token) => {
+        if (!token) return "-";
+
+        const value = String(token);
+
+        if (value.length <= 10) {
+            return "••••••";
+        }
+
+        return `${value.slice(0, 6)}••••••${value.slice(-4)}`;
+    };
+
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
@@ -288,7 +322,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         </h1>
 
                         <p className="mt-1 text-sm font-medium text-slate-500">
-                            Kelola daftar perusahaan untuk proses rekrutmen.
+                            Kelola daftar perusahaan, nomer WA, dan token API WA.
                         </p>
                     </div>
 
@@ -340,8 +374,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 type="text"
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Cari kode atau nama perusahaan..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
+                                placeholder="Cari kode, nama, nomer, atau token..."
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
                             />
                         </div>
                     </div>
@@ -367,6 +401,20 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     icon={sortIcon("nama_perusahaan")}
                                 />
 
+                                <SortableTableHead
+                                    label="Nomer Perusahaan"
+                                    sortKey="no_wa"
+                                    onSort={handleSort}
+                                    icon={sortIcon("no_wa")}
+                                />
+
+                                <SortableTableHead
+                                    label="Token API WA"
+                                    sortKey="token_api_wa"
+                                    onSort={handleSort}
+                                    icon={sortIcon("token_api_wa")}
+                                />
+
                                 <TableHead align="right">Aksi</TableHead>
                             </tr>
                         </thead>
@@ -374,7 +422,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-16">
+                                    <td colSpan="6" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -399,6 +447,21 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                         <td className="px-6 py-5">
                                             <div className="font-black text-slate-950">
                                                 {item.nama_perusahaan}
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-5">
+                                            <div className="font-black text-slate-700">
+                                                {item.no_wa || "-"}
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-5">
+                                            <div
+                                                className="max-w-[260px] truncate font-mono text-xs font-black text-slate-600"
+                                                title={item.token_api_wa || "-"}
+                                            >
+                                                {maskToken(item.token_api_wa)}
                                             </div>
                                         </td>
 
@@ -427,7 +490,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-16">
+                                    <td colSpan="6" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ▥
@@ -520,7 +583,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Lengkapi kode dan nama perusahaan.
+                                        Kode dibuat otomatis oleh sistem. Lengkapi nama, nomer, dan token API WA perusahaan.
                                     </p>
                                 </div>
 
@@ -536,14 +599,28 @@ export default function DataPerusahaanPage({ actionSignals }) {
 
                         <form onSubmit={handleSubmit}>
                             <div className="grid gap-5 px-6 py-6 md:grid-cols-2">
-                                <Input
-                                    label="Kode"
-                                    name="kode"
-                                    value={form.kode}
-                                    onChange={handleChange}
-                                    placeholder="Contoh: PRSHN001"
-                                    required
-                                />
+                                {editId && (
+                                    <Input
+                                        label="Kode"
+                                        name="kode"
+                                        value={form.kode}
+                                        onChange={handleChange}
+                                        placeholder="Kode otomatis"
+                                        disabled
+                                    />
+                                )}
+
+                                {!editId && (
+                                    <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 md:col-span-2">
+                                        <p className="text-xs font-black uppercase tracking-wide text-teal-700">
+                                            Kode Perusahaan
+                                        </p>
+
+                                        <p className="mt-1 text-sm font-bold text-teal-800">
+                                            Kode akan dibuat otomatis secara random setelah data disimpan.
+                                        </p>
+                                    </div>
+                                )}
 
                                 <Input
                                     label="Nama Perusahaan"
@@ -553,6 +630,25 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     placeholder="Contoh: PT Example Indonesia"
                                     required
                                 />
+
+                                <Input
+                                    label="Nomer Perusahaan"
+                                    name="no_wa"
+                                    value={form.no_wa}
+                                    onChange={handleChange}
+                                    placeholder="Contoh: 081234567890"
+                                    required
+                                />
+
+                                <div className="md:col-span-2">
+                                    <Textarea
+                                        label="Token API WA"
+                                        name="token_api_wa"
+                                        value={form.token_api_wa}
+                                        onChange={handleChange}
+                                        placeholder="Masukkan token API WhatsApp perusahaan"
+                                    />
+                                </div>
                             </div>
 
                             <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
@@ -621,6 +717,7 @@ function Input({
     type = "text",
     required = false,
     placeholder = "",
+    disabled = false,
 }) {
     return (
         <div>
@@ -635,8 +732,39 @@ function Input({
                 value={value}
                 onChange={onChange}
                 required={required}
+                disabled={disabled}
                 placeholder={placeholder}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+            />
+        </div>
+    );
+}
+
+function Textarea({
+    label,
+    name,
+    value,
+    onChange,
+    required = false,
+    placeholder = "",
+    disabled = false,
+}) {
+    return (
+        <div>
+            <label className="mb-2 block text-sm font-black text-slate-700">
+                {label}
+                {required && <span className="text-rose-500"> *</span>}
+            </label>
+
+            <textarea
+                name={name}
+                value={value}
+                onChange={onChange}
+                required={required}
+                disabled={disabled}
+                placeholder={placeholder}
+                rows={4}
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
             />
         </div>
     );

@@ -24,8 +24,6 @@ use Illuminate\Validation\Rule;
 
 class DataPelamarController extends Controller
 {
-    private string $fonnteToken = '6DZTEcgCbaCobfLaDcGG';
-
     /**
      * WA tidak bisa membuka link 127.0.0.1 / localhost.
      * Isi dengan domain publik aplikasi Anda, contoh:
@@ -361,20 +359,22 @@ class DataPelamarController extends Controller
             ], 404);
         }
 
-        $messages = [];
+        $groupedMessages = [];
         $skipped = [];
 
         foreach ($pelamars as $pelamar) {
             $target = $this->normalizeWhatsappNumber($pelamar->no_wa ?? null);
             $urlPendaftaran = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
+            $perusahaan = $pelamar->perusahaan;
 
             if (!$target) {
                 $skipped[] = [
                     'id' => $pelamar->id,
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
+                    'perusahaan' => $pelamar->perusahaan_label,
                     'pendaftaran_url' => $urlPendaftaran,
-                    'reason' => 'Nomor WhatsApp kosong atau tidak valid.',
+                    'reason' => 'Nomor WhatsApp pelamar kosong atau tidak valid.',
                 ];
 
                 continue;
@@ -386,6 +386,7 @@ class DataPelamarController extends Controller
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
+                    'perusahaan' => $pelamar->perusahaan_label,
                     'pendaftaran_url' => null,
                     'reason' => 'URL pendaftaran tidak tersedia karena token kandidat kosong.',
                 ];
@@ -393,7 +394,67 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            $messages[] = [
+            if (!$perusahaan) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan' => $pelamar->perusahaan_label,
+                    'pendaftaran_url' => $urlPendaftaran,
+                    'reason' => 'Data perusahaan kandidat tidak ditemukan.',
+                ];
+
+                continue;
+            }
+
+            $tokenApiWa = $this->normalizeTokenApiWa($perusahaan->token_api_wa ?? null);
+            $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
+
+            if (!$nomerPerusahaan) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
+                    'pendaftaran_url' => $urlPendaftaran,
+                    'reason' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$tokenApiWa) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'pendaftaran_url' => $urlPendaftaran,
+                    'reason' => 'Token API WA perusahaan kosong.',
+                ];
+
+                continue;
+            }
+
+            $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
+
+            if (!isset($groupedMessages[$groupKey])) {
+                $groupedMessages[$groupKey] = [
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'token_api_wa' => $tokenApiWa,
+                    'messages' => [],
+                ];
+            }
+
+            $groupedMessages[$groupKey]['messages'][] = [
                 'target' => $target,
                 'message' => $this->buildPesanSkrining(
                     $pelamar,
@@ -403,10 +464,10 @@ class DataPelamarController extends Controller
             ];
         }
 
-        if (empty($messages)) {
+        if (empty($groupedMessages)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp dan token pendaftaran kandidat sudah tersedia.',
+                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp pelamar, nomor WhatsApp perusahaan, token API WA perusahaan, dan token pendaftaran kandidat sudah tersedia.',
                 'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
                 'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
                 'total_pelamar' => $pelamars->count(),
@@ -416,64 +477,102 @@ class DataPelamarController extends Controller
             ], 422);
         }
 
-        try {
-            /*
-             * Catatan:
-             * - withoutVerifying() dipakai untuk menghindari error lokal seperti:
-             *   cURL error 60: SSL certificate problem.
-             * - Di server production yang sertifikat CA-nya sudah benar, bagian ini boleh dihapus.
-             * - Fonnte menerima pengiriman massal melalui parameter "data" berisi JSON array.
-             */
-            $response = Http::asForm()
-                ->withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => $this->fonnteToken,
-                ])
-                ->timeout(120)
-                ->post('https://api.fonnte.com/send', [
-                    'data' => json_encode($messages),
-                    'countryCode' => '62',
-                    'typing' => 'false',
-                    'preview' => 'true',
+        $responses = [];
+        $totalDikirim = 0;
+        $totalGagalProvider = 0;
+        $targets = [];
+
+        foreach ($groupedMessages as $group) {
+            try {
+                $response = Http::asForm()
+                    ->withoutVerifying()
+                    ->withHeaders([
+                        'Authorization' => $group['token_api_wa'],
+                    ])
+                    ->timeout(120)
+                    ->post('https://api.fonnte.com/send', [
+                        'data' => json_encode($group['messages']),
+                        'countryCode' => '62',
+                        'typing' => 'false',
+                        'preview' => 'true',
+                    ]);
+
+                $json = $response->json();
+                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
+                $isSuccess = $response->successful() && (bool) $fonnteStatus;
+
+                $countMessages = count($group['messages']);
+
+                if ($isSuccess) {
+                    $totalDikirim += $countMessages;
+                } else {
+                    $totalGagalProvider += $countMessages;
+                }
+
+                $targets = array_merge(
+                    $targets,
+                    collect($group['messages'])->pluck('target')->values()->all()
+                );
+
+                $responses[] = [
+                    'success' => $isSuccess,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_data' => $countMessages,
+                    'targets' => collect($group['messages'])->pluck('target')->values(),
+                    'fonnte_http_code' => $response->status(),
+                    'fonnte_response' => $json ?: $response->body(),
+                    'message' => $isSuccess
+                        ? 'Pesan berhasil dikirim ke antrean Fonnte untuk perusahaan ini.'
+                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan gagal dikirim melalui Fonnte untuk perusahaan ini.'),
+                ];
+            } catch (\Throwable $e) {
+                $countMessages = count($group['messages']);
+                $totalGagalProvider += $countMessages;
+
+                Log::error('Gagal mengirim pesan Fonnte skrining per perusahaan', [
+                    'message' => $e->getMessage(),
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                    'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
                 ]);
 
-            $json = $response->json();
-            $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-            $isSuccess = $response->successful() && (bool) $fonnteStatus;
-
-            return response()->json([
-                'success' => $isSuccess,
-                'message' => $isSuccess
-                    ? 'Pesan WhatsApp berhasil dikirim ke antrean Fonnte.'
-                    : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan WhatsApp gagal dikirim melalui Fonnte.'),
-                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
-                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
-                'total_pelamar' => $pelamars->count(),
-                'total_dikirim' => count($messages),
-                'total_dilewati' => count($skipped),
-                'skipped' => $skipped,
-                'targets' => collect($messages)->pluck('target')->values(),
-                'fonnte_http_code' => $response->status(),
-                'fonnte_response' => $json ?: $response->body(),
-            ], $isSuccess ? 200 : 422);
-        } catch (\Throwable $e) {
-            Log::error('Gagal mengirim pesan Fonnte skrining', [
-                'message' => $e->getMessage(),
-                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
-                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte: ' . $e->getMessage(),
-                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
-                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
-                'total_pelamar' => $pelamars->count(),
-                'total_dikirim' => 0,
-                'total_dilewati' => $pelamars->count(),
-                'skipped' => $skipped,
-            ], 500);
+                $responses[] = [
+                    'success' => false,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_data' => $countMessages,
+                    'targets' => collect($group['messages'])->pluck('target')->values(),
+                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
+                ];
+            }
         }
+
+        $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
+        $isPartialSuccess = $totalDikirim > 0 && $totalGagalProvider > 0;
+
+        return response()->json([
+            'success' => $totalDikirim > 0,
+            'message' => $isAllSuccess
+                ? 'Pesan WhatsApp berhasil dikirim sesuai perusahaan masing-masing.'
+                : ($isPartialSuccess
+                    ? 'Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal. Cek detail response per perusahaan.'
+                    : 'Pesan WhatsApp gagal dikirim. Cek detail response per perusahaan.'),
+            'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+            'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+            'total_pelamar' => $pelamars->count(),
+            'total_data' => $pelamars->count(),
+            'total_dikirim' => $totalDikirim,
+            'total_dilewati' => count($skipped),
+            'total_gagal_provider' => $totalGagalProvider,
+            'total_perusahaan' => count($groupedMessages),
+            'skipped' => $skipped,
+            'targets' => array_values(array_unique($targets)),
+            'perusahaan_responses' => $responses,
+        ], $totalDikirim > 0 ? 200 : 422);
     }
 
     public function posisiList(): JsonResponse
@@ -500,6 +599,8 @@ class DataPelamarController extends Controller
                 'id',
                 'kode',
                 'nama_perusahaan',
+                'no_wa',
+                'token_api_wa',
             ]);
 
         return response()->json([
@@ -1096,6 +1197,8 @@ class DataPelamarController extends Controller
         $namaLengkap = $pelamar->nama_lengkap ?: $nama;
         $posisi = $pelamar->posisi_label ?: '-';
         $perusahaan = $pelamar->perusahaan_label ?: '-';
+        $nomerPerusahaan = $this->normalizeWhatsappNumber($pelamar->perusahaan?->no_wa ?? null);
+        $nomerPerusahaanLabel = $nomerPerusahaan ?: ($pelamar->perusahaan?->no_wa ?? '-');
         $url = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
 
         $message = $template ?: "Halo {nama},\n\n"
@@ -1105,8 +1208,9 @@ class DataPelamarController extends Controller
             . "Klik/buka link ini:\n"
             . "{url_pendaftaran}\n\n"
             . "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n"
+            . "Jika ada kendala, silakan hubungi nomor perusahaan: {nomer_perusahaan}.\n\n"
             . "Terima kasih.\n"
-            . "Tim Rekrutmen";
+            . "Tim Rekrutmen {perusahaan}";
 
         return strtr($message, [
             '{nama}' => $nama,
@@ -1117,7 +1221,22 @@ class DataPelamarController extends Controller
             '{token}' => (string) ($pelamar->token ?? ''),
             '{url_pendaftaran}' => (string) $url,
             '{link_pendaftaran}' => (string) $url,
+            '{nomer_perusahaan}' => (string) $nomerPerusahaanLabel,
+            '{nomor_perusahaan}' => (string) $nomerPerusahaanLabel,
+            '{no_wa_perusahaan}' => (string) $nomerPerusahaanLabel,
         ]);
+    }
+
+
+    private function normalizeTokenApiWa(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
     }
 
     private function normalizeWhatsappNumber(?string $number): ?string

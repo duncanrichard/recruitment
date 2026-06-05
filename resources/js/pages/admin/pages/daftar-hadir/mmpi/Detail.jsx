@@ -2,12 +2,23 @@ import React, { useEffect, useMemo, useState } from "react";
 
 export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
     const selectedTanggal = tanggal || getTanggalFromUrl();
+
     const [items, setItems] = useState([]);
-    const [summary, setSummary] = useState({ total: 0, hadir: 0, tidak_hadir: 0, belum_ada: 0, lolos: 0, gagal: 0 });
+    const [summary, setSummary] = useState({
+        total: 0,
+        hadir: 0,
+        tidak_hadir: 0,
+        belum_ada: 0,
+        lolos: 0,
+        gagal: 0,
+    });
+
     const [activeTab, setActiveTab] = useState("semua");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(false);
     const [savingKey, setSavingKey] = useState("");
+    const [uploadingKey, setUploadingKey] = useState("");
+    const [selectedFiles, setSelectedFiles] = useState({});
 
     const fetchData = async () => {
         if (!selectedTanggal) return;
@@ -18,11 +29,21 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
             const params = new URLSearchParams();
             params.append("tanggal", selectedTanggal);
             params.append("status", activeTab);
-            if (search.trim()) params.append("search", search.trim());
 
-            const response = await fetch(`/admin/daftar-hadir/mmpi/detail?${params.toString()}`, {
-                headers: { Accept: "application/json" },
-            });
+            if (search.trim()) {
+                params.append("search", search.trim());
+            }
+
+            const response = await fetch(
+                `/admin/daftar-hadir/mmpi/detail?${params.toString()}`,
+                {
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                }
+            );
+
             const result = await response.json();
 
             if (!response.ok || !result.success) {
@@ -30,7 +51,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                 return;
             }
 
-            setItems(result.data || []);
+            setItems(Array.isArray(result.data) ? result.data : []);
             setSummary({
                 total: Number(result.summary?.total || 0),
                 hadir: Number(result.summary?.hadir || 0),
@@ -54,6 +75,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
 
     const filteredItems = useMemo(() => {
         const keyword = search.toLowerCase().trim();
+
         if (!keyword) return items;
 
         return items.filter((item) => {
@@ -67,23 +89,99 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
         });
     }, [items, search]);
 
-    const updateHasilTest = async (jadwalTestMmpiId, hasilTest) => {
-        const label = hasilTest === "lolos" ? "Lolos" : "Tidak Lolos";
-        if (!confirm(`Simpan hasil test MMPI sebagai ${label}?`)) return;
+    const handleFileChange = (item, file) => {
+        const rowId = item?.jadwal_test_mmpi_id;
 
-        const savingId = `${jadwalTestMmpiId}:hasil`;
-        setSavingKey(savingId);
+        if (!rowId) {
+            alert("ID jadwal test MMPI tidak ditemukan.");
+            return;
+        }
+
+        setSelectedFiles((prev) => ({
+            ...prev,
+            [rowId]: file || null,
+        }));
+    };
+
+    const applyUpdatedRow = (jadwalTestMmpiId, resultData, fallback = {}) => {
+        const hasilTest = resultData?.hasil_test ?? fallback.hasil_test ?? null;
+
+        setItems((prev) =>
+            prev.map((row) =>
+                String(row.jadwal_test_mmpi_id) === String(jadwalTestMmpiId)
+                    ? {
+                          ...row,
+                          hasil_test: hasilTest,
+                          hasil_test_label:
+                              hasilTest === "lolos"
+                                  ? "Lolos"
+                                  : hasilTest === "gagal"
+                                  ? "Tidak Lolos"
+                                  : "Belum Ada",
+                          file_hasil_test_mmpi:
+                              resultData?.file_hasil_test_mmpi ??
+                              row.file_hasil_test_mmpi,
+                          file_hasil_test_mmpi_url:
+                              resultData?.file_hasil_test_mmpi_url ??
+                              row.file_hasil_test_mmpi_url,
+                      }
+                    : row
+            )
+        );
+    };
+
+    const submitHasilTest = async ({
+        item,
+        hasilTest,
+        file = null,
+        mode = "hasil",
+    }) => {
+        const jadwalTestMmpiId = item?.jadwal_test_mmpi_id;
+
+        if (!jadwalTestMmpiId) {
+            alert("ID jadwal test MMPI tidak ditemukan.");
+            return;
+        }
+
+        if (!hasilTest) {
+            alert("Silakan pilih hasil test terlebih dahulu.");
+            return;
+        }
+
+        if (mode === "upload" && !file) {
+            alert("Silakan pilih file hasil test MMPI terlebih dahulu.");
+            return;
+        }
+
+        const key = `${jadwalTestMmpiId}:${mode}`;
+
+        if (mode === "upload") {
+            setUploadingKey(key);
+        } else {
+            setSavingKey(key);
+        }
 
         try {
-            const response = await fetch(`/admin/daftar-hadir/mmpi/${jadwalTestMmpiId}/hasil-test`, {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                    "X-CSRF-TOKEN": getCsrfToken(),
-                },
-                body: JSON.stringify({ hasil_test: hasilTest }),
-            });
+            const formData = new FormData();
+            formData.append("_method", "PATCH");
+            formData.append("hasil_test", hasilTest);
+
+            if (file) {
+                formData.append("file_hasil_test_mmpi", file);
+            }
+
+            const response = await fetch(
+                `/admin/daftar-hadir/mmpi/${jadwalTestMmpiId}/hasil-test`,
+                {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                    body: formData,
+                }
+            );
 
             const result = await response.json();
 
@@ -92,13 +190,50 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                 return;
             }
 
+            applyUpdatedRow(jadwalTestMmpiId, result.data, {
+                hasil_test: hasilTest,
+            });
+
+            if (mode === "upload") {
+                setSelectedFiles((prev) => ({
+                    ...prev,
+                    [jadwalTestMmpiId]: null,
+                }));
+            }
+
             fetchData();
         } catch (error) {
             console.error("Gagal memperbarui hasil test MMPI:", error);
             alert("Terjadi kesalahan saat memperbarui hasil test MMPI.");
         } finally {
-            setSavingKey("");
+            if (mode === "upload") {
+                setUploadingKey("");
+            } else {
+                setSavingKey("");
+            }
         }
+    };
+
+    const handleHasilTestChange = (item, hasilTest) => {
+        if (!hasilTest) return;
+
+        submitHasilTest({
+            item,
+            hasilTest,
+            mode: "hasil",
+        });
+    };
+
+    const handleUploadFile = (item) => {
+        const rowId = item?.jadwal_test_mmpi_id;
+        const selectedFile = selectedFiles[rowId] || null;
+
+        submitHasilTest({
+            item,
+            hasilTest: item.hasil_test,
+            file: selectedFile,
+            mode: "upload",
+        });
     };
 
     const goBack = () => {
@@ -107,7 +242,13 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
             return;
         }
 
-        window.dispatchEvent(new CustomEvent("admin:navigate", { detail: { key: "daftar-hadir-mmpi" } }));
+        window.dispatchEvent(
+            new CustomEvent("admin:navigate", {
+                detail: {
+                    key: "daftar-hadir-mmpi",
+                },
+            })
+        );
     };
 
     return (
@@ -132,7 +273,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                         </h2>
 
                         <p className="mt-1 text-sm font-semibold text-slate-500">
-                            Kelola hasil test MMPI peserta berdasarkan tanggal test.
+                            Kelola hasil test MMPI dan dokumen hasil test peserta.
                         </p>
                     </div>
 
@@ -154,6 +295,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                             <label className="mb-2 block whitespace-nowrap text-xs font-black uppercase tracking-wide text-slate-500">
                                 Search
                             </label>
+
                             <input
                                 type="text"
                                 value={search}
@@ -187,11 +329,40 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                        <TabButton active={activeTab === "semua"} onClick={() => setActiveTab("semua")}>Semua</TabButton>
-                        <TabButton active={activeTab === "hadir"} onClick={() => setActiveTab("hadir")}>Hadir</TabButton>
-                        <TabButton active={activeTab === "tidak_hadir"} onClick={() => setActiveTab("tidak_hadir")}>Tidak Hadir</TabButton>
-                        <TabButton active={activeTab === "lolos"} onClick={() => setActiveTab("lolos")}>Lolos</TabButton>
-                        <TabButton active={activeTab === "gagal"} onClick={() => setActiveTab("gagal")}>Tidak Lolos</TabButton>
+                        <TabButton
+                            active={activeTab === "semua"}
+                            onClick={() => setActiveTab("semua")}
+                        >
+                            Semua
+                        </TabButton>
+
+                        <TabButton
+                            active={activeTab === "hadir"}
+                            onClick={() => setActiveTab("hadir")}
+                        >
+                            Hadir
+                        </TabButton>
+
+                        <TabButton
+                            active={activeTab === "tidak_hadir"}
+                            onClick={() => setActiveTab("tidak_hadir")}
+                        >
+                            Tidak Hadir
+                        </TabButton>
+
+                        <TabButton
+                            active={activeTab === "lolos"}
+                            onClick={() => setActiveTab("lolos")}
+                        >
+                            Lolos
+                        </TabButton>
+
+                        <TabButton
+                            active={activeTab === "gagal"}
+                            onClick={() => setActiveTab("gagal")}
+                        >
+                            Tidak Lolos
+                        </TabButton>
                     </div>
                 </div>
 
@@ -205,6 +376,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                 <TableHead>Jadwal MMPI</TableHead>
                                 <TableHead>Kehadiran</TableHead>
                                 <TableHead>Hasil Test</TableHead>
+                                <TableHead>File Hasil</TableHead>
                                 <TableHead align="right">Aksi</TableHead>
                             </tr>
                         </thead>
@@ -212,64 +384,160 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16 text-center text-sm font-black text-slate-500">
+                                    <td
+                                        colSpan="8"
+                                        className="px-6 py-16 text-center text-sm font-black text-slate-500"
+                                    >
                                         Memuat data...
                                     </td>
                                 </tr>
                             ) : filteredItems.length > 0 ? (
                                 filteredItems.map((item, index) => {
-                                    const hasilSaving = savingKey === `${item.jadwal_test_mmpi_id}:hasil`;
+                                    const hasilSaving =
+                                        savingKey === `${item.jadwal_test_mmpi_id}:hasil`;
+                                    const uploadSaving =
+                                        uploadingKey === `${item.jadwal_test_mmpi_id}:upload`;
                                     const hadir = item.status_kehadiran === "hadir";
+                                    const selectedFile =
+                                        selectedFiles[item.jadwal_test_mmpi_id] || null;
 
                                     return (
-                                        <tr key={item.jadwal_test_mmpi_id} className="group transition hover:bg-slate-50">
-                                            <td className="px-6 py-5 text-sm font-black text-slate-500">{index + 1}</td>
+                                        <tr
+                                            key={item.jadwal_test_mmpi_id}
+                                            className="group transition hover:bg-slate-50"
+                                        >
+                                            <td className="px-6 py-5 text-sm font-black text-slate-500">
+                                                {index + 1}
+                                            </td>
+
                                             <td className="px-6 py-5">
-                                                <div className="font-black text-slate-950">{item.nama || "-"}</div>
-                                                <div className="mt-1 max-w-[240px] truncate text-xs font-bold text-slate-400" title={item.data_riwayat_diri_id || "-"}>
+                                                <div className="font-black text-slate-950">
+                                                    {item.nama || "-"}
+                                                </div>
+
+                                                <div
+                                                    className="mt-1 max-w-[240px] truncate text-xs font-bold text-slate-400"
+                                                    title={item.data_riwayat_diri_id || "-"}
+                                                >
                                                     ID: {item.data_riwayat_diri_id || "-"}
                                                 </div>
                                             </td>
+
                                             <td className="px-6 py-5">
-                                                <div className="max-w-[260px] truncate text-sm font-bold text-slate-700" title={item.email || "-"}>{item.email || "-"}</div>
-                                                <div className="mt-1 text-xs font-bold text-slate-400">{item.no_hp || "-"}</div>
+                                                <div
+                                                    className="max-w-[260px] truncate text-sm font-bold text-slate-700"
+                                                    title={item.email || "-"}
+                                                >
+                                                    {item.email || "-"}
+                                                </div>
+
+                                                <div className="mt-1 text-xs font-bold text-slate-400">
+                                                    {item.no_hp || "-"}
+                                                </div>
                                             </td>
+
                                             <td className="px-6 py-5">
-                                                <div className="text-sm font-black text-slate-700">{formatTanggal(item.tanggal_mmpi)}</div>
-                                                <div className="mt-1 text-xs font-bold text-slate-400">{formatJam(item.tanggal_mmpi)}</div>
+                                                <div className="text-sm font-black text-slate-700">
+                                                    {formatTanggal(item.tanggal_mmpi)}
+                                                </div>
+
+                                                <div className="mt-1 text-xs font-bold text-slate-400">
+                                                    {formatJam(item.tanggal_mmpi)}
+                                                </div>
                                             </td>
-                                            <td className="px-6 py-5">{renderKehadiranBadge(item)}</td>
-                                            <td className="px-6 py-5">{renderHasilBadge(item)}</td>
-                                            <td className="px-6 py-5 text-right">
+
+                                            <td className="px-6 py-5">
+                                                {renderKehadiranBadge(item)}
+                                            </td>
+
+                                            <td className="px-6 py-5">
                                                 {hadir ? (
-                                                    <div className="flex flex-nowrap justify-end gap-2">
-                                                        <button
-                                                            type="button"
-                                                            disabled={hasilSaving}
-                                                            onClick={() => updateHasilTest(item.jadwal_test_mmpi_id, "lolos")}
-                                                            className={`rounded-2xl px-4 py-2 text-xs font-black shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                                                item.hasil_test === "lolos"
-                                                                    ? "bg-teal-600 text-white"
-                                                                    : "border border-teal-100 bg-white text-teal-700 hover:bg-teal-50"
-                                                            }`}
+                                                    <div className="min-w-[170px]">
+                                                        <select
+                                                            value={item.hasil_test || ""}
+                                                            disabled={hasilSaving || uploadSaving}
+                                                            onChange={(event) =>
+                                                                handleHasilTestChange(
+                                                                    item,
+                                                                    event.target.value
+                                                                )
+                                                            }
+                                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
                                                         >
-                                                            Lolos
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            disabled={hasilSaving}
-                                                            onClick={() => updateHasilTest(item.jadwal_test_mmpi_id, "gagal")}
-                                                            className={`rounded-2xl px-4 py-2 text-xs font-black shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                                                item.hasil_test === "gagal"
-                                                                    ? "bg-red-600 text-white"
-                                                                    : "border border-red-100 bg-white text-red-700 hover:bg-red-50"
-                                                            }`}
-                                                        >
-                                                            Tidak Lolos
-                                                        </button>
+                                                            <option value="">Pilih Hasil</option>
+                                                            <option value="lolos">Lolos</option>
+                                                            <option value="gagal">Tidak Lolos</option>
+                                                        </select>
+
+                                                        {hasilSaving && (
+                                                            <p className="mt-1 text-xs font-black text-teal-700">
+                                                                Menyimpan...
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-xs font-black text-slate-400">Tidak ada action</span>
+                                                    <Badge type="neutral">Tidak Ada Action</Badge>
+                                                )}
+                                            </td>
+
+                                            <td className="px-6 py-5">
+                                                <div className="min-w-[240px] space-y-2">
+                                                    {item.file_hasil_test_mmpi_url ? (
+                                                        <a
+                                                            href={item.file_hasil_test_mmpi_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                                                        >
+                                                            Lihat Dokumen
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs font-black text-slate-400">
+                                                            Belum ada file
+                                                        </span>
+                                                    )}
+
+                                                    {hadir && (
+                                                        <div>
+                                                            <input
+                                                                type="file"
+                                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                                disabled={hasilSaving || uploadSaving}
+                                                                onChange={(event) =>
+                                                                    handleFileChange(
+                                                                        item,
+                                                                        event.target.files?.[0] || null
+                                                                    )
+                                                                }
+                                                                className="block w-full text-xs font-bold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-700 hover:file:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            />
+
+                                                            {selectedFile && (
+                                                                <p className="mt-1 break-all text-xs font-bold text-teal-700">
+                                                                    File dipilih: {selectedFile.name}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            <td className="px-6 py-5 text-right">
+                                                {hadir && selectedFile ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={hasilSaving || uploadSaving}
+                                                        onClick={() => handleUploadFile(item)}
+                                                        className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {uploadSaving ? "Upload..." : "Upload File"}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-xs font-black text-slate-400">
+                                                        {hadir
+                                                            ? "Pilih file untuk upload"
+                                                            : "Tidak ada action"}
+                                                    </span>
                                                 )}
                                             </td>
                                         </tr>
@@ -277,7 +545,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16 text-center">
+                                    <td colSpan="8" className="px-6 py-16 text-center">
                                         <EmptyState text="Belum ada peserta pada filter ini." />
                                     </td>
                                 </tr>
@@ -302,20 +570,20 @@ function getTanggalFromUrl() {
 function renderKehadiranBadge(item) {
     if (item.status_kehadiran === "hadir") return <Badge type="success">Hadir</Badge>;
     if (item.status_kehadiran === "tidak_hadir") return <Badge type="danger">Tidak Hadir</Badge>;
-    return <Badge type="neutral">Belum Ada</Badge>;
-}
 
-function renderHasilBadge(item) {
-    if (item.hasil_test === "lolos") return <Badge type="success">Lolos</Badge>;
-    if (item.hasil_test === "gagal") return <Badge type="danger">Tidak Lolos</Badge>;
     return <Badge type="neutral">Belum Ada</Badge>;
 }
 
 function SummaryCard({ label, value }) {
     return (
         <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
-            <div className="whitespace-nowrap text-xl font-black text-slate-950">{value}</div>
-            <div className="mt-1 whitespace-nowrap text-xs font-black uppercase tracking-wide text-slate-500">{label}</div>
+            <div className="whitespace-nowrap text-xl font-black text-slate-950">
+                {value}
+            </div>
+
+            <div className="mt-1 whitespace-nowrap text-xs font-black uppercase tracking-wide text-slate-500">
+                {label}
+            </div>
         </div>
     );
 }
@@ -326,7 +594,9 @@ function TabButton({ active, children, onClick }) {
             type="button"
             onClick={onClick}
             className={`whitespace-nowrap rounded-2xl px-5 py-2.5 text-sm font-black transition ${
-                active ? "bg-teal-600 text-white shadow-lg shadow-teal-100" : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                active
+                    ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
         >
             {children}
@@ -340,34 +610,69 @@ function Badge({ children, type = "neutral" }) {
         danger: "bg-rose-50 text-rose-700",
         neutral: "bg-slate-100 text-slate-600",
     };
-    return <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${classes[type]}`}>{children}</span>;
+
+    return (
+        <span
+            className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${classes[type]}`}
+        >
+            {children}
+        </span>
+    );
 }
 
 function TableHead({ children, align = "left" }) {
     const alignClass = align === "right" ? "text-right" : "text-left";
-    return <th className={`whitespace-nowrap px-6 py-4 ${alignClass} text-xs font-black uppercase tracking-[0.12em] text-slate-500`}>{children}</th>;
+
+    return (
+        <th
+            className={`whitespace-nowrap px-6 py-4 ${alignClass} text-xs font-black uppercase tracking-[0.12em] text-slate-500`}
+        >
+            {children}
+        </th>
+    );
 }
 
 function EmptyState({ text }) {
     return (
         <div className="mx-auto max-w-sm text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">◎</div>
-            <h3 className="mt-4 text-lg font-black text-slate-900">Data tidak ditemukan</h3>
-            <p className="mt-2 text-sm font-medium text-slate-500">{text}</p>
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
+                ◎
+            </div>
+
+            <h3 className="mt-4 text-lg font-black text-slate-900">
+                Data tidak ditemukan
+            </h3>
+
+            <p className="mt-2 text-sm font-medium text-slate-500">
+                {text}
+            </p>
         </div>
     );
 }
 
 function formatTanggal(value) {
     if (!value) return "-";
+
     const date = new Date(String(value).replace(" ", "T"));
+
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
+
+    return date.toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+    });
 }
 
 function formatJam(value) {
     if (!value) return "-";
+
     const date = new Date(String(value).replace(" ", "T"));
+
     if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+    return date.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }

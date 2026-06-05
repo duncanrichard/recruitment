@@ -7,6 +7,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ZoomController extends Controller
@@ -118,6 +120,12 @@ class ZoomController extends Controller
             'drd.email',
         ];
 
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
+            $selects[] = 'dh.file_hasil_test_zoom';
+        } else {
+            $selects[] = DB::raw("NULL as file_hasil_test_zoom");
+        }
+
         if ($nameColumn) {
             $selects[] = DB::raw("drd.{$nameColumn} as nama");
         } else {
@@ -155,6 +163,8 @@ class ZoomController extends Controller
             $statusKehadiran = $this->normalizeKehadiranValue($item->status_kehadiran ?? null);
             $hasilTest = $this->normalizeHasilTestValue($item->hasil_test ?? null);
 
+            $fileUrl = $this->normalizeFileUrl($item->file_hasil_test_zoom ?? null);
+
             return [
                 'id' => $item->jadwal_test_zoom_id,
                 'jadwal_test_zoom_id' => $item->jadwal_test_zoom_id,
@@ -162,11 +172,17 @@ class ZoomController extends Controller
                 'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
                 'jadwal' => $item->jadwal ? date('Y-m-d H:i:s', strtotime($item->jadwal)) : null,
                 'tanggal_kehadiran' => $item->tanggal_kehadiran,
+
                 'kehadiran' => $statusKehadiran,
                 'status_kehadiran' => $statusKehadiran,
                 'kehadiran_label' => $this->labelKehadiran($statusKehadiran),
+
                 'hasil_test' => $hasilTest,
                 'hasil_test_label' => $this->labelHasilTest($hasilTest),
+
+                'file_hasil_test_zoom' => $fileUrl,
+                'file_hasil_test_zoom_url' => $fileUrl,
+
                 'link_zoom' => $item->link_zoom,
                 'nama' => $item->nama ?: '-',
                 'email' => $item->email ?: '-',
@@ -209,6 +225,16 @@ class ZoomController extends Controller
     {
         $validated = $request->validate([
             'hasil_test' => ['required', Rule::in(['lolos', 'gagal'])],
+            'file_hasil_test_zoom' => [
+                'nullable',
+                'file',
+                'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+                'max:5120',
+            ],
+        ], [
+            'file_hasil_test_zoom.file' => 'File hasil test Zoom tidak valid.',
+            'file_hasil_test_zoom.mimes' => 'File harus berupa PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, atau PNG.',
+            'file_hasil_test_zoom.max' => 'Ukuran file maksimal 5 MB.',
         ]);
 
         if (!Schema::hasTable('daftar_hadir_test_zoom')) {
@@ -218,11 +244,37 @@ class ZoomController extends Controller
             ], 500);
         }
 
+        if (!Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom file_hasil_test_zoom belum tersedia. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
         $hasilTest = $this->normalizeHasilTestValue($validated['hasil_test']);
 
+        $nameColumn = $this->firstExistingColumn('data_riwayat_diri', [
+            'nama_lengkap',
+            'nama',
+            'nama_pelamar',
+        ]);
+
+        $selects = [
+            'jtz.id',
+            'jtz.data_riwayat_diri_id',
+        ];
+
+        if ($nameColumn) {
+            $selects[] = DB::raw("drd.{$nameColumn} as nama_kandidat");
+        } else {
+            $selects[] = DB::raw("'-' as nama_kandidat");
+        }
+
         $jadwal = DB::table('jadwal_test_zoom as jtz')
+            ->leftJoin('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
             ->where('jtz.id', $id)
             ->whereNull('jtz.deleted_at')
+            ->select($selects)
             ->first();
 
         if (!$jadwal) {
@@ -247,10 +299,49 @@ class ZoomController extends Controller
             ], 422);
         }
 
+        $fileUrl = $this->normalizeFileUrl($daftarHadir->file_hasil_test_zoom ?? null);
+
+        if ($request->hasFile('file_hasil_test_zoom')) {
+            $oldPath = $this->convertPublicUrlToStoragePath($fileUrl);
+
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $namaKandidat = $this->sanitizeFolderName($jadwal->nama_kandidat ?: 'tanpa nama');
+
+            $extension = $request
+                ->file('file_hasil_test_zoom')
+                ->getClientOriginalExtension();
+
+            $fileName = 'hasil-test-zoom-' .
+                now()->format('Ymd-His') .
+                '-' .
+                Str::random(8) .
+                '.' .
+                $extension;
+
+            $storedPath = $request
+                ->file('file_hasil_test_zoom')
+                ->storeAs(
+                    "test zoom/{$namaKandidat}/dokumen",
+                    $fileName,
+                    'public'
+                );
+
+            /*
+             | Yang disimpan ke database adalah URL relatif.
+             | Contoh:
+             | /storage/test zoom/Duncan/dokumen/hasil-test-zoom.pdf
+             */
+            $fileUrl = '/storage/' . $storedPath;
+        }
+
         DB::table('daftar_hadir_test_zoom')
             ->where('id', $daftarHadir->id)
             ->update([
                 'hasil_test' => $hasilTest,
+                'file_hasil_test_zoom' => $fileUrl,
                 'updated_at' => now(),
             ]);
 
@@ -262,6 +353,8 @@ class ZoomController extends Controller
                 'daftar_hadir_test_zoom_id' => $daftarHadir->id,
                 'status_kehadiran' => $kehadiran,
                 'hasil_test' => $hasilTest,
+                'file_hasil_test_zoom' => $fileUrl,
+                'file_hasil_test_zoom_url' => $fileUrl,
             ],
         ]);
     }
@@ -275,6 +368,88 @@ class ZoomController extends Controller
         }
 
         return null;
+    }
+
+    private function sanitizeFolderName(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '' || $value === '-') {
+            return 'tanpa-nama';
+        }
+
+        $value = preg_replace('/[\\\\\/:*?"<>|]+/', '', $value);
+        $value = preg_replace('/\s+/', ' ', $value);
+        $value = trim($value);
+
+        return $value !== '' ? $value : 'tanpa-nama';
+    }
+
+    private function normalizeFileUrl(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        /*
+         | Kalau data lama masih path folder:
+         | test zoom/Duncan/dokumen/file.pdf
+         | ubah jadi:
+         | /storage/test zoom/Duncan/dokumen/file.pdf
+         */
+        if (!str_starts_with($value, 'http://') &&
+            !str_starts_with($value, 'https://') &&
+            !str_starts_with($value, '/storage/')
+        ) {
+            return '/storage/' . ltrim($value, '/');
+        }
+
+        /*
+         | Kalau data lama sudah full URL:
+         | http://localhost/storage/test zoom/file.pdf
+         | ambil path-nya saja:
+         | /storage/test zoom/file.pdf
+         */
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $path = parse_url($value, PHP_URL_PATH);
+
+            return $path ?: $value;
+        }
+
+        return $value;
+    }
+
+    private function convertPublicUrlToStoragePath(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        $url = $this->normalizeFileUrl($url);
+
+        if (!$url) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (!$path) {
+            return null;
+        }
+
+        $storagePrefix = '/storage/';
+
+        if (!str_starts_with($path, $storagePrefix)) {
+            return null;
+        }
+
+        return urldecode(substr($path, strlen($storagePrefix)));
     }
 
     private function normalizeKehadiranValue($value): ?string

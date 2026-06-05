@@ -14,7 +14,9 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
     const [activeTab, setActiveTab] = useState("semua");
     const [tableLoading, setTableLoading] = useState(false);
     const [savingId, setSavingId] = useState(null);
+    const [uploadingId, setUploadingId] = useState(null);
     const [search, setSearch] = useState("");
+    const [selectedFiles, setSelectedFiles] = useState({});
 
     const getCsrfToken = () => {
         return document
@@ -88,30 +90,97 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
         });
     }, [dataPeserta, search]);
 
-    const updateHasilTest = async (item, hasilTest) => {
-        const jadwalTestZoomId = item?.jadwal_test_zoom_id || item?.id;
+    const getRowId = (item) => item?.jadwal_test_zoom_id || item?.id;
+
+    const handleFileChange = (item, file) => {
+        const rowId = getRowId(item);
+
+        if (!rowId) {
+            alert("ID jadwal test Zoom tidak ditemukan.");
+            return;
+        }
+
+        setSelectedFiles((prev) => ({
+            ...prev,
+            [rowId]: file || null,
+        }));
+    };
+
+    const applyUpdatedRow = (jadwalTestZoomId, resultData, fallback = {}) => {
+        const hasilTest = resultData?.hasil_test ?? fallback.hasil_test ?? null;
+
+        setDataPeserta((prev) =>
+            prev.map((row) =>
+                String(row.jadwal_test_zoom_id || row.id) === String(jadwalTestZoomId)
+                    ? {
+                          ...row,
+                          hasil_test: hasilTest,
+                          hasil_test_label:
+                              hasilTest === "lolos"
+                                  ? "Lolos"
+                                  : hasilTest === "gagal"
+                                  ? "Gagal"
+                                  : "Belum Ada",
+                          file_hasil_test_zoom:
+                              resultData?.file_hasil_test_zoom ??
+                              row.file_hasil_test_zoom,
+                          file_hasil_test_zoom_url:
+                              resultData?.file_hasil_test_zoom_url ??
+                              row.file_hasil_test_zoom_url,
+                      }
+                    : row
+            )
+        );
+    };
+
+    const submitHasilTest = async ({
+        item,
+        hasilTest,
+        file = null,
+        mode = "hasil",
+    }) => {
+        const jadwalTestZoomId = getRowId(item);
 
         if (!jadwalTestZoomId) {
             alert("ID jadwal test Zoom tidak ditemukan.");
             return;
         }
 
-        setSavingId(jadwalTestZoomId);
+        if (!hasilTest) {
+            alert("Silakan pilih hasil test terlebih dahulu.");
+            return;
+        }
+
+        if (mode === "upload" && !file) {
+            alert("Silakan pilih file hasil test terlebih dahulu.");
+            return;
+        }
+
+        if (mode === "upload") {
+            setUploadingId(jadwalTestZoomId);
+        } else {
+            setSavingId(jadwalTestZoomId);
+        }
 
         try {
+            const formData = new FormData();
+            formData.append("_method", "PUT");
+            formData.append("hasil_test", hasilTest);
+
+            if (file) {
+                formData.append("file_hasil_test_zoom", file);
+            }
+
             const response = await fetch(
                 `/admin/daftar-hadir/zoom/${jadwalTestZoomId}/hasil-test`,
                 {
-                    method: "PUT",
+                    method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
                         Accept: "application/json",
                         "X-Requested-With": "XMLHttpRequest",
                         "X-CSRF-TOKEN": getCsrfToken(),
                     },
-                    body: JSON.stringify({
-                        hasil_test: hasilTest,
-                    }),
+                    body: formData,
                 }
             );
 
@@ -122,26 +191,50 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 return;
             }
 
-            setDataPeserta((prev) =>
-                prev.map((row) =>
-                    String(row.jadwal_test_zoom_id || row.id) === String(jadwalTestZoomId)
-                        ? {
-                              ...row,
-                              hasil_test: hasilTest,
-                              hasil_test_label:
-                                  hasilTest === "lolos" ? "Lolos" : "Gagal",
-                          }
-                        : row
-                )
-            );
+            applyUpdatedRow(jadwalTestZoomId, result.data, {
+                hasil_test: hasilTest,
+            });
+
+            if (mode === "upload") {
+                setSelectedFiles((prev) => ({
+                    ...prev,
+                    [jadwalTestZoomId]: null,
+                }));
+            }
 
             fetchDetail();
         } catch (error) {
             console.error("Gagal memperbarui hasil test:", error);
             alert("Terjadi kesalahan saat memperbarui hasil test.");
         } finally {
-            setSavingId(null);
+            if (mode === "upload") {
+                setUploadingId(null);
+            } else {
+                setSavingId(null);
+            }
         }
+    };
+
+    const handleHasilTestChange = (item, hasilTest) => {
+        if (!hasilTest) return;
+
+        submitHasilTest({
+            item,
+            hasilTest,
+            mode: "hasil",
+        });
+    };
+
+    const handleUploadFile = (item) => {
+        const rowId = getRowId(item);
+        const selectedFile = selectedFiles[rowId] || null;
+
+        submitHasilTest({
+            item,
+            hasilTest: item.hasil_test,
+            file: selectedFile,
+            mode: "upload",
+        });
     };
 
     const formatTanggal = (value) => {
@@ -219,16 +312,31 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
         return <Badge type="neutral">Belum Ada</Badge>;
     };
 
-    const renderHasilTestBadge = (item) => {
-        if (item.hasil_test === "lolos") {
-            return <Badge type="success">Lolos</Badge>;
+    const renderHasilTestSelect = (item, isRowSaving) => {
+        if (!isHadir(item)) {
+            return <Badge type="neutral">Tidak Ada Action</Badge>;
         }
 
-        if (item.hasil_test === "gagal") {
-            return <Badge type="danger">Gagal</Badge>;
-        }
+        return (
+            <div className="min-w-[170px]">
+                <select
+                    value={item.hasil_test || ""}
+                    disabled={isRowSaving}
+                    onChange={(event) => handleHasilTestChange(item, event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                >
+                    <option value="">Pilih Hasil</option>
+                    <option value="lolos">Lolos</option>
+                    <option value="gagal">Gagal</option>
+                </select>
 
-        return <Badge type="neutral">Belum Ada</Badge>;
+                {isRowSaving && (
+                    <p className="mt-1 text-xs font-black text-teal-700">
+                        Menyimpan...
+                    </p>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -253,7 +361,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                         </h2>
 
                         <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                           Kehadiran Test Zoom dan hasil Test .
+                            Kehadiran Test Zoom, hasil test, dan dokumen hasil test.
                         </p>
                     </div>
 
@@ -320,6 +428,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                 <TableHead>Jam Test</TableHead>
                                 <TableHead>Kehadiran</TableHead>
                                 <TableHead>Hasil Test</TableHead>
+                                <TableHead>File Hasil</TableHead>
                                 <TableHead align="right">Action</TableHead>
                             </tr>
                         </thead>
@@ -328,7 +437,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                             {tableLoading ? (
                                 <tr>
                                     <td
-                                        colSpan="7"
+                                        colSpan="8"
                                         className="px-6 py-16 text-center text-sm font-black text-slate-500"
                                     >
                                         Memuat data...
@@ -336,8 +445,11 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                 </tr>
                             ) : filteredData.length > 0 ? (
                                 filteredData.map((item, index) => {
-                                    const rowId = item.jadwal_test_zoom_id || item.id || index;
-                                    const isRowSaving = String(savingId) === String(item.jadwal_test_zoom_id || item.id);
+                                    const itemId = getRowId(item);
+                                    const rowId = itemId || index;
+                                    const isRowSaving = String(savingId) === String(itemId);
+                                    const isRowUploading = String(uploadingId) === String(itemId);
+                                    const selectedFile = selectedFiles[itemId] || null;
 
                                     return (
                                         <tr
@@ -377,41 +489,66 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                             </td>
 
                                             <td className="px-6 py-5">
-                                                {renderHasilTestBadge(item)}
+                                                {renderHasilTestSelect(item, isRowSaving)}
+                                            </td>
+
+                                            <td className="px-6 py-5">
+                                                <div className="min-w-[240px] space-y-2">
+                                                    {item.file_hasil_test_zoom_url ? (
+                                                        <a
+                                                            href={item.file_hasil_test_zoom_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                                                        >
+                                                            Lihat Dokumen
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-xs font-black text-slate-400">
+                                                            Belum ada file
+                                                        </span>
+                                                    )}
+
+                                                    {isHadir(item) && (
+                                                        <div>
+                                                            <input
+                                                                type="file"
+                                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                                disabled={isRowSaving || isRowUploading}
+                                                                onChange={(event) =>
+                                                                    handleFileChange(
+                                                                        item,
+                                                                        event.target.files?.[0] || null
+                                                                    )
+                                                                }
+                                                                className="block w-full text-xs font-bold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-700 hover:file:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            />
+
+                                                            {selectedFile && (
+                                                                <p className="mt-1 break-all text-xs font-bold text-teal-700">
+                                                                    File dipilih: {selectedFile.name}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             <td className="px-6 py-5 text-right">
-                                                {isHadir(item) ? (
-                                                    <div className="flex justify-end gap-2">
-                                                        <button
-                                                            type="button"
-                                                            disabled={isRowSaving}
-                                                            onClick={() => updateHasilTest(item, "lolos")}
-                                                            className={`rounded-2xl px-4 py-2 text-xs font-black shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                                                item.hasil_test === "lolos"
-                                                                    ? "bg-emerald-600 text-white"
-                                                                    : "border border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-50"
-                                                            }`}
-                                                        >
-                                                            {isRowSaving ? "Menyimpan..." : "Lolos"}
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            disabled={isRowSaving}
-                                                            onClick={() => updateHasilTest(item, "gagal")}
-                                                            className={`rounded-2xl px-4 py-2 text-xs font-black shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                                                item.hasil_test === "gagal"
-                                                                    ? "bg-rose-600 text-white"
-                                                                    : "border border-rose-100 bg-white text-rose-700 hover:bg-rose-50"
-                                                            }`}
-                                                        >
-                                                            {isRowSaving ? "Menyimpan..." : "Gagal"}
-                                                        </button>
-                                                    </div>
+                                                {isHadir(item) && selectedFile ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isRowSaving || isRowUploading}
+                                                        onClick={() => handleUploadFile(item)}
+                                                        className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {isRowUploading ? "Upload..." : "Upload File"}
+                                                    </button>
                                                 ) : (
                                                     <span className="text-xs font-black text-slate-400">
-                                                        Tidak ada action
+                                                        {isHadir(item)
+                                                            ? "Pilih file untuk upload"
+                                                            : "Tidak ada action"}
                                                     </span>
                                                 )}
                                             </td>
@@ -420,7 +557,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16">
+                                    <td colSpan="8" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ◎

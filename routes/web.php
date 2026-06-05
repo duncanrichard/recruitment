@@ -51,10 +51,11 @@ Route::middleware('auth')->group(function () {
     require __DIR__ . '/account_user.php';
     require __DIR__ . '/account_permission.php';
     require __DIR__ . '/permintaan_kandidat.php';
+    require __DIR__ . '/jadwal_offering_letter.php';
 
     require __DIR__ . '/report_data_pelamar.php';
     require __DIR__ . '/report_hasil_test_zoom.php';
     require __DIR__ . '/report_hasil_test_mmpi.php';
     require __DIR__ . '/report_interview_kandidat.php';
-    require __DIR__ . '/jadwal_offering_letter.php';
+    require __DIR__ . '/report_offering_letter.php';
 });
