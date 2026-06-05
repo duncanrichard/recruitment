@@ -711,6 +711,8 @@ function TahapanItem({ item, index, token, onUpdated, disabledAllActions = false
                 {(item?.jadwal_interview || item?.jadwalInterview) && (
                     <JadwalInterviewDalamTahapan
                         jadwalInterview={item.jadwal_interview || item.jadwalInterview}
+                        token={token}
+                        onUpdated={onUpdated}
                     />
                 )}
 
@@ -1209,7 +1211,7 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
     );
 }
 
-function JadwalInterviewDalamTahapan({ jadwalInterview }) {
+function JadwalInterviewDalamTahapan({ jadwalInterview, token, onUpdated }) {
     const normalized = normalizeJadwalInterview(jadwalInterview);
     const tanggal = getJadwalTanggal(normalized);
     const jam = getJadwalJam(normalized);
@@ -1277,12 +1279,225 @@ function JadwalInterviewDalamTahapan({ jadwalInterview }) {
                             </p>
                         </div>
                     )}
+
+                    <DokumenInterviewDalamTahapan
+                        jadwalInterview={normalized}
+                        token={token}
+                        onUpdated={onUpdated}
+                    />
                 </div>
             </div>
         </div>
     );
 }
 
+function DokumenInterviewDalamTahapan({ jadwalInterview, token, onUpdated }) {
+    const [cvFile, setCvFile] = useState(null);
+    const [fotoFile, setFotoFile] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState("");
+    const [localDokumen, setLocalDokumen] = useState({
+        file_cv: jadwalInterview?.file_cv || null,
+        file_foto: jadwalInterview?.file_foto || null,
+    });
+
+    useEffect(() => {
+        setLocalDokumen({
+            file_cv: jadwalInterview?.file_cv || null,
+            file_foto: jadwalInterview?.file_foto || null,
+        });
+        setCvFile(null);
+        setFotoFile(null);
+        setMessage("");
+    }, [jadwalInterview?.id, jadwalInterview?.file_cv, jadwalInterview?.file_foto]);
+
+    const jadwalInterviewKandidatId =
+        jadwalInterview?.id ||
+        jadwalInterview?.jadwal_interview_kandidat_id ||
+        jadwalInterview?.jadwalInterviewKandidatId ||
+        null;
+
+    const hasSelectedFile = Boolean(cvFile || fotoFile);
+
+    async function uploadDokumenInterview() {
+        if (saving) return;
+
+        if (!token || !jadwalInterviewKandidatId) {
+            setMessage("Data jadwal interview tidak lengkap.");
+            return;
+        }
+
+        if (!hasSelectedFile) {
+            setMessage("Silakan pilih file CV atau Foto terlebih dahulu.");
+            return;
+        }
+
+        setSaving(true);
+        setMessage("");
+
+        try {
+            const formData = new FormData();
+
+            if (cvFile) {
+                formData.append("file_cv", cvFile);
+            }
+
+            if (fotoFile) {
+                formData.append("file_foto", fotoFile);
+            }
+
+            const response = await fetch(
+                `/pendaftaran/api/token/${encodeURIComponent(token)}/jadwal-interview/${encodeURIComponent(jadwalInterviewKandidatId)}/dokumen`,
+                {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                    body: formData,
+                }
+            );
+
+            const json = await parseJsonResponse(response);
+
+            if (!response.ok || json?.success === false) {
+                setMessage(json?.message || "Gagal upload dokumen interview.");
+                return;
+            }
+
+            const uploaded = json?.data || {};
+            const updatedDokumen = {
+                file_cv: normalizeFileUrl(uploaded.file_cv || uploaded.fileCv || localDokumen.file_cv),
+                file_foto: normalizeFileUrl(uploaded.file_foto || uploaded.fileFoto || localDokumen.file_foto),
+            };
+
+            setLocalDokumen(updatedDokumen);
+            setCvFile(null);
+            setFotoFile(null);
+            setMessage(json?.message || "Dokumen interview berhasil diupload.");
+
+            if (typeof onUpdated === "function") {
+                onUpdated((previousData) =>
+                    injectUpdatedDokumenInterview(
+                        previousData,
+                        jadwalInterviewKandidatId,
+                        updatedDokumen
+                    )
+                );
+            }
+        } catch (error) {
+            setMessage("Terjadi kesalahan saat upload dokumen interview.");
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div className="mt-4 rounded-2xl border border-purple-100 bg-purple-50 p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-purple-700">
+                Upload Dokumen Interview
+            </p>
+
+            <p className="mt-2 text-sm font-semibold leading-6 text-purple-800">
+                Silakan upload CV dan Foto setelah mendapatkan jadwal interview.
+            </p>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/70 bg-white p-4">
+                    <div className="mb-3">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                            CV
+                        </p>
+
+                        {localDokumen.file_cv ? (
+                            <a
+                                href={localDokumen.file_cv}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                            >
+                                Lihat CV
+                            </a>
+                        ) : (
+                            <p className="mt-2 text-xs font-bold text-slate-400">
+                                CV belum diupload.
+                            </p>
+                        )}
+                    </div>
+
+                    <input
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        disabled={saving}
+                        onChange={(event) => setCvFile(event.target.files?.[0] || null)}
+                        className="block w-full text-xs font-bold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-700 hover:file:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+
+                    {cvFile && (
+                        <p className="mt-2 break-all text-xs font-bold text-purple-700">
+                            File dipilih: {cvFile.name}
+                        </p>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border border-white/70 bg-white p-4">
+                    <div className="mb-3">
+                        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                            Foto
+                        </p>
+
+                        {localDokumen.file_foto ? (
+                            <a
+                                href={localDokumen.file_foto}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-2 inline-flex rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                            >
+                                Lihat Foto
+                            </a>
+                        ) : (
+                            <p className="mt-2 text-xs font-bold text-slate-400">
+                                Foto belum diupload.
+                            </p>
+                        )}
+                    </div>
+
+                    <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        disabled={saving}
+                        onChange={(event) => setFotoFile(event.target.files?.[0] || null)}
+                        className="block w-full text-xs font-bold text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-black file:text-slate-700 hover:file:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+
+                    {fotoFile && (
+                        <p className="mt-2 break-all text-xs font-bold text-purple-700">
+                            File dipilih: {fotoFile.name}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {hasSelectedFile && (
+                <button
+                    type="button"
+                    disabled={saving}
+                    onClick={uploadDokumenInterview}
+                    className="mt-4 w-full rounded-2xl bg-purple-600 px-5 py-3 text-sm font-black text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                    {saving ? "Mengupload..." : "Upload Dokumen"}
+                </button>
+            )}
+
+            {message && (
+                <p className="mt-3 text-sm font-bold text-purple-900">
+                    {message}
+                </p>
+            )}
+        </div>
+    );
+}
 
 function JadwalOfferingLetterDalamTahapan({ jadwalOl }) {
     const normalized = normalizeJadwalOfferingLetter(jadwalOl);
@@ -2385,6 +2600,46 @@ function normalizeJadwalInterview(jadwalInterview) {
         status_review: normalizedStatusReviewManagement,
         statusReview: normalizedStatusReviewManagement,
 
+        id:
+            jadwalInterview.id ||
+            jadwalInterview.jadwal_interview_kandidat_id ||
+            jadwalInterview.jadwalInterviewKandidatId ||
+            null,
+        jadwal_interview_kandidat_id:
+            jadwalInterview.jadwal_interview_kandidat_id ||
+            jadwalInterview.id ||
+            jadwalInterview.jadwalInterviewKandidatId ||
+            null,
+        jadwalInterviewKandidatId:
+            jadwalInterview.jadwalInterviewKandidatId ||
+            jadwalInterview.id ||
+            jadwalInterview.jadwal_interview_kandidat_id ||
+            null,
+        file_cv: normalizeFileUrl(
+            jadwalInterview.file_cv ||
+                jadwalInterview.fileCv ||
+                jadwalInterview.cv ||
+                null
+        ),
+        fileCv: normalizeFileUrl(
+            jadwalInterview.fileCv ||
+                jadwalInterview.file_cv ||
+                jadwalInterview.cv ||
+                null
+        ),
+        file_foto: normalizeFileUrl(
+            jadwalInterview.file_foto ||
+                jadwalInterview.fileFoto ||
+                jadwalInterview.foto ||
+                null
+        ),
+        fileFoto: normalizeFileUrl(
+            jadwalInterview.fileFoto ||
+                jadwalInterview.file_foto ||
+                jadwalInterview.foto ||
+                null
+        ),
+
         jadwal_offering_letter: jadwalOfferingLetter,
         jadwalOfferingLetter: jadwalOfferingLetter,
         status_jadwal_offering_letter: jadwalOfferingLetter?.status_jadwal || null,
@@ -2685,6 +2940,143 @@ function parseJadwalDate(value) {
     if (Number.isNaN(date.getTime())) return null;
 
     return date;
+}
+
+
+function normalizeFileUrl(value) {
+    if (!value) return null;
+
+    const text = String(value).trim();
+
+    if (!text) return null;
+
+    if (
+        text.startsWith("http://") ||
+        text.startsWith("https://") ||
+        text.startsWith("/storage/")
+    ) {
+        return text;
+    }
+
+    return `/storage/${text.replace(/^\/+/, "")}`;
+}
+
+function injectUpdatedDokumenInterview(previousData, jadwalInterviewKandidatId, dokumen) {
+    if (!previousData) return previousData;
+
+    const normalizedDokumen = {
+        file_cv: normalizeFileUrl(dokumen?.file_cv || dokumen?.fileCv || null),
+        fileCv: normalizeFileUrl(dokumen?.fileCv || dokumen?.file_cv || null),
+        file_foto: normalizeFileUrl(dokumen?.file_foto || dokumen?.fileFoto || null),
+        fileFoto: normalizeFileUrl(dokumen?.fileFoto || dokumen?.file_foto || null),
+    };
+
+    const sameId = (item) => {
+        const id =
+            item?.id ||
+            item?.jadwal_interview_kandidat_id ||
+            item?.jadwalInterviewKandidatId ||
+            null;
+
+        return String(id || "") === String(jadwalInterviewKandidatId || "");
+    };
+
+    const updateInterview = (item) => {
+        if (!item) return item;
+
+        if (sameId(item)) {
+            return {
+                ...item,
+                ...normalizedDokumen,
+            };
+        }
+
+        return item;
+    };
+
+    const nextData = {
+        ...previousData,
+    };
+
+    if (nextData.jadwal_interview) {
+        nextData.jadwal_interview = updateInterview(nextData.jadwal_interview);
+    }
+
+    if (nextData.jadwalInterview) {
+        nextData.jadwalInterview = updateInterview(nextData.jadwalInterview);
+    }
+
+    if (nextData.interview) {
+        nextData.interview = updateInterview(nextData.interview);
+    }
+
+    if (Array.isArray(nextData.tahapan)) {
+        nextData.tahapan = nextData.tahapan.map((item) => {
+            const jadwalInterview = item?.jadwal_interview || item?.jadwalInterview;
+
+            if (!jadwalInterview || !sameId(jadwalInterview)) {
+                return item;
+            }
+
+            return {
+                ...item,
+                jadwal_interview: item.jadwal_interview
+                    ? updateInterview(item.jadwal_interview)
+                    : item.jadwal_interview,
+                jadwalInterview: item.jadwalInterview
+                    ? updateInterview(item.jadwalInterview)
+                    : item.jadwalInterview,
+            };
+        });
+    }
+
+    if (nextData.tahapan_seleksi?.tahapan && Array.isArray(nextData.tahapan_seleksi.tahapan)) {
+        nextData.tahapan_seleksi = {
+            ...nextData.tahapan_seleksi,
+            tahapan: nextData.tahapan_seleksi.tahapan.map((item) => {
+                const jadwalInterview = item?.jadwal_interview || item?.jadwalInterview;
+
+                if (!jadwalInterview || !sameId(jadwalInterview)) {
+                    return item;
+                }
+
+                return {
+                    ...item,
+                    jadwal_interview: item.jadwal_interview
+                        ? updateInterview(item.jadwal_interview)
+                        : item.jadwal_interview,
+                    jadwalInterview: item.jadwalInterview
+                        ? updateInterview(item.jadwalInterview)
+                        : item.jadwalInterview,
+                };
+            }),
+        };
+    }
+
+    if (nextData.tahapanSeleksi?.tahapan && Array.isArray(nextData.tahapanSeleksi.tahapan)) {
+        nextData.tahapanSeleksi = {
+            ...nextData.tahapanSeleksi,
+            tahapan: nextData.tahapanSeleksi.tahapan.map((item) => {
+                const jadwalInterview = item?.jadwal_interview || item?.jadwalInterview;
+
+                if (!jadwalInterview || !sameId(jadwalInterview)) {
+                    return item;
+                }
+
+                return {
+                    ...item,
+                    jadwal_interview: item.jadwal_interview
+                        ? updateInterview(item.jadwal_interview)
+                        : item.jadwal_interview,
+                    jadwalInterview: item.jadwalInterview
+                        ? updateInterview(item.jadwalInterview)
+                        : item.jadwalInterview,
+                };
+            }),
+        };
+    }
+
+    return nextData;
 }
 
 async function parseJsonResponse(response) {

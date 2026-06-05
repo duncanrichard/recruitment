@@ -25,6 +25,8 @@ class JadwalInterviewKandidat extends Model
         'status_kehadiran',
         'hasil_interview',
         'catatan',
+        'file_cv',
+        'file_foto',
     ];
 
     protected static function booted(): void

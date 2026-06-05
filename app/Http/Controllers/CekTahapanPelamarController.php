@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\DataRiwayatDiri;
 use App\Models\JadwalTestZoom;
+use App\Models\JadwalInterviewKandidat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class CekTahapanPelamarController extends Controller
 {
@@ -329,6 +332,232 @@ class CekTahapanPelamarController extends Controller
         string $jadwalTestMmpi
     ): JsonResponse {
         return $this->updateKehadiranJadwalTestMmpi($request, $token, $jadwalTestMmpi);
+    }
+
+
+    public function uploadDokumenInterview(
+        Request $request,
+        string $token,
+        string $jadwalInterviewKandidat
+    ): JsonResponse {
+        /*
+         |--------------------------------------------------------------------------
+         | Normalisasi nama input file
+         |--------------------------------------------------------------------------
+         | Frontend yang lama/berbeda kadang mengirim nama field:
+         | - cv / fileCv / file_cv
+         | - foto / fileFoto / file_foto
+         | Supaya upload tidak gagal hanya karena nama field berbeda,
+         | semua alias diarahkan ke file_cv dan file_foto.
+         |--------------------------------------------------------------------------
+         */
+        if (!$request->hasFile('file_cv')) {
+            foreach (['cv', 'fileCv', 'cv_file'] as $alias) {
+                if ($request->hasFile($alias)) {
+                    $request->files->set('file_cv', $request->file($alias));
+                    break;
+                }
+            }
+        }
+
+        if (!$request->hasFile('file_foto')) {
+            foreach (['foto', 'fileFoto', 'foto_file'] as $alias) {
+                if ($request->hasFile($alias)) {
+                    $request->files->set('file_foto', $request->file($alias));
+                    break;
+                }
+            }
+        }
+
+        $request->validate([
+            'file_cv' => [
+                'nullable',
+                'file',
+                'mimes:pdf,doc,docx',
+                'max:5120',
+            ],
+            'file_foto' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:3072',
+            ],
+        ], [
+            'file_cv.file' => 'File CV tidak valid.',
+            'file_cv.mimes' => 'File CV harus berupa PDF, DOC, atau DOCX.',
+            'file_cv.max' => 'Ukuran file CV maksimal 5 MB.',
+            'file_foto.file' => 'File foto tidak valid.',
+            'file_foto.mimes' => 'File foto harus berupa JPG, JPEG, PNG, atau WEBP.',
+            'file_foto.max' => 'Ukuran file foto maksimal 3 MB.',
+        ]);
+
+        if (!$request->hasFile('file_cv') && !$request->hasFile('file_foto')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih minimal satu file CV atau Foto untuk diupload.',
+            ], 422);
+        }
+
+        if (!Schema::hasTable('jadwal_interview_kandidat')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tabel jadwal_interview_kandidat tidak ditemukan.',
+            ], 500);
+        }
+
+        if (!Schema::hasColumn('jadwal_interview_kandidat', 'file_cv')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom file_cv belum tersedia. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        if (!Schema::hasColumn('jadwal_interview_kandidat', 'file_foto')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom file_foto belum tersedia. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        $pelamar = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        if (!$pelamar) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token pelamar tidak ditemukan.',
+                'errors' => [
+                    'token' => 'Token pelamar tidak ditemukan.',
+                ],
+            ], 404);
+        }
+
+        /*
+         |--------------------------------------------------------------------------
+         | Cari jadwal interview kandidat
+         |--------------------------------------------------------------------------
+         | Error yang sering terjadi:
+         | Frontend mengirim ji.id dari tabel jadwal_interview, bukan jik.id dari
+         | tabel jadwal_interview_kandidat.
+         |
+         | Karena file_cv dan file_foto tersimpan di jadwal_interview_kandidat,
+         | controller ini dibuat menerima dua kemungkinan:
+         | 1. jik.id
+         | 2. jik.jadwal_interview_id
+         |--------------------------------------------------------------------------
+         */
+        $jadwal = JadwalInterviewKandidat::query()
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->where(function ($query) use ($jadwalInterviewKandidat) {
+                $query->where('id', $jadwalInterviewKandidat)
+                    ->orWhere('jadwal_interview_id', $jadwalInterviewKandidat);
+            })
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$jadwal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal interview kandidat tidak ditemukan untuk token ini.',
+                'data' => $this->buildTahapanPelamar($pelamar),
+            ], 404);
+        }
+
+        $payload = [];
+
+        $folderNama = $this->sanitizeFolderName($pelamar->nama_lengkap ?: 'tanpa nama');
+        $folder = "interview/{$folderNama}/dokumen";
+
+        if ($request->hasFile('file_cv')) {
+            $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_cv ?? null);
+
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $extension = strtolower($request->file('file_cv')->getClientOriginalExtension());
+
+            $fileName = 'cv-interview-' .
+                now()->format('Ymd-His') .
+                '-' .
+                Str::random(8) .
+                '.' .
+                $extension;
+
+            $storedPath = $request->file('file_cv')->storeAs(
+                $folder,
+                $fileName,
+                'public'
+            );
+
+            $payload['file_cv'] = '/storage/' . $storedPath;
+        }
+
+        if ($request->hasFile('file_foto')) {
+            $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_foto ?? null);
+
+            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $extension = strtolower($request->file('file_foto')->getClientOriginalExtension());
+
+            $fileName = 'foto-interview-' .
+                now()->format('Ymd-His') .
+                '-' .
+                Str::random(8) .
+                '.' .
+                $extension;
+
+            $storedPath = $request->file('file_foto')->storeAs(
+                $folder,
+                $fileName,
+                'public'
+            );
+
+            $payload['file_foto'] = '/storage/' . $storedPath;
+        }
+
+        if (empty($payload)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada file yang berhasil diproses.',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($jadwal, $payload) {
+            /*
+             | forceFill dipakai agar tetap tersimpan walaupun model belum sempat
+             | menambahkan file_cv dan file_foto ke $fillable.
+             */
+            $jadwal->forceFill($payload);
+            $jadwal->save();
+        });
+
+        $jadwal->refresh();
+
+        $pelamarTerbaru = $this->pelamarQuery()
+            ->where('token', $token)
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dokumen interview berhasil diupload.',
+            'data' => $this->buildTahapanPelamar($pelamarTerbaru),
+            'jadwal_interview_kandidat_id' => $jadwal->id,
+            'jadwalInterviewKandidatId' => $jadwal->id,
+            'jadwal_interview_id' => $jadwal->jadwal_interview_id,
+            'jadwalInterviewId' => $jadwal->jadwal_interview_id,
+            'file_cv' => $this->normalizeFileUrl($jadwal->file_cv),
+            'fileCv' => $this->normalizeFileUrl($jadwal->file_cv),
+            'file_cv_url' => $this->normalizeFileUrl($jadwal->file_cv),
+            'fileCvUrl' => $this->normalizeFileUrl($jadwal->file_cv),
+            'file_foto' => $this->normalizeFileUrl($jadwal->file_foto),
+            'fileFoto' => $this->normalizeFileUrl($jadwal->file_foto),
+            'file_foto_url' => $this->normalizeFileUrl($jadwal->file_foto),
+            'fileFotoUrl' => $this->normalizeFileUrl($jadwal->file_foto),
+        ]);
     }
 
     private function buildTahapanPelamar(?DataRiwayatDiri $pelamar): array
@@ -1149,7 +1378,7 @@ class CekTahapanPelamarController extends Controller
             DB::raw(Schema::hasColumn('jadwal_interview_kandidat', 'updated_at') ? 'jik.updated_at as interview_updated_at' : 'NULL as interview_updated_at'),
         ];
 
-        foreach (['status_kehadiran', 'hasil_interview', 'catatan'] as $column) {
+        foreach (['status_kehadiran', 'hasil_interview', 'catatan', 'file_cv', 'file_foto'] as $column) {
             $select[] = Schema::hasColumn('jadwal_interview_kandidat', $column)
                 ? DB::raw("jik.{$column} as {$column}")
                 : DB::raw("NULL as {$column}");
@@ -1218,6 +1447,8 @@ class CekTahapanPelamarController extends Controller
         $statusReviewManagement = $this->normalizeStatusReviewManagementValue($jadwalInterview->status_review_management ?? null);
         $statusJadwalOfferingLetter = $this->normalizeStatusOfferingLetterValue($jadwalInterview->status_jadwal_ol ?? null);
         $catatan = $jadwalInterview->catatan ?? null;
+        $fileCvUrl = $this->normalizeFileUrl($jadwalInterview->file_cv ?? null);
+        $fileFotoUrl = $this->normalizeFileUrl($jadwalInterview->file_foto ?? null);
 
         $jadwalOfferingLetter = null;
 
@@ -1248,7 +1479,14 @@ class CekTahapanPelamarController extends Controller
         }
 
         return [
-            'id' => $jadwalInterview->id ?? null,
+            /*
+             | id dibuat memakai pivot_id / jadwal_interview_kandidat.id
+             | karena upload dokumen disimpan pada tabel jadwal_interview_kandidat.
+             | ID master jadwal_interview tetap disediakan pada key jadwal_interview_master_id.
+             */
+            'id' => $jadwalInterview->pivot_id ?? null,
+            'jadwal_interview_master_id' => $jadwalInterview->id ?? null,
+            'jadwalInterviewMasterId' => $jadwalInterview->id ?? null,
             'pivot_id' => $jadwalInterview->pivot_id ?? null,
             'pivotId' => $jadwalInterview->pivot_id ?? null,
             'jadwal_interview_kandidat_id' => $jadwalInterview->pivot_id ?? null,
@@ -1288,6 +1526,14 @@ class CekTahapanPelamarController extends Controller
             'catatan' => $catatan,
             'catatan_interview' => $catatan,
             'catatanInterview' => $catatan,
+            'file_cv' => $fileCvUrl,
+            'fileCv' => $fileCvUrl,
+            'file_cv_url' => $fileCvUrl,
+            'fileCvUrl' => $fileCvUrl,
+            'file_foto' => $fileFotoUrl,
+            'fileFoto' => $fileFotoUrl,
+            'file_foto_url' => $fileFotoUrl,
+            'fileFotoUrl' => $fileFotoUrl,
             'review_management_id' => $jadwalInterview->review_management_id ?? null,
             'reviewManagementId' => $jadwalInterview->review_management_id ?? null,
             'hasil_review_management_id' => $jadwalInterview->hasil_review_management_id ?? null,
@@ -1851,4 +2097,75 @@ class CekTahapanPelamarController extends Controller
 
         return '-';
     }
+
+    private function normalizeFileUrl(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (!str_starts_with($value, 'http://') &&
+            !str_starts_with($value, 'https://') &&
+            !str_starts_with($value, '/storage/')
+        ) {
+            return '/storage/' . ltrim($value, '/');
+        }
+
+        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+            $path = parse_url($value, PHP_URL_PATH);
+
+            return $path ?: $value;
+        }
+
+        return $value;
+    }
+
+    private function convertPublicUrlToStoragePath(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        $url = $this->normalizeFileUrl($url);
+
+        if (!$url) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (!$path) {
+            return null;
+        }
+
+        $storagePrefix = '/storage/';
+
+        if (!str_starts_with($path, $storagePrefix)) {
+            return null;
+        }
+
+        return urldecode(substr($path, strlen($storagePrefix)));
+    }
+
+    private function sanitizeFolderName(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '' || $value === '-') {
+            return 'tanpa-nama';
+        }
+
+        $value = preg_replace('/[\\\\\/:*?"<>|]+/', '', $value);
+        $value = preg_replace('/\s+/', ' ', $value);
+        $value = trim($value);
+
+        return $value !== '' ? $value : 'tanpa-nama';
+    }
+
 }

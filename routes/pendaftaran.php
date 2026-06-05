@@ -70,6 +70,32 @@ Route::patch(
 
 /*
 |--------------------------------------------------------------------------
+| Upload Dokumen Interview Kandidat
+|--------------------------------------------------------------------------
+| POST dipakai untuk upload CV dan Foto.
+| GET fallback dibuat supaya tidak error Method Not Allowed kalau URL terbuka.
+|--------------------------------------------------------------------------
+*/
+Route::post(
+    '/pendaftaran/api/token/{token}/jadwal-interview/{jadwalInterviewKandidat}/dokumen',
+    [CekTahapanPelamarController::class, 'uploadDokumenInterview']
+)
+    ->whereUuid('jadwalInterviewKandidat')
+    ->name('pendaftaran.api.token.jadwal-interview.dokumen.upload');
+
+Route::get(
+    '/pendaftaran/api/token/{token}/jadwal-interview/{jadwalInterviewKandidat}/dokumen',
+    function (string $token) {
+        return redirect()->route('pendaftaran.cek-tahapan', [
+            'token' => $token,
+        ]);
+    }
+)
+    ->whereUuid('jadwalInterviewKandidat')
+    ->name('pendaftaran.api.token.jadwal-interview.dokumen.fallback');
+
+/*
+|--------------------------------------------------------------------------
 | Step 1 - Data Diri
 |--------------------------------------------------------------------------
 */
