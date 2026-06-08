@@ -6,15 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\HasilReviewManagement;
 use App\Models\JadwalInterview;
 use App\Models\JadwalInterviewKandidat;
+use App\Models\JadwalInterviewPanelis;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class InterviewKandidatController extends Controller
 {
+    private string $timezone = 'Asia/Jakarta';
+
     private array $statusKehadiranOptions = [
         'Hadir',
         'Tidak Hadir',
@@ -39,6 +44,69 @@ class InterviewKandidatController extends Controller
         'Dipertimbangkan',
     ];
 
+    private function normalizeDateTime(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return Carbon::parse($value, $this->timezone)->format('Y-m-d H:i:s');
+    }
+
+    private function formatDateTimeForJson($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
+
+    private function formatDateTimeForDisplay($value): string
+    {
+        if (!$value) {
+            return '-';
+        }
+
+        return Carbon::parse($value)
+            ->locale('id')
+            ->translatedFormat('d F Y H:i');
+    }
+
+    private function mapJadwalInterviewForJson(?JadwalInterview $jadwal): ?array
+    {
+        if (!$jadwal) {
+            return null;
+        }
+
+        return [
+            'id' => $jadwal->id,
+            'judul_interview' => $jadwal->judul_interview,
+            'jadwal_interview' => $this->formatDateTimeForJson($jadwal->jadwal_interview),
+            'deleted_at' => $jadwal->deleted_at
+                ? $this->formatDateTimeForJson($jadwal->deleted_at)
+                : null,
+        ];
+    }
+
+    private function mapGroupInterview($items): array
+    {
+        $first = $items->first();
+
+        return [
+            'id' => $first->jadwal_interview_id,
+            'jadwal_interview_id' => $first->jadwal_interview_id,
+            'jadwal_interview' => $this->mapJadwalInterviewForJson($first->jadwalInterview),
+            'kandidat_ids' => $items->pluck('data_riwayat_diri_id')->values(),
+            'kandidats' => $items->map(function ($item) {
+                return $this->mapKandidat($item);
+            })->values(),
+            'jumlah_kandidat' => $items->count(),
+            'created_at' => $this->formatDateTimeForJson($items->min('created_at')),
+            'updated_at' => $this->formatDateTimeForJson($items->max('updated_at')),
+        ];
+    }
+
     public function list(Request $request)
     {
         $validated = $request->validate([
@@ -46,13 +114,13 @@ class InterviewKandidatController extends Controller
             'tanggal_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
         ]);
 
-        $tanggalMulai = $validated['tanggal_mulai'] ?? now()->toDateString();
-        $tanggalSelesai = $validated['tanggal_selesai'] ?? now()->toDateString();
+        $tanggalMulai = $validated['tanggal_mulai'] ?? now($this->timezone)->toDateString();
+        $tanggalSelesai = $validated['tanggal_selesai'] ?? now($this->timezone)->toDateString();
 
         $rows = JadwalInterviewKandidat::query()
             ->with([
                 'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
-                'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar',
+                'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
             ])
             ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
                 $query
@@ -66,20 +134,7 @@ class InterviewKandidatController extends Controller
         $data = $rows
             ->groupBy('jadwal_interview_id')
             ->map(function ($items) {
-                $first = $items->first();
-
-                return [
-                    'id' => $first->jadwal_interview_id,
-                    'jadwal_interview_id' => $first->jadwal_interview_id,
-                    'jadwal_interview' => $first->jadwalInterview,
-                    'kandidat_ids' => $items->pluck('data_riwayat_diri_id')->values(),
-                    'kandidats' => $items->map(function ($item) {
-                        return $this->mapKandidat($item);
-                    })->values(),
-                    'jumlah_kandidat' => $items->count(),
-                    'created_at' => $items->min('created_at'),
-                    'updated_at' => $items->max('updated_at'),
-                ];
+                return $this->mapGroupInterview($items);
             })
             ->values();
 
@@ -99,7 +154,7 @@ class InterviewKandidatController extends Controller
         $items = JadwalInterviewKandidat::query()
             ->with([
                 'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
-                'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar',
+                'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
             ])
             ->where('jadwal_interview_id', $jadwalInterviewId)
             ->whereHas('jadwalInterview', function ($query) {
@@ -115,23 +170,10 @@ class InterviewKandidatController extends Controller
             ], 404);
         }
 
-        $first = $items->first();
-
         return response()->json([
             'success' => true,
             'message' => 'Detail kandidat interview berhasil diambil.',
-            'data' => [
-                'id' => $first->jadwal_interview_id,
-                'jadwal_interview_id' => $first->jadwal_interview_id,
-                'jadwal_interview' => $first->jadwalInterview,
-                'kandidat_ids' => $items->pluck('data_riwayat_diri_id')->values(),
-                'kandidats' => $items->map(function ($item) {
-                    return $this->mapKandidat($item);
-                })->values(),
-                'jumlah_kandidat' => $items->count(),
-                'created_at' => $items->min('created_at'),
-                'updated_at' => $items->max('updated_at'),
-            ],
+            'data' => $this->mapGroupInterview($items),
         ]);
     }
 
@@ -143,14 +185,22 @@ class InterviewKandidatController extends Controller
             ->select('id', 'judul_interview', 'jadwal_interview')
             ->whereNull('deleted_at')
             ->where(function ($query) use ($includeJadwalInterviewId) {
-                $query->where('jadwal_interview', '>=', now());
+                $query->where('jadwal_interview', '>=', now($this->timezone)->format('Y-m-d H:i:s'));
 
                 if (!empty($includeJadwalInterviewId)) {
                     $query->orWhere('id', $includeJadwalInterviewId);
                 }
             })
             ->orderBy('jadwal_interview', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'judul_interview' => $item->judul_interview,
+                    'jadwal_interview' => $this->formatDateTimeForJson($item->jadwal_interview),
+                ];
+            })
+            ->values();
 
         return response()->json([
             'success' => true,
@@ -204,6 +254,7 @@ class InterviewKandidatController extends Controller
                 'data_riwayat_diri.email',
                 'data_riwayat_diri.no_wa',
                 'data_riwayat_diri.posisi_yang_dilamar',
+                'data_riwayat_diri.perusahaan_dilamar',
                 'daftar_hadir_test_mmpi.hasil_test',
             ])
             ->distinct()
@@ -263,17 +314,23 @@ class InterviewKandidatController extends Controller
                     'status_kehadiran' => null,
                     'hasil_interview' => null,
                     'catatan' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'created_at' => now($this->timezone),
+                    'updated_at' => now($this->timezone),
                 ];
             })->all();
 
             DB::table('jadwal_interview_kandidat')->insert($rows);
         });
 
+        $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+            $validated['jadwal_interview_id'],
+            $kandidatIds->all()
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Kandidat berhasil dimasukkan ke jadwal interview.',
+            'wa_panelis' => $waResult,
         ]);
     }
 
@@ -336,8 +393,8 @@ class InterviewKandidatController extends Controller
                         'status_kehadiran' => null,
                         'hasil_interview' => null,
                         'catatan' => null,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'created_at' => now($this->timezone),
+                        'updated_at' => now($this->timezone),
                     ];
                 })->all();
 
@@ -345,9 +402,15 @@ class InterviewKandidatController extends Controller
             }
         });
 
+        $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+            $jadwalInterviewId,
+            $kandidatIds->all()
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Kandidat jadwal interview berhasil diperbarui.',
+            'wa_panelis' => $waResult,
         ]);
     }
 
@@ -362,12 +425,29 @@ class InterviewKandidatController extends Controller
             ->findOrFail($jadwalInterviewId);
 
         $jadwal->update([
-            'jadwal_interview' => $validated['jadwal_interview'],
+            'jadwal_interview' => $this->normalizeDateTime($validated['jadwal_interview']),
         ]);
+
+        $kandidatIds = JadwalInterviewKandidat::query()
+            ->where('jadwal_interview_id', $jadwalInterviewId)
+            ->pluck('data_riwayat_diri_id')
+            ->values()
+            ->all();
+
+        $waResult = [];
+
+        if (!empty($kandidatIds)) {
+            $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+                $jadwalInterviewId,
+                $kandidatIds
+            );
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Tanggal interview berhasil diperbarui.',
+            'jadwal_interview' => $this->formatDateTimeForJson($jadwal->fresh()->jadwal_interview),
+            'wa_panelis' => $waResult,
         ]);
     }
 
@@ -468,6 +548,361 @@ class InterviewKandidatController extends Controller
         ]);
     }
 
+    private function kirimPesanJadwalInterviewKePanelis(string $jadwalInterviewId, array $kandidatIds): array
+    {
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->find($jadwalInterviewId);
+
+        if (!$jadwal) {
+            return [
+                'success' => false,
+                'message' => 'Jadwal interview tidak ditemukan.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'skipped' => [],
+                'responses' => [],
+            ];
+        }
+
+        $panelis = JadwalInterviewPanelis::query()
+            ->with('interviewer:id,nama,no_wa,deleted_at')
+            ->where('jadwal_interview_id', $jadwalInterviewId)
+            ->get()
+            ->map(function ($item) {
+                return $item->interviewer;
+            })
+            ->filter()
+            ->values();
+
+        if ($panelis->isEmpty()) {
+            return [
+                'success' => false,
+                'message' => 'Panelis/interviewer belum diatur untuk jadwal interview ini.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 1,
+                'total_gagal_provider' => 0,
+                'skipped' => [
+                    [
+                        'jadwal_interview_id' => $jadwalInterviewId,
+                        'reason' => 'Tidak ada data panelis di tabel jadwal_interview_panelis.',
+                    ],
+                ],
+                'responses' => [],
+            ];
+        }
+
+        $kandidats = DB::table('data_riwayat_diri')
+            ->leftJoin('posisi', 'posisi.id', '=', 'data_riwayat_diri.posisi_yang_dilamar')
+            ->leftJoin('data_perusahaan', 'data_perusahaan.id', '=', 'data_riwayat_diri.perusahaan_dilamar')
+            ->whereIn('data_riwayat_diri.id', $kandidatIds)
+            ->select([
+                'data_riwayat_diri.id',
+                'data_riwayat_diri.nama_lengkap',
+                'data_riwayat_diri.nama_panggil',
+                'data_riwayat_diri.no_wa',
+                'data_riwayat_diri.perusahaan_dilamar',
+                'data_riwayat_diri.posisi_yang_dilamar',
+                'posisi.nama_posisi',
+                'data_perusahaan.id as perusahaan_id',
+                'data_perusahaan.nama_perusahaan',
+                'data_perusahaan.no_wa as no_wa_perusahaan',
+                'data_perusahaan.token_api_wa',
+            ])
+            ->get();
+
+        if ($kandidats->isEmpty()) {
+            return [
+                'success' => false,
+                'message' => 'Data kandidat tidak ditemukan.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'skipped' => [],
+                'responses' => [],
+            ];
+        }
+
+        $groupedMessages = [];
+        $skipped = [];
+
+        foreach ($kandidats as $kandidat) {
+            if (empty($kandidat->perusahaan_id)) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'reason' => 'Data perusahaan kandidat tidak ditemukan.',
+                ];
+
+                continue;
+            }
+
+            $tokenApiWa = $this->normalizeTokenApiWa($kandidat->token_api_wa ?? null);
+            $nomorPerusahaan = $this->normalizeWhatsappNumber($kandidat->no_wa_perusahaan ?? null);
+
+            if (!$nomorPerusahaan) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'reason' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$tokenApiWa) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'reason' => 'Token API WA perusahaan kosong.',
+                ];
+
+                continue;
+            }
+
+            $groupKey = (string) $kandidat->perusahaan_id;
+
+            if (!isset($groupedMessages[$groupKey])) {
+                $groupedMessages[$groupKey] = [
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'token_api_wa' => $tokenApiWa,
+                    'kandidats' => [],
+                    'messages' => [],
+                ];
+            }
+
+            $groupedMessages[$groupKey]['kandidats'][] = [
+                'id' => $kandidat->id,
+                'nama' => $kandidat->nama_lengkap ?: ($kandidat->nama_panggil ?: '-'),
+                'nama_panggil' => $kandidat->nama_panggil ?: '-',
+                'no_wa' => $kandidat->no_wa ?: '-',
+                'posisi' => $kandidat->nama_posisi ?: '-',
+            ];
+        }
+
+        if (empty($groupedMessages)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada data valid untuk dikirim. Pastikan kandidat punya perusahaan, perusahaan punya no_wa, dan token_api_wa.',
+                'total_dikirim' => 0,
+                'total_dilewati' => count($skipped),
+                'total_gagal_provider' => 0,
+                'skipped' => $skipped,
+                'responses' => [],
+            ];
+        }
+
+        foreach ($groupedMessages as $groupKey => $group) {
+            foreach ($panelis as $interviewer) {
+                $target = $this->normalizeWhatsappNumber($interviewer->no_wa ?? null);
+
+                if (!$target) {
+                    $skipped[] = [
+                        'interviewer_id' => $interviewer->id ?? null,
+                        'interviewer' => $interviewer->nama ?? null,
+                        'no_wa' => $interviewer->no_wa ?? null,
+                        'perusahaan_id' => $group['perusahaan_id'],
+                        'perusahaan' => $group['perusahaan'],
+                        'reason' => 'Nomor WhatsApp interviewer kosong atau tidak valid.',
+                    ];
+
+                    continue;
+                }
+
+                $groupedMessages[$groupKey]['messages'][] = [
+                    'target' => $target,
+                    'message' => $this->buildPesanJadwalInterviewUntukPanelis($jadwal, $group, $interviewer),
+                    'delay' => '2',
+                ];
+            }
+        }
+
+        $groupedMessages = collect($groupedMessages)
+            ->filter(function ($group) {
+                return !empty($group['messages']);
+            })
+            ->values()
+            ->all();
+
+        if (empty($groupedMessages)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada nomor interviewer valid untuk dikirim pesan.',
+                'total_dikirim' => 0,
+                'total_dilewati' => count($skipped),
+                'total_gagal_provider' => 0,
+                'skipped' => $skipped,
+                'responses' => [],
+            ];
+        }
+
+        $responses = [];
+        $totalDikirim = 0;
+        $totalGagalProvider = 0;
+        $targets = [];
+
+        foreach ($groupedMessages as $group) {
+            try {
+                $response = Http::asForm()
+                    ->withoutVerifying()
+                    ->withHeaders([
+                        'Authorization' => $group['token_api_wa'],
+                    ])
+                    ->timeout(120)
+                    ->post('https://api.fonnte.com/send', [
+                        'data' => json_encode($group['messages']),
+                        'countryCode' => '62',
+                        'typing' => 'false',
+                        'preview' => 'true',
+                    ]);
+
+                $json = $response->json();
+                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
+                $isSuccess = $response->successful() && (bool) $fonnteStatus;
+
+                $countMessages = count($group['messages']);
+
+                if ($isSuccess) {
+                    $totalDikirim += $countMessages;
+                } else {
+                    $totalGagalProvider += $countMessages;
+                }
+
+                $targetGroup = collect($group['messages'])->pluck('target')->values()->all();
+                $targets = array_merge($targets, $targetGroup);
+
+                $responses[] = [
+                    'success' => $isSuccess,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_kandidat' => count($group['kandidats']),
+                    'total_pesan' => $countMessages,
+                    'targets' => $targetGroup,
+                    'fonnte_http_code' => $response->status(),
+                    'fonnte_response' => $json ?: $response->body(),
+                    'message' => $isSuccess
+                        ? 'Pesan jadwal interview berhasil dikirim ke panelis untuk perusahaan ini.'
+                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan gagal dikirim melalui Fonnte.'),
+                ];
+            } catch (\Throwable $e) {
+                $countMessages = count($group['messages']);
+                $totalGagalProvider += $countMessages;
+
+                Log::error('Gagal mengirim WA jadwal interview ke panelis', [
+                    'message' => $e->getMessage(),
+                    'jadwal_interview_id' => $jadwal->id ?? null,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                ]);
+
+                $responses[] = [
+                    'success' => false,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_kandidat' => count($group['kandidats']),
+                    'total_pesan' => $countMessages,
+                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
+                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte: ' . $e->getMessage(),
+                ];
+            }
+        }
+
+        $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
+        $isPartialSuccess = $totalDikirim > 0 && $totalGagalProvider > 0;
+
+        return [
+            'success' => $totalDikirim > 0,
+            'message' => $isAllSuccess
+                ? 'Pesan jadwal interview berhasil dikirim ke panelis sesuai perusahaan.'
+                : ($isPartialSuccess
+                    ? 'Sebagian pesan jadwal interview berhasil dikirim, sebagian gagal.'
+                    : 'Pesan jadwal interview gagal dikirim.'),
+            'total_dikirim' => $totalDikirim,
+            'total_dilewati' => count($skipped),
+            'total_gagal_provider' => $totalGagalProvider,
+            'total_perusahaan' => count($groupedMessages),
+            'skipped' => $skipped,
+            'targets' => array_values(array_unique($targets)),
+            'responses' => $responses,
+        ];
+    }
+
+    private function buildPesanJadwalInterviewUntukPanelis(JadwalInterview $jadwal, array $group, $interviewer): string
+    {
+        $tanggalInterview = $this->formatDateTimeForDisplay($jadwal->jadwal_interview);
+
+        $namaHeadDivisi = $interviewer->nama ?? 'Bapak/Ibu Head Divisi';
+
+        $listKandidat = collect($group['kandidats'])
+            ->values()
+            ->map(function ($kandidat, $index) {
+                $no = $index + 1;
+
+                return "{$no}. {$kandidat['nama']}\n"
+                    . "   Posisi yang Dilamar: {$kandidat['posisi']}\n"
+                    . "   No. WhatsApp: {$kandidat['no_wa']}";
+            })
+            ->implode("\n\n");
+
+        return "Yth. {$namaHeadDivisi},\n\n"
+            . "Dengan hormat,\n\n"
+            . "Kami informasikan bahwa terdapat jadwal interview kandidat untuk kebutuhan rekrutmen di {$group['perusahaan']}.\n\n"
+            . "Berikut detail jadwal interview:\n"
+            . "Judul Interview: " . ($jadwal->judul_interview ?: '-') . "\n"
+            . "Tanggal Interview: {$tanggalInterview}\n\n"
+            . "Daftar kandidat yang dijadwalkan:\n"
+            . "{$listKandidat}\n\n"
+            . "Mohon kesediaan Bapak/Ibu untuk melakukan proses interview sesuai jadwal yang telah ditentukan.\n"
+            . "Apabila terdapat kendala atau perlu dilakukan penyesuaian jadwal, mohon segera menginformasikan kepada tim rekrutmen.\n\n"
+            . "Terima kasih atas perhatian dan kerja samanya.\n\n"
+            . "Hormat kami,\n"
+            . "Tim Rekrutmen {$group['perusahaan']}";
+    }
+
+    private function normalizeWhatsappNumber(?string $number): ?string
+    {
+        if (!$number) {
+            return null;
+        }
+
+        $number = preg_replace('/[^0-9]/', '', $number);
+
+        if (!$number) {
+            return null;
+        }
+
+        if (str_starts_with($number, '0')) {
+            $number = '62' . substr($number, 1);
+        }
+
+        if (str_starts_with($number, '8')) {
+            $number = '62' . $number;
+        }
+
+        if (!str_starts_with($number, '62')) {
+            return null;
+        }
+
+        return $number;
+    }
+
+    private function normalizeTokenApiWa(?string $token): ?string
+    {
+        $token = trim((string) $token);
+
+        return $token !== '' ? $token : null;
+    }
+
     private function syncHasilReviewManagement(JadwalInterviewKandidat $row): void
     {
         $hasilInterview = trim((string) $row->hasil_interview);
@@ -513,9 +948,10 @@ class InterviewKandidatController extends Controller
             ], 422));
         }
 
-        $tanggalInterview = Carbon::parse($jadwal->jadwal_interview);
+        $tanggalInterview = Carbon::parse($jadwal->jadwal_interview, $this->timezone);
+        $sekarang = now($this->timezone);
 
-        if ($tanggalInterview->lt(now())) {
+        if ($tanggalInterview->lt($sekarang)) {
             abort(response()->json([
                 'success' => false,
                 'message' => 'Jadwal interview sudah melewati tanggal sekarang.',

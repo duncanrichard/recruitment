@@ -215,29 +215,52 @@ export default function KandidatInterviewPage({ actionSignals }) {
         fetchData(defaultFilter);
     };
 
+    const parseDateTimeValue = (value) => {
+        if (!value) return 0;
+
+        const cleanValue = String(value).replace("T", " " ).slice(0, 16);
+        const [datePart, timePart = "00:00"] = cleanValue.split(" " );
+        const [year, month, day] = (datePart || "").split("-").map(Number);
+        const [hour, minute] = (timePart || "00:00").split(":").map(Number);
+
+        if (!year || !month || !day) return 0;
+
+        return Date.UTC(year, month - 1, day, hour || 0, minute || 0);
+    };
+
     const formatDisplayDateTime = (value) => {
         if (!value) return "-";
 
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return value;
+        const cleanValue = String(value).replace("T", " " ).slice(0, 16);
+        const [datePart, timePart] = cleanValue.split(" " );
 
-        return date.toLocaleString("id-ID", {
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
+        if (!datePart || !timePart) return value;
+
+        const [year, month, day] = datePart.split("-");
+        const [hour, minute] = timePart.split(":");
+
+        const monthNames = [
+            "Januari",
+            "Februari",
+            "Maret",
+            "April",
+            "Mei",
+            "Juni",
+            "Juli",
+            "Agustus",
+            "September",
+            "Oktober",
+            "November",
+            "Desember",
+        ];
+
+        return `${day} ${monthNames[Number(month) - 1] || month} ${year} pukul ${hour}.${minute}`;
     };
 
     const toDateTimeLocalValue = (value) => {
         if (!value) return "";
 
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return "";
-
-        const offset = date.getTimezoneOffset();
-        return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+        return String(value).replace(" ", "T").slice(0, 16);
     };
 
     const formatKandidat = (kandidats = []) => {
@@ -275,8 +298,8 @@ export default function KandidatInterviewPage({ actionSignals }) {
             let valueB = "";
 
             if (sortConfig.key === "jadwal") {
-                valueA = new Date(a.jadwal_interview?.jadwal_interview || "").getTime() || 0;
-                valueB = new Date(b.jadwal_interview?.jadwal_interview || "").getTime() || 0;
+                valueA = parseDateTimeValue(a.jadwal_interview?.jadwal_interview);
+                valueB = parseDateTimeValue(b.jadwal_interview?.jadwal_interview);
             }
 
             if (sortConfig.key === "judul") {
@@ -627,6 +650,19 @@ export default function KandidatInterviewPage({ actionSignals }) {
                     loading={loading}
                     submitLabel={editId ? "Update Data" : "Simpan Data"}
                 >
+                    {!editId && (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-700">
+                            <div className="mb-1 font-black text-amber-800">
+                                Catatan Jadwal Interview
+                            </div>
+
+                            <p>
+                                Jadwal interview yang sudah melewati tanggal atau jam pelaksanaan tidak akan tampil pada pilihan.
+                                Jika jadwal yang dicari tidak tersedia, silakan buat jadwal interview baru terlebih dahulu.
+                            </p>
+                        </div>
+                    )}
+
                     <SelectJadwal
                         label="Jadwal Interview"
                         name="jadwal_interview_id"
@@ -657,7 +693,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                     />
 
                     <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
-                        Kandidat yang tampil adalah pelamar yang sudah lolos MMPI dan belum memiliki jadwal interview.
+                        Kandidat yang tampil adalah pelamar yang sudah lolos MMPI dan belum memiliki jadwal interview aktif.
                         Dalam satu jadwal interview bisa memilih lebih dari satu kandidat.
                     </p>
                 </FormModal>
@@ -1290,6 +1326,35 @@ function Badge({ value }) {
 }
 
 function SelectJadwal({ label, name, value, onChange, options, required = false, disabled = false }) {
+    const formatJadwalOptionDateTime = (dateTimeValue) => {
+        if (!dateTimeValue) return "-";
+
+        const cleanValue = String(dateTimeValue).replace("T", " ").slice(0, 16);
+        const [datePart, timePart] = cleanValue.split(" ");
+
+        if (!datePart || !timePart) return dateTimeValue;
+
+        const [year, month, day] = datePart.split("-");
+        const [hour, minute] = timePart.split(":");
+
+        const monthNames = [
+            "Januari",
+            "Februari",
+            "Maret",
+            "April",
+            "Mei",
+            "Juni",
+            "Juli",
+            "Agustus",
+            "September",
+            "Oktober",
+            "November",
+            "Desember",
+        ];
+
+        return `${day} ${monthNames[Number(month) - 1] || month} ${year} pukul ${hour}.${minute}`;
+    };
+
     return (
         <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
@@ -1309,10 +1374,11 @@ function SelectJadwal({ label, name, value, onChange, options, required = false,
 
                 {options.map((item) => (
                     <option key={item.id} value={item.id}>
-                        {item.judul_interview} - {item.jadwal_interview ? new Date(item.jadwal_interview).toLocaleString("id-ID") : "-"}
+                        {item.judul_interview || "-"} - {formatJadwalOptionDateTime(item.jadwal_interview)}
                     </option>
                 ))}
             </select>
+
         </div>
     );
 }

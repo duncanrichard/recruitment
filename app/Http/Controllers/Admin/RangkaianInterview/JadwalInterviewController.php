@@ -6,12 +6,45 @@ use App\Http\Controllers\Controller;
 use App\Models\Interviewer;
 use App\Models\JadwalInterview;
 use App\Models\JadwalInterviewKandidat;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class JadwalInterviewController extends Controller
 {
+    private string $timezone = 'Asia/Jakarta';
+
+    private function normalizeDateTime(?string $value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return Carbon::parse($value, $this->timezone)->format('Y-m-d H:i:s');
+    }
+
+    private function formatDateTimeForJson($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        return Carbon::parse($value)->format('Y-m-d H:i:s');
+    }
+
+    private function formatJadwalInterview($item): array
+    {
+        return [
+            'id' => $item->id,
+            'judul_interview' => $item->judul_interview,
+            'jadwal_interview' => $this->formatDateTimeForJson($item->jadwal_interview),
+            'created_at' => $this->formatDateTimeForJson($item->created_at),
+            'updated_at' => $this->formatDateTimeForJson($item->updated_at),
+            'panelis' => $item->panelis,
+        ];
+    }
+
     public function list()
     {
         $data = JadwalInterview::query()
@@ -28,7 +61,11 @@ class JadwalInterviewController extends Controller
                 'updated_at',
             ])
             ->orderBy('jadwal_interview', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($item) {
+                return $this->formatJadwalInterview($item);
+            })
+            ->values();
 
         return response()->json([
             'success' => true,
@@ -62,8 +99,8 @@ class JadwalInterviewController extends Controller
 
         $jadwalInterview = DB::transaction(function () use ($validated) {
             $jadwalInterview = JadwalInterview::create([
-                'judul_interview' => $validated['judul_interview'],
-                'jadwal_interview' => $validated['jadwal_interview'],
+                'judul_interview' => trim($validated['judul_interview']),
+                'jadwal_interview' => $this->normalizeDateTime($validated['jadwal_interview']),
             ]);
 
             $rows = collect($validated['interviewer_ids'])
@@ -73,7 +110,7 @@ class JadwalInterviewController extends Controller
                         'id' => (string) Str::uuid(),
                         'jadwal_interview_id' => $jadwalInterview->id,
                         'interviewer_id' => $interviewerId,
-                        'created_at' => now(),
+                        'created_at' => now($this->timezone),
                     ];
                 })
                 ->values()
@@ -87,7 +124,7 @@ class JadwalInterviewController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data jadwal interview berhasil disimpan.',
-            'data' => $jadwalInterview,
+            'data' => $this->formatJadwalInterview($jadwalInterview),
         ]);
     }
 
@@ -104,8 +141,8 @@ class JadwalInterviewController extends Controller
 
         $jadwalInterview = DB::transaction(function () use ($jadwalInterview, $validated) {
             $jadwalInterview->update([
-                'judul_interview' => $validated['judul_interview'],
-                'jadwal_interview' => $validated['jadwal_interview'],
+                'judul_interview' => trim($validated['judul_interview']),
+                'jadwal_interview' => $this->normalizeDateTime($validated['jadwal_interview']),
             ]);
 
             DB::table('jadwal_interview_panelis')
@@ -119,7 +156,7 @@ class JadwalInterviewController extends Controller
                         'id' => (string) Str::uuid(),
                         'jadwal_interview_id' => $jadwalInterview->id,
                         'interviewer_id' => $interviewerId,
-                        'created_at' => now(),
+                        'created_at' => now($this->timezone),
                     ];
                 })
                 ->values()
@@ -133,7 +170,7 @@ class JadwalInterviewController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data jadwal interview berhasil diperbarui.',
-            'data' => $jadwalInterview,
+            'data' => $this->formatJadwalInterview($jadwalInterview),
         ]);
     }
 
