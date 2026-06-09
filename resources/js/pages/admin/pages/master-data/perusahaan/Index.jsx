@@ -6,6 +6,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [validatingId, setValidatingId] = useState(null);
 
     const [search, setSearch] = useState("");
     const [entriesPerPage, setEntriesPerPage] = useState(10);
@@ -107,12 +108,18 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const namaPerusahaan = String(item.nama_perusahaan || "").toLowerCase();
             const noWa = String(item.no_wa || "").toLowerCase();
             const tokenApiWa = String(item.token_api_wa || "").toLowerCase();
+            const waStatus = String(item.wa_status_label || "").toLowerCase();
+            const waMessage = String(item.wa_status_message || "").toLowerCase();
+            const waDevice = String(item.wa_device_number || "").toLowerCase();
 
             return (
                 kode.includes(keyword) ||
                 namaPerusahaan.includes(keyword) ||
                 noWa.includes(keyword) ||
-                tokenApiWa.includes(keyword)
+                tokenApiWa.includes(keyword) ||
+                waStatus.includes(keyword) ||
+                waMessage.includes(keyword) ||
+                waDevice.includes(keyword)
             );
         });
     }, [dataPerusahaan, search]);
@@ -252,7 +259,13 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const result = await response.json();
 
             if (!response.ok) {
-                alert(result.message || "Data gagal disimpan.");
+                const errors = result?.errors || {};
+                const firstError =
+                    Object.values(errors).flat().filter(Boolean)[0] ||
+                    result.message ||
+                    "Data gagal disimpan.";
+
+                alert(firstError);
                 return;
             }
 
@@ -296,6 +309,76 @@ export default function DataPerusahaanPage({ actionSignals }) {
         }
     };
 
+    const parseJsonResponse = async (response) => {
+        const text = await response.text();
+
+        if (!text) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            console.error("Response bukan JSON:", text);
+
+            return {
+                success: false,
+                message: "Response server tidak valid.",
+                raw: text,
+            };
+        }
+    };
+
+    const handleValidasiWa = async (item) => {
+        if (!item?.id) {
+            alert("Data perusahaan tidak valid.");
+            return;
+        }
+
+        setValidatingId(item.id);
+
+        try {
+            const response = await fetch(
+                `/admin/master-data/perusahaan/${item.id}/validasi-wa`,
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken() || "",
+                    },
+                }
+            );
+
+            const result = await parseJsonResponse(response);
+
+            if (!response.ok || !result.success) {
+                alert(result.message || "Nomor perusahaan dan token API WA tidak valid.");
+                fetchData();
+                return;
+            }
+
+            alert(
+                `${result.message || "Validasi berhasil."}
+
+` +
+                    `Nomor database: ${result?.data?.nomor_database || "-"}
+` +
+                    `Nomor device: ${result?.data?.nomor_device || "-"}
+` +
+                    `Status device: ${result?.data?.device_status || "-"}`
+            );
+
+            fetchData();
+        } catch (error) {
+            console.error("Gagal validasi WA:", error);
+            alert("Terjadi kesalahan saat validasi nomor dan token API WA.");
+        } finally {
+            setValidatingId(null);
+        }
+    };
+
     const maskToken = (token) => {
         if (!token) return "-";
 
@@ -308,6 +391,32 @@ export default function DataPerusahaanPage({ actionSignals }) {
         return `${value.slice(0, 6)}••••••${value.slice(-4)}`;
     };
 
+
+    const renderWaStatus = (item) => {
+    const status = item.wa_status || "unknown";
+    const label = item.wa_status_label || "Belum Dicek";
+    const message = item.wa_status_message || "-";
+
+    const className =
+        status === "connected"
+            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            : status === "disconnected"
+            ? "bg-amber-50 text-amber-700 border-amber-100"
+            : status === "mismatch"
+            ? "bg-orange-50 text-orange-700 border-orange-100"
+            : status === "error"
+            ? "bg-slate-50 text-slate-700 border-slate-200"
+            : "bg-rose-50 text-rose-700 border-rose-100";
+
+    return (
+        <span
+            title={message}
+            className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-black ${className}`}
+        >
+            {label}
+        </span>
+    );
+};
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
@@ -382,7 +491,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="min-w-full">
+                    <table className="min-w-max w-full table-auto whitespace-nowrap">
                         <thead>
                             <tr className="bg-slate-50/80">
                                 <TableHead>No</TableHead>
@@ -415,6 +524,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     icon={sortIcon("token_api_wa")}
                                 />
 
+                                <TableHead>Status Fonnte</TableHead>
+
                                 <TableHead align="right">Aksi</TableHead>
                             </tr>
                         </thead>
@@ -422,7 +533,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="7" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -434,39 +545,52 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                         key={item.id}
                                         className="group transition hover:bg-slate-50"
                                     >
-                                        <td className="px-6 py-5 text-sm font-black text-slate-500">
+                                        <td className="whitespace-nowrap px-6 py-5 text-sm font-black text-slate-500">
                                             {showingFrom + index}
                                         </td>
 
-                                        <td className="px-6 py-5">
+                                        <td className="whitespace-nowrap px-6 py-5">
                                             <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-700">
                                                 {item.kode}
                                             </span>
                                         </td>
 
-                                        <td className="px-6 py-5">
+                                        <td className="whitespace-nowrap px-6 py-5">
                                             <div className="font-black text-slate-950">
                                                 {item.nama_perusahaan}
                                             </div>
                                         </td>
 
-                                        <td className="px-6 py-5">
+                                        <td className="whitespace-nowrap px-6 py-5">
                                             <div className="font-black text-slate-700">
                                                 {item.no_wa || "-"}
                                             </div>
                                         </td>
 
-                                        <td className="px-6 py-5">
+                                        <td className="whitespace-nowrap px-6 py-5">
                                             <div
-                                                className="max-w-[260px] truncate font-mono text-xs font-black text-slate-600"
+                                                className="max-w-[260px] truncate whitespace-nowrap font-mono text-xs font-black text-slate-600"
                                                 title={item.token_api_wa || "-"}
                                             >
                                                 {maskToken(item.token_api_wa)}
                                             </div>
                                         </td>
 
-                                        <td className="px-6 py-5 text-right">
-                                            <div className="flex justify-end gap-2">
+                                        <td className="whitespace-nowrap px-6 py-5">
+                                            {renderWaStatus(item)}
+                                        </td>
+
+                                        <td className="whitespace-nowrap px-6 py-5 text-right">
+                                            <div className="flex flex-nowrap justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={validatingId === item.id}
+                                                    onClick={() => handleValidasiWa(item)}
+                                                    className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {validatingId === item.id ? "Validasi..." : "Validasi"}
+                                                </button>
+
                                                 <button
                                                     type="button"
                                                     onClick={() => handleEdit(item)}
@@ -490,7 +614,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-16">
+                                    <td colSpan="7" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ▥
@@ -523,7 +647,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         )}
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
                         <button
                             type="button"
                             disabled={currentPage === 1}
@@ -687,7 +811,7 @@ function TableHead({ children, align = "left" }) {
 
     return (
         <th
-            className={`px-6 py-4 ${alignClass} text-xs font-black uppercase tracking-[0.12em] text-slate-500`}
+            className={`whitespace-nowrap px-6 py-4 ${alignClass} text-xs font-black uppercase tracking-[0.12em] text-slate-500`}
         >
             {children}
         </th>
@@ -696,11 +820,11 @@ function TableHead({ children, align = "left" }) {
 
 function SortableTableHead({ label, sortKey, onSort, icon }) {
     return (
-        <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        <th className="whitespace-nowrap px-6 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-500">
             <button
                 type="button"
                 onClick={() => onSort(sortKey)}
-                className="inline-flex items-center gap-2 font-black uppercase tracking-[0.12em] text-slate-500 transition hover:text-slate-800"
+                className="inline-flex items-center gap-2 whitespace-nowrap font-black uppercase tracking-[0.12em] text-slate-500 transition hover:text-slate-800"
             >
                 <span>{label}</span>
                 <span className="text-xs">{icon}</span>

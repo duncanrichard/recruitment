@@ -340,8 +340,8 @@ export default function AdminLayout() {
         !isDetailDaftarHadirMmpiPage;
 
     return (
-        <main className="min-h-screen bg-slate-100 text-slate-900">
-            <div className="flex min-h-screen">
+        <main className="h-screen overflow-hidden bg-slate-100 text-slate-900">
+            <div className="flex h-screen overflow-hidden">
                 <AdminSidebar
                     sidebarOpen={sidebarOpen}
                     activeMenu={activeMenu}
@@ -351,7 +351,7 @@ export default function AdminLayout() {
                     onSubMenuClick={handleSubMenuClick}
                 />
 
-                <section className="flex min-w-0 flex-1 flex-col">
+                <section className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
                     <AdminHeader
                         activeMenuData={activeMenuData}
                         showActionButton={showActionButton}
@@ -359,7 +359,7 @@ export default function AdminLayout() {
                         onHeaderAction={handleHeaderAction}
                     />
 
-                    <div className="flex-1 p-5 sm:p-8">
+                    <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
                         {isDetailPelamarPage ? (
                             <ActiveComponent
                                 id={detailPelamarId}

@@ -3,25 +3,28 @@
 use App\Http\Controllers\Admin\JadwalTest\MmpiController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Tambahkan route ini di routes/web.php pada group admin/auth yang sudah ada.
-|--------------------------------------------------------------------------
-*/
+Route::prefix('admin/jadwal-test/mmpi')
+    ->name('admin.jadwal-test.mmpi.')
+    ->controller(MmpiController::class)
+    ->group(function () {
+        Route::get('/', 'index')
+            ->middleware('permission:admin.jadwal-test.mmpi.list')
+            ->name('index');
 
-Route::prefix('admin/jadwal-test/mmpi')->group(function () {
-    Route::get('/', [MmpiController::class, 'index'])
-        ->name('admin.jadwal-test.mmpi.index');
+        Route::get('/list', 'list')
+            ->middleware('permission:admin.jadwal-test.mmpi.list')
+            ->name('list');
 
-    Route::get('/list', [MmpiController::class, 'list'])
-        ->name('admin.jadwal-test.mmpi.list');
+        Route::get('/kandidat-lolos-zoom', 'kandidatLolosZoom')
+            ->middleware('permission:admin.jadwal-test.mmpi.options')
+            ->name('kandidat-lolos-zoom');
 
-    Route::get('/kandidat-lolos-zoom', [MmpiController::class, 'kandidatLolosZoom'])
-        ->name('admin.jadwal-test.mmpi.kandidat-lolos-zoom');
+        Route::post('/', 'store')
+            ->middleware('permission:admin.jadwal-test.mmpi.store')
+            ->name('store');
 
-    Route::post('/', [MmpiController::class, 'store'])
-        ->name('admin.jadwal-test.mmpi.store');
-
-    Route::delete('/{id}', [MmpiController::class, 'destroy'])
-        ->name('admin.jadwal-test.mmpi.destroy');
-});
+        Route::delete('/{id}', 'destroy')
+            ->middleware('permission:admin.jadwal-test.mmpi.destroy')
+            ->whereUuid('id')
+            ->name('destroy');
+    });

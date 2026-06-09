@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Admin\MasterData;
 use App\Http\Controllers\Controller;
 use App\Models\OpsiKacamata;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class OpsiKacamataController extends Controller
 {
     public function list()
     {
         $data = OpsiKacamata::query()
-            ->orderByDesc('created_at')
+            ->orderBy('opsi', 'asc')
             ->get();
 
         return response()->json([
@@ -24,11 +25,17 @@ class OpsiKacamataController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'opsi' => ['required', 'string', 'max:255'],
+            'opsi' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('opsi_kacamata', 'opsi')
+                    ->whereNull('deleted_at'),
+            ],
         ]);
 
         $opsiKacamata = OpsiKacamata::create([
-            'opsi' => $validated['opsi'],
+            'opsi' => trim($validated['opsi']),
         ]);
 
         return response()->json([
@@ -40,14 +47,21 @@ class OpsiKacamataController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'opsi' => ['required', 'string', 'max:255'],
-        ]);
-
         $opsiKacamata = OpsiKacamata::findOrFail($id);
 
+        $validated = $request->validate([
+            'opsi' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('opsi_kacamata', 'opsi')
+                    ->ignore($opsiKacamata->id, 'id')
+                    ->whereNull('deleted_at'),
+            ],
+        ]);
+
         $opsiKacamata->update([
-            'opsi' => $validated['opsi'],
+            'opsi' => trim($validated['opsi']),
         ]);
 
         return response()->json([

@@ -8,13 +8,15 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Spatie\Permission\PermissionRegistrar;
 
 class UserController extends Controller
 {
     public function index()
     {
-        return view('admin');
+        return view('pages.admin.index');
     }
 
     public function list()
@@ -25,28 +27,10 @@ class UserController extends Controller
                     'roles:id,name,guard_name',
                     'divisi:id,nama',
                 ])
-                ->orderByDesc('created_at')
+                ->orderBy('name', 'asc')
                 ->get()
                 ->map(function ($user) {
-                    $role = $user->roles->first();
-
-                    return [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'email_verified_at' => $user->email_verified_at,
-
-                        'role_id' => $role?->id,
-                        'role_label' => $role?->name,
-                        'role_guard' => $role?->guard_name,
-                        'role_kode' => $role?->guard_name,
-
-                        'divisi_id' => $user->divisi_id,
-                        'divisi_label' => $user->divisi?->nama,
-
-                        'created_at' => $user->created_at,
-                        'updated_at' => $user->updated_at,
-                    ];
+                    return $this->formatUser($user);
                 });
 
             return response()->json([
@@ -68,7 +52,7 @@ class UserController extends Controller
         try {
             $roles = Role::query()
                 ->select('id', 'name', 'guard_name')
-                ->orderBy('name')
+                ->orderBy('name', 'asc')
                 ->get()
                 ->map(function ($role) {
                     return [
@@ -84,7 +68,7 @@ class UserController extends Controller
 
             $divisi = Divisi::query()
                 ->select('id', 'nama')
-                ->orderBy('nama')
+                ->orderBy('nama', 'asc')
                 ->get();
 
             return response()->json([
@@ -107,34 +91,75 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:191'],
-            'email' => ['required', 'email', 'max:191', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
-            'role_id' => ['required', 'uuid', 'exists:roles,id'],
-            'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
-            'email_verified_at' => ['nullable', 'date'],
+            'name' => [
+                'required',
+                'string',
+                'max:191',
+            ],
+            'email' => [
+                'required',
+                'email',
+                'max:191',
+                Rule::unique('users', 'email'),
+            ],
+            'password' => [
+                'required',
+                'string',
+                'min:6',
+                'confirmed',
+            ],
+            'role_id' => [
+                'required',
+                'uuid',
+                'exists:roles,id',
+            ],
+            'divisi_id' => [
+                'nullable',
+                'uuid',
+                'exists:divisi,id',
+            ],
+            'email_verified_at' => [
+                'nullable',
+                'date',
+            ],
+        ], [
+            'name.required' => 'Nama user wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'email.unique' => 'Email sudah digunakan.',
+            'password.required' => 'Password wajib diisi.',
+            'password.min' => 'Password minimal 6 karakter.',
+            'password.confirmed' => 'Konfirmasi password tidak sesuai.',
+            'role_id.required' => 'Role wajib dipilih.',
+            'role_id.exists' => 'Role tidak valid.',
+            'divisi_id.exists' => 'Divisi tidak valid.',
         ]);
 
         try {
-            DB::transaction(function () use ($validated) {
+            $user = DB::transaction(function () use ($validated) {
                 $role = Role::query()
                     ->where('id', $validated['role_id'])
                     ->firstOrFail();
 
                 $user = User::create([
-                    'name' => $validated['name'],
-                    'email' => $validated['email'],
-                    'password' => $validated['password'],
+                    'name' => trim($validated['name']),
+                    'email' => strtolower(trim($validated['email'])),
+                    'password' => Hash::make($validated['password']),
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ]);
 
                 $user->assignRole($role);
+
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+                return $user->load(['roles:id,name,guard_name', 'divisi:id,nama']);
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'User berhasil ditambahkan.',
+                'data' => $this->formatUser($user),
             ], 201);
         } catch (\Throwable $th) {
             return response()->json([
@@ -148,44 +173,78 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:191'],
+            'name' => [
+                'required',
+                'string',
+                'max:191',
+            ],
             'email' => [
                 'required',
                 'email',
                 'max:191',
                 Rule::unique('users', 'email')->ignore($user->id, 'id'),
             ],
-            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
-            'role_id' => ['required', 'uuid', 'exists:roles,id'],
-            'divisi_id' => ['nullable', 'uuid', 'exists:divisi,id'],
-            'email_verified_at' => ['nullable', 'date'],
+            'password' => [
+                'nullable',
+                'string',
+                'min:6',
+                'confirmed',
+            ],
+            'role_id' => [
+                'required',
+                'uuid',
+                'exists:roles,id',
+            ],
+            'divisi_id' => [
+                'nullable',
+                'uuid',
+                'exists:divisi,id',
+            ],
+            'email_verified_at' => [
+                'nullable',
+                'date',
+            ],
+        ], [
+            'name.required' => 'Nama user wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'email.unique' => 'Email sudah digunakan.',
+            'password.min' => 'Password minimal 6 karakter.',
+            'password.confirmed' => 'Konfirmasi password tidak sesuai.',
+            'role_id.required' => 'Role wajib dipilih.',
+            'role_id.exists' => 'Role tidak valid.',
+            'divisi_id.exists' => 'Divisi tidak valid.',
         ]);
 
         try {
-            DB::transaction(function () use ($validated, $user) {
+            $updatedUser = DB::transaction(function () use ($validated, $user) {
                 $role = Role::query()
                     ->where('id', $validated['role_id'])
                     ->firstOrFail();
 
                 $payload = [
-                    'name' => $validated['name'],
-                    'email' => $validated['email'],
+                    'name' => trim($validated['name']),
+                    'email' => strtolower(trim($validated['email'])),
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ];
 
-                if (! empty($validated['password'])) {
-                    $payload['password'] = $validated['password'];
+                if (!empty($validated['password'])) {
+                    $payload['password'] = Hash::make($validated['password']);
                 }
 
                 $user->update($payload);
-
                 $user->syncRoles([$role]);
+
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+                return $user->fresh()->load(['roles:id,name,guard_name', 'divisi:id,nama']);
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'User berhasil diperbarui.',
+                'data' => $this->formatUser($updatedUser),
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -198,10 +257,19 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        if ($this->userHasSuperadminRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User dengan role Superadmin tidak boleh dihapus.',
+            ], 422);
+        }
+
         try {
             DB::transaction(function () use ($user) {
                 $user->syncRoles([]);
                 $user->delete();
+
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
             });
 
             return response()->json([
@@ -215,5 +283,44 @@ class UserController extends Controller
                 'error' => $th->getMessage(),
             ], 500);
         }
+    }
+
+    private function formatUser(User $user): array
+    {
+        $role = $user->roles->first();
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at,
+
+            'role_id' => $role?->id,
+            'role_label' => $role?->name,
+            'role_guard' => $role?->guard_name,
+            'role_kode' => $role?->guard_name,
+            'is_superadmin' => $role ? $this->isSuperadminRole($role) : false,
+
+            'divisi_id' => $user->divisi_id,
+            'divisi_label' => $user->divisi?->nama,
+
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+        ];
+    }
+
+    private function userHasSuperadminRole(User $user): bool
+    {
+        return $user->roles->contains(function ($role) {
+            return $this->isSuperadminRole($role);
+        });
+    }
+
+    private function isSuperadminRole(Role $role): bool
+    {
+        return in_array(strtolower(trim($role->name)), [
+            'superadmin',
+            'super admin',
+        ], true);
     }
 }

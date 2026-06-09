@@ -23,7 +23,7 @@ class PermissionSeeder extends Seeder
             */
             [
                 'group' => 'Master Data',
-                'label' => 'Posisi',
+                'label' => 'Posisi Pelamar',
                 'key' => 'admin.master-data.posisi',
                 'actions' => [
                     'list' => 'View',
@@ -62,6 +62,249 @@ class PermissionSeeder extends Seeder
                     'list' => 'View',
                     'store' => 'Create',
                     'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Agama',
+                'key' => 'admin.master-data.agama',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Kewarganegaraan',
+                'key' => 'admin.master-data.kewarganegaraan',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Status Pernikahan',
+                'key' => 'admin.master-data.status-pernikahan',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Opsi Kacamata',
+                'key' => 'admin.master-data.opsi-kacamata',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Sumber Informasi',
+                'key' => 'admin.master-data.sumber-informasi',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Master Data',
+                'label' => 'Data Perusahaan',
+                'key' => 'admin.master-data.perusahaan',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Data Pelamar
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Data Pelamar',
+                'label' => 'Data Pelamar',
+                'key' => 'admin.data-pelamar',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                    'detail' => 'Detail',
+                    'send-message' => 'Send Message',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Permintaan Kandidat
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Permintaan Kandidat',
+                'label' => 'Permintaan Kandidat Recruitment',
+                'key' => 'admin.permintaan-kandidat-recruitment',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'show' => 'Detail',
+                    'update' => 'Update',
+                    'status' => 'Update Status',
+                    'destroy' => 'Delete',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Jadwal Test
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Jadwal Test',
+                'label' => 'Zoom',
+                'key' => 'admin.jadwal-test.zoom',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                    'detail' => 'Detail',
+                    'options' => 'Options',
+                ],
+            ],
+            [
+                'group' => 'Jadwal Test',
+                'label' => 'MMPI',
+                'key' => 'admin.jadwal-test.mmpi',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create',
+                    'destroy' => 'Delete',
+                    'options' => 'Options',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Daftar Hadir
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Daftar Hadir',
+                'label' => 'Zoom',
+                'key' => 'admin.daftar-hadir.zoom',
+                'actions' => [
+                    'list' => 'View',
+                    'detail' => 'Detail',
+                    'update-hasil-test' => 'Update Hasil Test',
+                ],
+            ],
+            [
+                'group' => 'Daftar Hadir',
+                'label' => 'MMPI',
+                'key' => 'admin.daftar-hadir.mmpi',
+                'actions' => [
+                    'list' => 'View',
+                    'detail' => 'Detail',
+                    'update-kehadiran' => 'Update Kehadiran',
+                    'update-hasil-test' => 'Update Hasil Test',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Interview
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Interview',
+                'label' => 'Interviewer',
+                'key' => 'admin.rangkaian-interview.interviewer',
+                'actions' => [
+                    'list' => 'View',
+                    'options' => 'Options',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Interview',
+                'label' => 'Jadwal Interview',
+                'key' => 'admin.rangkaian-interview.jadwal-interview',
+                'actions' => [
+                    'list' => 'View',
+                    'options' => 'Options',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'destroy' => 'Delete',
+                ],
+            ],
+            [
+                'group' => 'Interview',
+                'label' => 'Kandidat Interview',
+                'key' => 'admin.rangkaian-interview.kandidat',
+                'actions' => [
+                    'list' => 'View',
+                    'options' => 'Options',
+                    'detail' => 'Detail',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'update-tanggal' => 'Update Tanggal',
+                    'update-hasil' => 'Update Hasil',
+                    'destroy-kandidat' => 'Delete Kandidat',
+                    'destroy' => 'Delete',
+                ],
+            ],
+
+            /*
+            |--------------------------------------------------------------------------
+            | Review Management
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Review Management',
+                'label' => 'Review Kandidat',
+                'key' => 'admin.review-management',
+                'actions' => [
+                    'list' => 'View',
+                    'store' => 'Create Review',
+                    'show' => 'Detail Review',
+                    'update' => 'Update Review',
+                    'destroy' => 'Delete Review',
+                ],
+            ],
+            /*
+            |--------------------------------------------------------------------------
+            | Offering Letter
+            |--------------------------------------------------------------------------
+            */
+            [
+                'group' => 'Offering Letter',
+                'label' => 'Jadwal Offering Letter',
+                'key' => 'admin.jadwal-ol',
+                'actions' => [
+                    'list' => 'View',
+                    'candidates' => 'Candidate Options',
+                    'store' => 'Create',
+                    'update' => 'Update',
+                    'update-status' => 'Update Status',
                     'destroy' => 'Delete',
                 ],
             ],

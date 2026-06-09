@@ -21,56 +21,54 @@ export default function AdminSidebar({
             )}
 
             <aside
-                className={`fixed inset-y-0 left-0 z-40 w-72 transform bg-slate-950 text-white shadow-2xl transition-transform duration-300 lg:static lg:translate-x-0 ${
+                className={`fixed inset-y-0 left-0 z-40 flex h-screen w-72 shrink-0 transform flex-col overflow-hidden bg-slate-950 text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
-                <div className="flex h-full flex-col">
-                    <SidebarBrand />
+                <SidebarBrand />
 
-                    <nav className="flex-1 space-y-2 overflow-y-auto p-4">
-                        {menuItems.map((menu) => {
-                            const hasChildren = Array.isArray(menu.children);
-                            const active = isMenuActive(menu, activeMenu);
-                            const open = Boolean(openMenus[menu.key]);
+                <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 pr-3 scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700">
+                    {menuItems.map((menu) => {
+                        const hasChildren = Array.isArray(menu.children);
+                        const active = isMenuActive(menu, activeMenu);
+                        const open = Boolean(openMenus[menu.key]);
 
-                            return (
-                                <div key={menu.key}>
-                                    <SidebarMenuButton
-                                        menu={menu}
-                                        active={active}
-                                        open={open}
-                                        hasChildren={hasChildren}
-                                        onClick={() => onMenuClick(menu)}
-                                    />
+                        return (
+                            <div key={menu.key}>
+                                <SidebarMenuButton
+                                    menu={menu}
+                                    active={active}
+                                    open={open}
+                                    hasChildren={hasChildren}
+                                    onClick={() => onMenuClick(menu)}
+                                />
 
-                                    {hasChildren && open && (
-                                        <div className="ml-5 mt-2 space-y-1 border-l border-white/10 pl-4">
-                                            {menu.children.map((child) => (
-                                                <SidebarSubMenuButton
-                                                    key={child.key}
-                                                    child={child}
-                                                    active={isChildActive(
-                                                        child,
-                                                        activeMenu
-                                                    )}
-                                                    onClick={() =>
-                                                        onSubMenuClick(
-                                                            menu.key,
-                                                            child.key
-                                                        )
-                                                    }
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </nav>
+                                {hasChildren && open && (
+                                    <div className="ml-5 mt-2 space-y-1 border-l border-white/10 pl-4">
+                                        {menu.children.map((child) => (
+                                            <SidebarSubMenuButton
+                                                key={child.key}
+                                                child={child}
+                                                active={isChildActive(
+                                                    child,
+                                                    activeMenu
+                                                )}
+                                                onClick={() =>
+                                                    onSubMenuClick(
+                                                        menu.key,
+                                                        child.key
+                                                    )
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </nav>
 
-                    <SidebarInfo />
-                </div>
+                <SidebarInfo />
             </aside>
         </>
     );
@@ -78,18 +76,18 @@ export default function AdminSidebar({
 
 function SidebarBrand() {
     return (
-        <div className="border-b border-white/10 p-5">
+        <div className="shrink-0 border-b border-white/10 p-5">
             <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-400 text-lg font-black text-slate-950 shadow-lg shadow-teal-950/30">
                     HR
                 </div>
 
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-200">
+                <div className="min-w-0">
+                    <p className="truncate text-xs font-bold uppercase tracking-[0.22em] text-teal-200">
                         Admin Panel
                     </p>
 
-                    <h1 className="mt-1 text-lg font-black text-white">
+                    <h1 className="mt-1 truncate text-lg font-black text-white">
                         Rekrutmen
                     </h1>
                 </div>
@@ -173,28 +171,34 @@ function SidebarSubMenuButton({ child, active, onClick }) {
                 <span className="block truncate">{child.label}</span>
 
                 {child.description && (
-                    <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+                    <span
+                        className={`mt-0.5 block truncate text-xs font-semibold ${
+                            active ? "text-slate-500" : "text-slate-500"
+                        }`}
+                    >
                         {child.description}
                     </span>
                 )}
             </span>
 
-            {active && <span className="text-teal-600">●</span>}
+            {active && <span className="shrink-0 text-teal-600">●</span>}
         </button>
     );
 }
 
 function SidebarInfo() {
     return (
-        <div className="border-t border-white/10 p-4">
+        <div className="shrink-0 border-t border-white/10 p-4">
             <div className="rounded-3xl bg-white/10 p-4">
-               {/*  <p className="text-xs font-bold uppercase tracking-wide text-teal-200">
+                {/* 
+                <p className="text-xs font-bold uppercase tracking-wide text-teal-200">
                     Informasi
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-300">
                     Gunakan menu di atas untuk mengelola proses rekrutmen.
-                </p> */}
+                </p>
+                */}
             </div>
         </div>
     );

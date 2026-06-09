@@ -222,7 +222,7 @@ export const menuItems = [
     },
     {
         key: "jadwal-test",
-        label: "Data Jadwal Test",
+        label: "Jadwal Test",
         description: "Kelola jadwal test",
         icon: "◷",
         children: [

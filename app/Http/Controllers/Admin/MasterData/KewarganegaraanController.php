@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Kewarganegaraan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class KewarganegaraanController extends Controller
 {
     public function list()
     {
         $data = Kewarganegaraan::query()
-            ->orderByDesc('created_at')
+            ->orderBy('kewarganegaraan', 'asc')
             ->get();
 
         return response()->json([
@@ -25,11 +26,16 @@ class KewarganegaraanController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'kewarganegaraan' => ['required', 'string', 'max:255'],
+            'kewarganegaraan' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('kewarganegaraan', 'kewarganegaraan')->whereNull('deleted_at'),
+            ],
         ]);
 
         $kewarganegaraan = Kewarganegaraan::create([
-            'kewarganegaraan' => $validated['kewarganegaraan'],
+            'kewarganegaraan' => trim($validated['kewarganegaraan']),
             'created_by' => Auth::id(),
         ]);
 
@@ -42,14 +48,21 @@ class KewarganegaraanController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'kewarganegaraan' => ['required', 'string', 'max:255'],
-        ]);
-
         $kewarganegaraan = Kewarganegaraan::findOrFail($id);
 
+        $validated = $request->validate([
+            'kewarganegaraan' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('kewarganegaraan', 'kewarganegaraan')
+                    ->ignore($kewarganegaraan->id, 'id')
+                    ->whereNull('deleted_at'),
+            ],
+        ]);
+
         $kewarganegaraan->update([
-            'kewarganegaraan' => $validated['kewarganegaraan'],
+            'kewarganegaraan' => trim($validated['kewarganegaraan']),
             'updated_by' => Auth::id(),
         ]);
 

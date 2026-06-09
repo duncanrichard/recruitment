@@ -64,7 +64,6 @@ class DataPelamarController extends Controller
                     'fields' => [
                         'posisi_yang_dilamar',
                         'posisi_dilamar',
-                        'posisi_yang_dilamar',
                         'perusahaan_dilamar',
                         'sumber_informasi_id',
                         'nama_lengkap',
@@ -324,7 +323,6 @@ class DataPelamarController extends Controller
         ]);
     }
 
-
     public function kirimPesanSkrining(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -353,14 +351,19 @@ class DataPelamarController extends Controller
                 'success' => false,
                 'message' => 'Tidak ada pelamar pada tanggal skrining tersebut.',
                 'total_pelamar' => 0,
+                'total_data' => 0,
                 'total_dikirim' => 0,
                 'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
                 'skipped' => [],
+                'perusahaan_responses' => [],
             ], 404);
         }
 
         $groupedMessages = [];
         $skipped = [];
+        $validatedCompanies = [];
 
         foreach ($pelamars as $pelamar) {
             $target = $this->normalizeWhatsappNumber($pelamar->no_wa ?? null);
@@ -442,6 +445,35 @@ class DataPelamarController extends Controller
                 continue;
             }
 
+            $companyValidationKey = (string) ($perusahaan->id ?? $tokenApiWa);
+
+            if (!isset($validatedCompanies[$companyValidationKey])) {
+                $validatedCompanies[$companyValidationKey] = $this->checkFonnteCredentialForSending(
+                    $nomerPerusahaan,
+                    $tokenApiWa
+                );
+            }
+
+            $validasiWa = $validatedCompanies[$companyValidationKey];
+
+            if (!$validasiWa['success']) {
+                $skipped[] = [
+                    'id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'pendaftaran_url' => $urlPendaftaran,
+                    'reason' => $validasiWa['message'],
+                    'fonnte_device' => $validasiWa['device_number'] ?? null,
+                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                ];
+
+                continue;
+            }
+
             $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
 
             if (!isset($groupedMessages[$groupKey])) {
@@ -450,6 +482,8 @@ class DataPelamarController extends Controller
                     'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
                     'nomer_perusahaan' => $nomerPerusahaan,
                     'token_api_wa' => $tokenApiWa,
+                    'fonnte_device' => $validasiWa['device_number'] ?? null,
+                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
                     'messages' => [],
                 ];
             }
@@ -467,13 +501,18 @@ class DataPelamarController extends Controller
         if (empty($groupedMessages)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp pelamar, nomor WhatsApp perusahaan, token API WA perusahaan, dan token pendaftaran kandidat sudah tersedia.',
+                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp pelamar, nomor WhatsApp perusahaan, token API WA perusahaan, token pendaftaran kandidat tersedia, dan token WA sesuai dengan nomor perusahaan.',
                 'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
                 'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
                 'total_pelamar' => $pelamars->count(),
+                'total_data' => $pelamars->count(),
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
                 'skipped' => $skipped,
+                'targets' => [],
+                'perusahaan_responses' => [],
             ], 422);
         }
 
@@ -500,7 +539,6 @@ class DataPelamarController extends Controller
                 $json = $response->json();
                 $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
                 $isSuccess = $response->successful() && (bool) $fonnteStatus;
-
                 $countMessages = count($group['messages']);
 
                 if ($isSuccess) {
@@ -519,6 +557,8 @@ class DataPelamarController extends Controller
                     'perusahaan_id' => $group['perusahaan_id'],
                     'perusahaan' => $group['perusahaan'],
                     'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'fonnte_device' => $group['fonnte_device'] ?? null,
+                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
                     'total_data' => $countMessages,
                     'targets' => collect($group['messages'])->pluck('target')->values(),
                     'fonnte_http_code' => $response->status(),
@@ -544,6 +584,8 @@ class DataPelamarController extends Controller
                     'perusahaan_id' => $group['perusahaan_id'],
                     'perusahaan' => $group['perusahaan'],
                     'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'fonnte_device' => $group['fonnte_device'] ?? null,
+                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
                     'total_data' => $countMessages,
                     'targets' => collect($group['messages'])->pluck('target')->values(),
                     'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
@@ -1029,6 +1071,7 @@ class DataPelamarController extends Controller
         $steps = collect($steps)
             ->map(function ($step) use ($highestCompletedOrder) {
                 $step['completed'] = (int) $step['order'] <= $highestCompletedOrder;
+
                 return $step;
             })
             ->values()
@@ -1186,7 +1229,6 @@ class DataPelamarController extends Controller
         return null;
     }
 
-
     private function buildPesanSkrining(DataRiwayatDiri $pelamar, ?string $template = null): string
     {
         $tanggalSkrining = $pelamar->tanggal_skrining
@@ -1227,6 +1269,94 @@ class DataPelamarController extends Controller
         ]);
     }
 
+    private function checkFonnteCredentialForSending(?string $nomerPerusahaan, ?string $tokenApiWa): array
+    {
+        if (!$nomerPerusahaan) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+            ];
+        }
+
+        if (!$tokenApiWa) {
+            return [
+                'success' => false,
+                'message' => 'Token API WA perusahaan kosong.',
+            ];
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders([
+                    'Authorization' => $tokenApiWa,
+                ])
+                ->timeout(30)
+                ->post('https://api.fonnte.com/device');
+
+            $json = $response->json();
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'message' => 'Gagal memvalidasi token API WA perusahaan ke Fonnte.',
+                    'fonnte_response' => $json ?: $response->body(),
+                ];
+            }
+
+            if (!($json['status'] ?? false)) {
+                return [
+                    'success' => false,
+                    'message' => $json['reason']
+                        ?? $json['message']
+                        ?? 'Token API WA perusahaan tidak valid.',
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            $deviceNumber = $this->normalizeWhatsappNumber($json['device'] ?? null);
+
+            if (!$deviceNumber) {
+                return [
+                    'success' => false,
+                    'message' => 'Nomor device pada token API WA tidak ditemukan.',
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            if ($deviceNumber !== $nomerPerusahaan) {
+                return [
+                    'success' => false,
+                    'message' => 'Token API WA tidak sesuai dengan nomor perusahaan. Token ini terdaftar untuk nomor ' . ($json['device'] ?? '-') . '.',
+                    'device_number' => $deviceNumber,
+                    'device_status' => $json['device_status'] ?? null,
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            if (($json['device_status'] ?? null) !== 'connect') {
+                return [
+                    'success' => false,
+                    'message' => 'Device WhatsApp perusahaan belum connect.',
+                    'device_number' => $deviceNumber,
+                    'device_status' => $json['device_status'] ?? null,
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Token API WA dan nomor perusahaan valid.',
+                'device_number' => $deviceNumber,
+                'device_status' => $json['device_status'] ?? null,
+                'fonnte_response' => $json,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Gagal memvalidasi token API WA perusahaan: ' . $e->getMessage(),
+            ];
+        }
+    }
 
     private function normalizeTokenApiWa(?string $value): ?string
     {

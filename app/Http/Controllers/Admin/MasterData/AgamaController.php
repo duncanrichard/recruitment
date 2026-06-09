@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Agama;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AgamaController extends Controller
 {
     public function list()
     {
         $data = Agama::query()
-            ->orderByDesc('created_at')
+            ->orderBy('agama', 'asc')
             ->get();
 
         return response()->json([
@@ -25,11 +26,16 @@ class AgamaController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'agama' => ['required', 'string', 'max:255'],
+            'agama' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('agama', 'agama')->whereNull('deleted_at'),
+            ],
         ]);
 
         $agama = Agama::create([
-            'agama' => $validated['agama'],
+            'agama' => trim($validated['agama']),
             'created_by' => Auth::id(),
         ]);
 
@@ -42,14 +48,21 @@ class AgamaController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $validated = $request->validate([
-            'agama' => ['required', 'string', 'max:255'],
-        ]);
-
         $agama = Agama::findOrFail($id);
 
+        $validated = $request->validate([
+            'agama' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('agama', 'agama')
+                    ->ignore($agama->id, 'id')
+                    ->whereNull('deleted_at'),
+            ],
+        ]);
+
         $agama->update([
-            'agama' => $validated['agama'],
+            'agama' => trim($validated['agama']),
             'updated_by' => Auth::id(),
         ]);
 
