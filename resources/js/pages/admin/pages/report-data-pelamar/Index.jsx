@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 export default function ReportDataPelamarPage() {
     const [tanggalAwal, setTanggalAwal] = useState("");
     const [tanggalAkhir, setTanggalAkhir] = useState("");
+    const [perusahaan, setPerusahaan] = useState("");
     const [rows, setRows] = useState([]);
     const [meta, setMeta] = useState(null);
     const [page, setPage] = useState(1);
@@ -14,11 +15,12 @@ export default function ReportDataPelamarPage() {
 
         if (tanggalAwal) params.set("tanggal_awal", tanggalAwal);
         if (tanggalAkhir) params.set("tanggal_akhir", tanggalAkhir);
+        if (perusahaan) params.set("perusahaan", perusahaan);
 
         params.set("page", page);
 
         return params.toString();
-    }, [tanggalAwal, tanggalAkhir, page]);
+    }, [tanggalAwal, tanggalAkhir, perusahaan, page]);
 
     async function fetchData() {
         setLoading(true);
@@ -66,6 +68,7 @@ export default function ReportDataPelamarPage() {
     function handleReset() {
         setTanggalAwal("");
         setTanggalAkhir("");
+        setPerusahaan("");
         setPage(1);
     }
 
@@ -74,6 +77,7 @@ export default function ReportDataPelamarPage() {
 
         if (tanggalAwal) params.set("tanggal_awal", tanggalAwal);
         if (tanggalAkhir) params.set("tanggal_akhir", tanggalAkhir);
+        if (perusahaan) params.set("perusahaan", perusahaan);
 
         window.location.href = `/report-data-pelamar/export?${params.toString()}`;
     }
@@ -86,7 +90,7 @@ export default function ReportDataPelamarPage() {
                         Data Pelamar
                     </h1>
                     <p className="mt-2 text-sm font-semibold text-slate-500">
-                        Report data pelamar berdasarkan tanggal skrining.
+                        Report data pelamar berdasarkan tanggal skrining dan perusahaan.
                     </p>
                 </div>
 
@@ -102,7 +106,7 @@ export default function ReportDataPelamarPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <form
                     onSubmit={handleSubmit}
-                    className="grid grid-cols-1 gap-4 md:grid-cols-4"
+                    className="grid grid-cols-1 gap-4 md:grid-cols-5"
                 >
                     <div>
                         <label className="mb-2 block text-sm font-bold text-slate-700">
@@ -124,6 +128,19 @@ export default function ReportDataPelamarPage() {
                             type="date"
                             value={tanggalAkhir}
                             onChange={(event) => setTanggalAkhir(event.target.value)}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                            Perusahaan
+                        </label>
+                        <input
+                            type="text"
+                            value={perusahaan}
+                            onChange={(event) => setPerusahaan(event.target.value)}
+                            placeholder="Cari perusahaan"
                             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
                         />
                     </div>
@@ -166,6 +183,7 @@ export default function ReportDataPelamarPage() {
 
                     <p className="text-sm font-semibold text-slate-500">
                         Filter: {tanggalAwal || "Semua"} s/d {tanggalAkhir || "Semua"}
+                        {" "} | Perusahaan: {perusahaan || "Semua"}
                     </p>
                 </div>
 
@@ -190,7 +208,10 @@ export default function ReportDataPelamarPage() {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {loading && (
                                 <tr>
-                                    <td colSpan="11" className="px-6 py-8 text-center text-sm font-semibold text-slate-500">
+                                    <td
+                                        colSpan="11"
+                                        className="px-6 py-8 text-center text-sm font-semibold text-slate-500"
+                                    >
                                         Memuat data...
                                     </td>
                                 </tr>
@@ -198,7 +219,10 @@ export default function ReportDataPelamarPage() {
 
                             {!loading && rows.length === 0 && (
                                 <tr>
-                                    <td colSpan="11" className="px-6 py-8 text-center text-sm font-semibold text-slate-500">
+                                    <td
+                                        colSpan="11"
+                                        className="px-6 py-8 text-center text-sm font-semibold text-slate-500"
+                                    >
                                         Data tidak ditemukan.
                                     </td>
                                 </tr>
@@ -215,7 +239,9 @@ export default function ReportDataPelamarPage() {
                                     <Td>{item.no_wa || "-"}</Td>
                                     <Td>{item.posisi_yang_dilamar || "-"}</Td>
                                     <Td>{item.perusahaan_dilamar || "-"}</Td>
-                                    <Td><StatusBadge value={item.hasil_administrasi} /></Td>
+                                    <Td>
+                                        <StatusBadge value={item.hasil_administrasi} />
+                                    </Td>
                                     <Td>{formatDateTime(item.created_at)}</Td>
                                 </tr>
                             ))}

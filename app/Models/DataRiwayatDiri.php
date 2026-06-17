@@ -31,12 +31,17 @@ class DataRiwayatDiri extends Model
         'agama_id',
         'tanggal_lahir',
         'tanggal_skrining',
+        'tempat_lahir',
+        'jenis_kelamin',
         'alamat_ktp',
         'alamat_domisili',
+        'alamat',
         'provinsi_id',
         'kabupaten_id',
         'kecamatan_id',
         'kelurahan_id',
+        'rt',
+        'rw',
         'kewarganegaraan_id',
         'status_pernikahan_id',
         'no_wa',
@@ -108,14 +113,34 @@ class DataRiwayatDiri extends Model
         return $this->belongsTo(StatusPernikahan::class, 'status_pernikahan_id', 'id');
     }
 
-    public function sosialMedia(): HasMany
-    {
-        return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id');
-    }
-
     public function sumberInformasi(): BelongsTo
     {
         return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id');
+    }
+
+    public function provinsi(): BelongsTo
+    {
+        return $this->belongsTo(Provinsi::class, 'provinsi_id', 'id');
+    }
+
+    public function kabupaten(): BelongsTo
+    {
+        return $this->belongsTo(Kabupaten::class, 'kabupaten_id', 'id');
+    }
+
+    public function kecamatan(): BelongsTo
+    {
+        return $this->belongsTo(Kecamatan::class, 'kecamatan_id', 'id');
+    }
+
+    public function kelurahan(): BelongsTo
+    {
+        return $this->belongsTo(Kelurahan::class, 'kelurahan_id', 'id');
+    }
+
+    public function sosialMedia(): HasMany
+    {
+        return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id');
     }
 
     public function riwayatKeluarga(): HasOne

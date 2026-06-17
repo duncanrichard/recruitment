@@ -30,6 +30,10 @@ class PendaftaranController extends Controller
                 'statusPernikahan',
                 'posisi',
                 'perusahaan',
+                'provinsi',
+                'kabupaten',
+                'kecamatan',
+                'kelurahan',
                 'sosialMedia',
                 'sumberInformasi',
                 'riwayatKeluarga',
@@ -1199,45 +1203,47 @@ public function masterPendidikan(): JsonResponse
         return response()->json([
             'success' => true,
             'data' => $this->getWilayahOptions(
-                table: 'provinces',
-                whereColumn: null,
-                whereValue: null
+                table: 'provinsi',
+                labelColumn: 'nama'
             ),
         ]);
     }
 
-    public function wilayahRegencies(string $province_code): JsonResponse
+    public function wilayahRegencies(string $provinsi_id): JsonResponse
     {
         return response()->json([
             'success' => true,
             'data' => $this->getWilayahOptions(
-                table: 'regencies',
-                whereColumn: 'province_code',
-                whereValue: $province_code
+                table: 'kabupaten',
+                labelColumn: 'nama',
+                whereColumn: 'provinsi_id',
+                whereValue: $provinsi_id
             ),
         ]);
     }
 
-    public function wilayahDistricts(string $regency_code): JsonResponse
+    public function wilayahDistricts(string $kabupaten_id): JsonResponse
     {
         return response()->json([
             'success' => true,
             'data' => $this->getWilayahOptions(
-                table: 'districts',
-                whereColumn: 'regency_code',
-                whereValue: $regency_code
+                table: 'kecamatan',
+                labelColumn: 'nama',
+                whereColumn: 'kabupaten_id',
+                whereValue: $kabupaten_id
             ),
         ]);
     }
 
-    public function wilayahVillages(string $district_code): JsonResponse
+    public function wilayahVillages(string $kecamatan_id): JsonResponse
     {
         return response()->json([
             'success' => true,
             'data' => $this->getWilayahOptions(
-                table: 'villages',
-                whereColumn: 'district_code',
-                whereValue: $district_code
+                table: 'kelurahan',
+                labelColumn: 'nama',
+                whereColumn: 'kecamatan_id',
+                whereValue: $kecamatan_id
             ),
         ]);
     }
@@ -1964,35 +1970,40 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function getWilayahOptions(
         string $table,
+        string $labelColumn = 'nama',
         ?string $whereColumn = null,
         ?string $whereValue = null
     ): array {
         if (
             !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, 'code') ||
-            !Schema::hasColumn($table, 'name')
+            !Schema::hasColumn($table, 'id') ||
+            !Schema::hasColumn($table, $labelColumn)
         ) {
             return [];
         }
 
         $query = DB::table($table)
-            ->select('code', 'name')
-            ->whereNotNull('code')
-            ->whereNotNull('name')
-            ->orderBy('name');
+            ->select('id', $labelColumn)
+            ->whereNotNull('id')
+            ->whereNotNull($labelColumn)
+            ->orderBy($labelColumn);
 
-        if ($whereColumn && Schema::hasColumn($table, $whereColumn)) {
+        if (
+            $whereColumn &&
+            $whereValue !== null &&
+            Schema::hasColumn($table, $whereColumn)
+        ) {
             $query->where($whereColumn, $whereValue);
         }
 
         return $query->get()
-            ->map(function ($row) {
+            ->map(function ($row) use ($labelColumn) {
                 return [
-                    'id' => (string) $row->code,
-                    'value' => (string) $row->code,
-                    'label' => (string) $row->name,
-                    'code' => (string) $row->code,
-                    'name' => (string) $row->name,
+                    'id' => (string) $row->id,
+                    'value' => (string) $row->id,
+                    'label' => (string) $row->{$labelColumn},
+                    'nama' => (string) $row->{$labelColumn},
+                    'name' => (string) $row->{$labelColumn},
                 ];
             })
             ->filter(function ($row) {
@@ -2003,41 +2014,41 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
     }
 
     private function validateWilayahBertingkat(
-        ?string $provinsiCode,
-        ?string $kabupatenCode,
-        ?string $kecamatanCode,
-        ?string $kelurahanCode
+        ?string $provinsiId,
+        ?string $kabupatenId,
+        ?string $kecamatanId,
+        ?string $kelurahanId
     ): ?JsonResponse {
-        if ($provinsiCode && !$this->wilayahCodeExists('provinces', 'code', $provinsiCode)) {
+        if ($provinsiId && !$this->wilayahIdExists('provinsi', $provinsiId)) {
             return $this->masterError('provinsi_id', 'Provinsi yang dipilih tidak ditemukan.');
         }
 
-        if ($kabupatenCode) {
-            if (!$provinsiCode) {
+        if ($kabupatenId) {
+            if (!$provinsiId) {
                 return $this->masterError('kabupaten_id', 'Pilih provinsi terlebih dahulu.');
             }
 
-            if (!$this->wilayahCodeExists('regencies', 'code', $kabupatenCode, 'province_code', $provinsiCode)) {
+            if (!$this->wilayahIdExists('kabupaten', $kabupatenId, 'provinsi_id', $provinsiId)) {
                 return $this->masterError('kabupaten_id', 'Kabupaten / Kota yang dipilih tidak sesuai dengan provinsi.');
             }
         }
 
-        if ($kecamatanCode) {
-            if (!$kabupatenCode) {
+        if ($kecamatanId) {
+            if (!$kabupatenId) {
                 return $this->masterError('kecamatan_id', 'Pilih kabupaten / kota terlebih dahulu.');
             }
 
-            if (!$this->wilayahCodeExists('districts', 'code', $kecamatanCode, 'regency_code', $kabupatenCode)) {
+            if (!$this->wilayahIdExists('kecamatan', $kecamatanId, 'kabupaten_id', $kabupatenId)) {
                 return $this->masterError('kecamatan_id', 'Kecamatan yang dipilih tidak sesuai dengan kabupaten / kota.');
             }
         }
 
-        if ($kelurahanCode) {
-            if (!$kecamatanCode) {
+        if ($kelurahanId) {
+            if (!$kecamatanId) {
                 return $this->masterError('kelurahan_id', 'Pilih kecamatan terlebih dahulu.');
             }
 
-            if (!$this->wilayahCodeExists('villages', 'code', $kelurahanCode, 'district_code', $kecamatanCode)) {
+            if (!$this->wilayahIdExists('kelurahan', $kelurahanId, 'kecamatan_id', $kecamatanId)) {
                 return $this->masterError('kelurahan_id', 'Kelurahan / Desa yang dipilih tidak sesuai dengan kecamatan.');
             }
         }
@@ -2045,24 +2056,26 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         return null;
     }
 
-    private function wilayahCodeExists(
+    private function wilayahIdExists(
         string $table,
-        string $codeColumn,
-        string $codeValue,
+        string $id,
         ?string $parentColumn = null,
         ?string $parentValue = null
     ): bool {
         if (
             !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, $codeColumn)
+            !Schema::hasColumn($table, 'id')
         ) {
             return false;
         }
 
-        $query = DB::table($table)
-            ->where($codeColumn, $codeValue);
+        $query = DB::table($table)->where('id', $id);
 
-        if ($parentColumn && Schema::hasColumn($table, $parentColumn)) {
+        if (
+            $parentColumn &&
+            $parentValue !== null &&
+            Schema::hasColumn($table, $parentColumn)
+        ) {
             $query->where($parentColumn, $parentValue);
         }
 
@@ -2075,46 +2088,66 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
             return null;
         }
 
+        $pelamar->loadMissing([
+            'provinsi',
+            'kabupaten',
+            'kecamatan',
+            'kelurahan',
+        ]);
+
         $pelamar->setAttribute(
             'provinsi_label',
-            $this->getWilayahName('provinces', $pelamar->provinsi_id ?? null)
+            $pelamar->provinsi->nama ?? $this->getWilayahName('provinsi', $pelamar->provinsi_id ?? null)
         );
 
         $pelamar->setAttribute(
             'kabupaten_label',
-            $this->getWilayahName('regencies', $pelamar->kabupaten_id ?? null)
+            $pelamar->kabupaten->nama ?? $this->getWilayahName('kabupaten', $pelamar->kabupaten_id ?? null)
         );
 
         $pelamar->setAttribute(
             'kecamatan_label',
-            $this->getWilayahName('districts', $pelamar->kecamatan_id ?? null)
+            $pelamar->kecamatan->nama ?? $this->getWilayahName('kecamatan', $pelamar->kecamatan_id ?? null)
         );
 
         $pelamar->setAttribute(
             'kelurahan_label',
-            $this->getWilayahName('villages', $pelamar->kelurahan_id ?? null)
+            $pelamar->kelurahan->nama ?? $this->getWilayahName('kelurahan', $pelamar->kelurahan_id ?? null)
         );
 
         return $pelamar;
     }
 
-    private function getWilayahName(string $table, ?string $code): ?string
+    private function getWilayahName(string $table, ?string $id): ?string
     {
-        if (!$code) {
+        if (!$id) {
             return null;
         }
 
+        $tableMap = [
+            'provinces' => 'provinsi',
+            'regencies' => 'kabupaten',
+            'districts' => 'kecamatan',
+            'villages' => 'kelurahan',
+            'provinsi' => 'provinsi',
+            'kabupaten' => 'kabupaten',
+            'kecamatan' => 'kecamatan',
+            'kelurahan' => 'kelurahan',
+        ];
+
+        $realTable = $tableMap[$table] ?? $table;
+
         if (
-            !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, 'code') ||
-            !Schema::hasColumn($table, 'name')
+            !Schema::hasTable($realTable) ||
+            !Schema::hasColumn($realTable, 'id') ||
+            !Schema::hasColumn($realTable, 'nama')
         ) {
             return null;
         }
 
-        $name = DB::table($table)
-            ->where('code', $code)
-            ->value('name');
+        $name = DB::table($realTable)
+            ->where('id', $id)
+            ->value('nama');
 
         return $name ? (string) $name : null;
     }

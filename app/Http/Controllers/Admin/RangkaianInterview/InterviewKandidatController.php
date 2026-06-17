@@ -15,6 +15,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Google\Client as GoogleClient;
+use Google\Service\Calendar;
+use Google\Service\Calendar\ConferenceData;
+use Google\Service\Calendar\ConferenceSolutionKey;
+use Google\Service\Calendar\CreateConferenceRequest;
+use Google\Service\Calendar\Event as GoogleCalendarEvent;
+use Google\Service\Calendar\EventAttendee;
+use Google\Service\Calendar\EventDateTime;
+use Google\Service\Exception as GoogleServiceException;
 
 class InterviewKandidatController extends Controller
 {
@@ -83,6 +92,9 @@ class InterviewKandidatController extends Controller
             'id' => $jadwal->id,
             'judul_interview' => $jadwal->judul_interview,
             'jadwal_interview' => $this->formatDateTimeForJson($jadwal->jadwal_interview),
+            'google_calendar_event_id' => $this->getJadwalInterviewAttribute($jadwal, 'google_calendar_event_id'),
+            'google_calendar_html_link' => $this->getJadwalInterviewAttribute($jadwal, 'google_calendar_html_link'),
+            'google_meet_link' => $this->getJadwalInterviewAttribute($jadwal, 'google_meet_link'),
             'deleted_at' => $jadwal->deleted_at
                 ? $this->formatDateTimeForJson($jadwal->deleted_at)
                 : null,
@@ -119,7 +131,9 @@ class InterviewKandidatController extends Controller
 
         $rows = JadwalInterviewKandidat::query()
             ->with([
-                'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
+                'jadwalInterview' => function ($query) {
+                    $query->select($this->jadwalInterviewSelectColumns());
+                },
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
             ])
             ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
@@ -153,7 +167,9 @@ class InterviewKandidatController extends Controller
     {
         $items = JadwalInterviewKandidat::query()
             ->with([
-                'jadwalInterview:id,judul_interview,jadwal_interview,deleted_at',
+                'jadwalInterview' => function ($query) {
+                    $query->select($this->jadwalInterviewSelectColumns());
+                },
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
             ])
             ->where('jadwal_interview_id', $jadwalInterviewId)
@@ -327,10 +343,16 @@ class InterviewKandidatController extends Controller
             $kandidatIds->all()
         );
 
+        $calendarResult = $this->syncGoogleCalendarInterview(
+            $validated['jadwal_interview_id'],
+            $kandidatIds->all()
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Kandidat berhasil dimasukkan ke jadwal interview.',
             'wa_panelis' => $waResult,
+            'google_calendar' => $calendarResult,
         ]);
     }
 
@@ -407,10 +429,16 @@ class InterviewKandidatController extends Controller
             $kandidatIds->all()
         );
 
+        $calendarResult = $this->syncGoogleCalendarInterview(
+            $jadwalInterviewId,
+            $kandidatIds->all()
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Kandidat jadwal interview berhasil diperbarui.',
             'wa_panelis' => $waResult,
+            'google_calendar' => $calendarResult,
         ]);
     }
 
@@ -435,9 +463,15 @@ class InterviewKandidatController extends Controller
             ->all();
 
         $waResult = [];
+        $calendarResult = [];
 
         if (!empty($kandidatIds)) {
             $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+                $jadwalInterviewId,
+                $kandidatIds
+            );
+
+            $calendarResult = $this->syncGoogleCalendarInterview(
                 $jadwalInterviewId,
                 $kandidatIds
             );
@@ -448,6 +482,7 @@ class InterviewKandidatController extends Controller
             'message' => 'Tanggal interview berhasil diperbarui.',
             'jadwal_interview' => $this->formatDateTimeForJson($jadwal->fresh()->jadwal_interview),
             'wa_panelis' => $waResult,
+            'google_calendar' => $calendarResult,
         ]);
     }
 
@@ -505,6 +540,17 @@ class InterviewKandidatController extends Controller
 
     public function destroy(string $jadwalInterviewId)
     {
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->find($jadwalInterviewId);
+
+        $calendarResult = $jadwal
+            ? $this->deleteGoogleCalendarInterviewEvent($jadwal)
+            : [
+                'success' => false,
+                'message' => 'Jadwal interview tidak ditemukan untuk hapus Google Calendar.',
+            ];
+
         DB::transaction(function () use ($jadwalInterviewId) {
             $pivotIds = JadwalInterviewKandidat::query()
                 ->where('jadwal_interview_id', $jadwalInterviewId)
@@ -524,6 +570,7 @@ class InterviewKandidatController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Kandidat jadwal interview berhasil dihapus.',
+            'google_calendar' => $calendarResult,
         ]);
     }
 
@@ -542,11 +589,435 @@ class InterviewKandidatController extends Controller
             $row->delete();
         });
 
+        $remainingKandidatIds = JadwalInterviewKandidat::query()
+            ->where('jadwal_interview_id', $jadwalInterviewId)
+            ->pluck('data_riwayat_diri_id')
+            ->values()
+            ->all();
+
+        if (!empty($remainingKandidatIds)) {
+            $calendarResult = $this->syncGoogleCalendarInterview(
+                $jadwalInterviewId,
+                $remainingKandidatIds
+            );
+        } else {
+            $jadwal = JadwalInterview::query()
+                ->whereNull('deleted_at')
+                ->find($jadwalInterviewId);
+
+            $calendarResult = $jadwal
+                ? $this->deleteGoogleCalendarInterviewEvent($jadwal)
+                : [
+                    'success' => false,
+                    'message' => 'Jadwal interview tidak ditemukan untuk hapus Google Calendar.',
+                ];
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Kandidat berhasil dihapus dari jadwal interview.',
+            'google_calendar' => $calendarResult,
         ]);
     }
+
+
+    private function jadwalInterviewSelectColumns(): array
+    {
+        $columns = [
+            'id',
+            'judul_interview',
+            'jadwal_interview',
+            'deleted_at',
+        ];
+
+        foreach ([
+            'google_calendar_event_id',
+            'google_calendar_html_link',
+            'google_meet_link',
+        ] as $column) {
+            if (Schema::hasColumn('jadwal_interview', $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    private function getJadwalInterviewAttribute(?JadwalInterview $jadwal, string $column): ?string
+    {
+        if (!$jadwal || !Schema::hasColumn('jadwal_interview', $column)) {
+            return null;
+        }
+
+        $value = $jadwal->getAttribute($column);
+
+        return $value !== null ? (string) $value : null;
+    }
+
+    private function updateJadwalInterviewCalendarFields(JadwalInterview $jadwal, array $payload): void
+    {
+        $allowedPayload = [];
+
+        foreach ($payload as $column => $value) {
+            if (Schema::hasColumn('jadwal_interview', $column)) {
+                $allowedPayload[$column] = $value;
+            }
+        }
+
+        if (!empty($allowedPayload)) {
+            $jadwal->update($allowedPayload);
+        }
+    }
+
+    private function syncGoogleCalendarInterview(string $jadwalInterviewId, array $kandidatIds): array
+    {
+        if (!filter_var(env('GOOGLE_CALENDAR_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
+            return [
+                'success' => false,
+                'message' => 'Sinkronisasi Google Calendar dinonaktifkan.',
+            ];
+        }
+
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->find($jadwalInterviewId);
+
+        if (!$jadwal) {
+            return [
+                'success' => false,
+                'message' => 'Jadwal interview tidak ditemukan.',
+            ];
+        }
+
+        $kandidatIds = collect($kandidatIds)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($kandidatIds)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada kandidat untuk dibuatkan Google Calendar.',
+            ];
+        }
+
+        $kandidats = DB::table('data_riwayat_diri')
+            ->leftJoin('posisi', 'posisi.id', '=', 'data_riwayat_diri.posisi_yang_dilamar')
+            ->whereIn('data_riwayat_diri.id', $kandidatIds)
+            ->select([
+                'data_riwayat_diri.id',
+                'data_riwayat_diri.nama_lengkap',
+                'data_riwayat_diri.nama_panggil',
+                'data_riwayat_diri.email',
+                'data_riwayat_diri.no_wa',
+                'posisi.nama_posisi',
+            ])
+            ->get();
+
+        $attendees = $kandidats
+            ->filter(function ($kandidat) {
+                return !empty($kandidat->email)
+                    && filter_var($kandidat->email, FILTER_VALIDATE_EMAIL);
+            })
+            ->map(function ($kandidat) {
+                return [
+                    'email' => $kandidat->email,
+                    'name' => $kandidat->nama_lengkap
+                        ?: ($kandidat->nama_panggil ?: $kandidat->email),
+                ];
+            })
+            ->unique('email')
+            ->values()
+            ->all();
+
+        if (empty($attendees)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada email kandidat yang valid untuk dibuatkan Google Calendar.',
+                'skipped' => $kandidats
+                    ->filter(function ($kandidat) {
+                        return empty($kandidat->email)
+                            || !filter_var($kandidat->email, FILTER_VALIDATE_EMAIL);
+                    })
+                    ->map(function ($kandidat) {
+                        return [
+                            'id' => $kandidat->id,
+                            'nama_lengkap' => $kandidat->nama_lengkap,
+                            'email' => $kandidat->email,
+                            'reason' => 'Email kosong atau tidak valid.',
+                        ];
+                    })
+                    ->values(),
+            ];
+        }
+
+        $listKandidat = $kandidats
+            ->values()
+            ->map(function ($kandidat, $index) {
+                $no = $index + 1;
+                $nama = $kandidat->nama_lengkap ?: ($kandidat->nama_panggil ?: '-');
+                $posisi = $kandidat->nama_posisi ?: '-';
+                $email = $kandidat->email ?: '-';
+                $wa = $kandidat->no_wa ?: '-';
+
+                return "{$no}. {$nama}\n"
+                    . "   Posisi: {$posisi}\n"
+                    . "   Email: {$email}\n"
+                    . "   No. WA: {$wa}";
+            })
+            ->implode("\n\n");
+
+        try {
+            $result = $this->upsertGoogleCalendarEvent($jadwal, $attendees, $listKandidat);
+
+            $this->updateJadwalInterviewCalendarFields($jadwal, [
+                'google_calendar_event_id' => $result['event_id'] ?? null,
+                'google_calendar_html_link' => $result['html_link'] ?? null,
+                'google_meet_link' => $result['meet_link'] ?? null,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Jadwal berhasil dibuat/diperbarui di Google Calendar.',
+                'event_id' => $result['event_id'] ?? null,
+                'html_link' => $result['html_link'] ?? null,
+                'meet_link' => $result['meet_link'] ?? null,
+                'total_attendees' => count($attendees),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Gagal sync Google Calendar interview', [
+                'message' => $e->getMessage(),
+                'jadwal_interview_id' => $jadwalInterviewId,
+                'kandidat_ids' => $kandidatIds,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Gagal membuat jadwal di Google Calendar: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private function upsertGoogleCalendarEvent(JadwalInterview $jadwal, array $attendees, string $listKandidat): array
+    {
+        $calendar = $this->makeGoogleCalendarService();
+        $calendarId = env('GOOGLE_CALENDAR_ID', 'primary');
+        $eventId = $this->getJadwalInterviewAttribute($jadwal, 'google_calendar_event_id');
+
+        $event = $this->buildGoogleCalendarEvent($jadwal, $attendees, $listKandidat);
+
+        try {
+            if ($eventId) {
+                $result = $calendar->events->update(
+                    $calendarId,
+                    $eventId,
+                    $event,
+                    [
+                        'sendUpdates' => 'all',
+                        'conferenceDataVersion' => 1,
+                    ]
+                );
+            } else {
+                $result = $calendar->events->insert(
+                    $calendarId,
+                    $event,
+                    [
+                        'sendUpdates' => 'all',
+                        'conferenceDataVersion' => 1,
+                    ]
+                );
+            }
+        } catch (GoogleServiceException $e) {
+            if ((int) $e->getCode() !== 404 || !$eventId) {
+                throw $e;
+            }
+
+            $result = $calendar->events->insert(
+                $calendarId,
+                $event,
+                [
+                    'sendUpdates' => 'all',
+                    'conferenceDataVersion' => 1,
+                ]
+            );
+        }
+
+        return [
+            'event_id' => $result->getId(),
+            'html_link' => $result->getHtmlLink(),
+            'meet_link' => $result->getHangoutLink(),
+        ];
+    }
+
+    private function buildGoogleCalendarEvent(JadwalInterview $jadwal, array $attendees, string $listKandidat): GoogleCalendarEvent
+    {
+        $timezone = env('GOOGLE_CALENDAR_TIMEZONE', $this->timezone);
+        $durationMinutes = (int) env('GOOGLE_CALENDAR_EVENT_DURATION_MINUTES', 60);
+
+        if ($durationMinutes <= 0) {
+            $durationMinutes = 60;
+        }
+
+        $start = Carbon::parse($jadwal->jadwal_interview, $timezone);
+        $end = (clone $start)->addMinutes($durationMinutes);
+
+        $googleAttendees = collect($attendees)
+            ->map(function ($attendee) {
+                return new EventAttendee([
+                    'email' => $attendee['email'],
+                    'displayName' => $attendee['name'] ?? $attendee['email'],
+                    'optional' => false,
+                ]);
+            })
+            ->values()
+            ->all();
+
+        $description = "Jadwal interview kandidat.\n\n"
+            . "Judul Interview: " . ($jadwal->judul_interview ?: '-') . "\n"
+            . "Tanggal Interview: " . $this->formatDateTimeForDisplay($jadwal->jadwal_interview) . "\n\n"
+            . "Daftar Kandidat:\n"
+            . $listKandidat;
+
+        $event = new GoogleCalendarEvent([
+            'summary' => $jadwal->judul_interview ?: 'Jadwal Interview Kandidat',
+            'description' => $description,
+            'location' => env('GOOGLE_CALENDAR_DEFAULT_LOCATION', 'Google Meet'),
+            'start' => new EventDateTime([
+                'dateTime' => $start->toRfc3339String(),
+                'timeZone' => $timezone,
+            ]),
+            'end' => new EventDateTime([
+                'dateTime' => $end->toRfc3339String(),
+                'timeZone' => $timezone,
+            ]),
+            'attendees' => $googleAttendees,
+        ]);
+
+        if (filter_var(env('GOOGLE_CALENDAR_CREATE_MEET', true), FILTER_VALIDATE_BOOLEAN)) {
+            $conferenceSolutionKey = new ConferenceSolutionKey();
+            $conferenceSolutionKey->setType('hangoutsMeet');
+
+            $createConferenceRequest = new CreateConferenceRequest();
+            $createConferenceRequest->setRequestId('interview-' . $jadwal->id . '-' . Str::random(8));
+            $createConferenceRequest->setConferenceSolutionKey($conferenceSolutionKey);
+
+            $conferenceData = new ConferenceData();
+            $conferenceData->setCreateRequest($createConferenceRequest);
+
+            $event->setConferenceData($conferenceData);
+        }
+
+        return $event;
+    }
+
+    private function makeGoogleCalendarService(): Calendar
+    {
+        if (!class_exists(GoogleClient::class)) {
+            throw new \RuntimeException('Package google/apiclient belum terinstall. Jalankan: composer require google/apiclient:^2.0');
+        }
+
+        $credentialsConfig = env('GOOGLE_CALENDAR_CREDENTIALS');
+
+        if (empty($credentialsConfig)) {
+            throw new \RuntimeException('GOOGLE_CALENDAR_CREDENTIALS belum diatur di file .env.');
+        }
+
+        $credentialsPath = $credentialsConfig;
+
+        if (!Str::startsWith($credentialsPath, ['/'])) {
+            $credentialsPath = base_path($credentialsPath);
+        }
+
+        if (!file_exists($credentialsPath)) {
+            throw new \RuntimeException('File credential Google Calendar tidak ditemukan: ' . $credentialsPath);
+        }
+
+        $client = new GoogleClient();
+        $client->setApplicationName(env('APP_NAME', 'Recruitment') . ' Google Calendar');
+        $client->setScopes([
+            Calendar::CALENDAR,
+        ]);
+        $client->setAuthConfig($credentialsPath);
+
+        $impersonateEmail = env('GOOGLE_CALENDAR_IMPERSONATE_EMAIL');
+
+        if (!empty($impersonateEmail)) {
+            $client->setSubject($impersonateEmail);
+        }
+
+        return new Calendar($client);
+    }
+
+    private function deleteGoogleCalendarInterviewEvent(JadwalInterview $jadwal): array
+    {
+        $eventId = $this->getJadwalInterviewAttribute($jadwal, 'google_calendar_event_id');
+
+        if (!$eventId) {
+            return [
+                'success' => true,
+                'message' => 'Tidak ada event Google Calendar yang perlu dihapus.',
+            ];
+        }
+
+        try {
+            $calendar = $this->makeGoogleCalendarService();
+            $calendar->events->delete(
+                env('GOOGLE_CALENDAR_ID', 'primary'),
+                $eventId,
+                [
+                    'sendUpdates' => 'all',
+                ]
+            );
+
+            $this->updateJadwalInterviewCalendarFields($jadwal, [
+                'google_calendar_event_id' => null,
+                'google_calendar_html_link' => null,
+                'google_meet_link' => null,
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Event Google Calendar berhasil dihapus.',
+            ];
+        } catch (GoogleServiceException $e) {
+            if ((int) $e->getCode() === 404) {
+                $this->updateJadwalInterviewCalendarFields($jadwal, [
+                    'google_calendar_event_id' => null,
+                    'google_calendar_html_link' => null,
+                    'google_meet_link' => null,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Event Google Calendar sudah tidak ditemukan, data lokal dibersihkan.',
+                ];
+            }
+
+            Log::error('Gagal hapus Google Calendar interview', [
+                'message' => $e->getMessage(),
+                'jadwal_interview_id' => $jadwal->id,
+                'event_id' => $eventId,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Gagal menghapus event Google Calendar: ' . $e->getMessage(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Gagal hapus Google Calendar interview', [
+                'message' => $e->getMessage(),
+                'jadwal_interview_id' => $jadwal->id,
+                'event_id' => $eventId,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Gagal menghapus event Google Calendar: ' . $e->getMessage(),
+            ];
+        }
+    }
+
 
     private function kirimPesanJadwalInterviewKePanelis(string $jadwalInterviewId, array $kandidatIds): array
     {

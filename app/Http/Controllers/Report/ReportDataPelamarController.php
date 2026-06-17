@@ -16,6 +16,7 @@ class ReportDataPelamarController extends Controller
         $validated = $request->validate([
             'tanggal_awal' => ['nullable', 'date'],
             'tanggal_akhir' => ['nullable', 'date', 'after_or_equal:tanggal_awal'],
+            'perusahaan' => ['nullable', 'string', 'max:255'],
         ], [
             'tanggal_awal.date' => 'Tanggal awal tidak valid.',
             'tanggal_akhir.date' => 'Tanggal akhir tidak valid.',
@@ -43,6 +44,7 @@ class ReportDataPelamarController extends Controller
         $validated = $request->validate([
             'tanggal_awal' => ['nullable', 'date'],
             'tanggal_akhir' => ['nullable', 'date', 'after_or_equal:tanggal_awal'],
+            'perusahaan' => ['nullable', 'string', 'max:255'],
         ], [
             'tanggal_awal.date' => 'Tanggal awal tidak valid.',
             'tanggal_akhir.date' => 'Tanggal akhir tidak valid.',
@@ -57,9 +59,10 @@ class ReportDataPelamarController extends Controller
 
         $tanggalAwal = $validated['tanggal_awal'] ?? 'Semua';
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
+        $perusahaan = $validated['perusahaan'] ?? 'Semua';
         $filename = 'report-data-pelamar-' . now()->format('Ymd-His') . '.xls';
 
-        return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir) {
+        return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir, $perusahaan) {
             echo '<html>';
             echo '<head>';
             echo '<meta charset="UTF-8">';
@@ -92,7 +95,11 @@ class ReportDataPelamarController extends Controller
             echo '<body>';
 
             echo '<div class="title">Report Data Pelamar</div>';
-            echo '<div class="subtitle">Tanggal Skrining: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir) . '</div>';
+            echo '<div class="subtitle">';
+            echo 'Tanggal Skrining: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir);
+            echo '<br>';
+            echo 'Perusahaan: ' . e($perusahaan);
+            echo '</div>';
 
             echo '<table>';
             echo '<thead>';
@@ -206,6 +213,19 @@ class ReportDataPelamarController extends Controller
                 '<=',
                 Carbon::parse($filters['tanggal_akhir'])->toDateString()
             );
+        }
+
+        if (!empty($filters['perusahaan'])) {
+            $keyword = $filters['perusahaan'];
+
+            $query->where(function ($q) use ($keyword) {
+                $q->where('perusahaan_dilamar', 'like', '%' . $keyword . '%')
+                    ->orWhereHas('perusahaan', function ($perusahaanQuery) use ($keyword) {
+                        $perusahaanQuery->where('nama_perusahaan', 'like', '%' . $keyword . '%')
+                            ->orWhere('perusahaan', 'like', '%' . $keyword . '%')
+                            ->orWhere('nama', 'like', '%' . $keyword . '%');
+                    });
+            });
         }
 
         return $query;
