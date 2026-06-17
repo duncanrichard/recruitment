@@ -17,7 +17,10 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -1036,6 +1039,15 @@ class DataPelamarController extends Controller
         $data->total_field_terisi = $completion['completed_steps'];
         $data->total_field_form = $completion['total_steps'];
 
+        $dokumenInterview = $this->getDokumenInterview($data);
+
+        $data->dokumen_interview = $dokumenInterview;
+        $data->dokumenInterview = $dokumenInterview;
+        $data->file_cv_interview = $dokumenInterview['file_cv'] ?? null;
+        $data->fileCvInterview = $dokumenInterview['fileCv'] ?? null;
+        $data->file_foto_interview = $dokumenInterview['file_foto'] ?? null;
+        $data->fileFotoInterview = $dokumenInterview['fileFoto'] ?? null;
+
         return $data;
     }
 
@@ -1356,6 +1368,148 @@ class DataPelamarController extends Controller
                 'message' => 'Gagal memvalidasi token API WA perusahaan: ' . $e->getMessage(),
             ];
         }
+    }
+
+
+    private function getDokumenInterview(DataRiwayatDiri $data): array
+    {
+        $empty = [
+            'jadwal_interview_kandidat_id' => null,
+            'jadwalInterviewKandidatId' => null,
+            'jadwal_interview_id' => null,
+            'jadwalInterviewId' => null,
+            'judul_interview' => null,
+            'judulInterview' => null,
+            'jadwal_interview' => null,
+            'jadwalInterview' => null,
+            'tanggal_interview' => null,
+            'tanggalInterview' => null,
+            'file_cv' => null,
+            'fileCv' => null,
+            'file_cv_url' => null,
+            'fileCvUrl' => null,
+            'file_foto' => null,
+            'fileFoto' => null,
+            'file_foto_url' => null,
+            'fileFotoUrl' => null,
+            'ada_dokumen' => false,
+            'adaDokumen' => false,
+        ];
+
+        if (!Schema::hasTable('jadwal_interview_kandidat')) {
+            return $empty;
+        }
+
+        $query = DB::table('jadwal_interview_kandidat as jik')
+            ->where('jik.data_riwayat_diri_id', $data->id);
+
+        if (Schema::hasColumn('jadwal_interview_kandidat', 'deleted_at')) {
+            $query->whereNull('jik.deleted_at');
+        }
+
+        $select = [
+            'jik.id as jadwal_interview_kandidat_id',
+            'jik.jadwal_interview_id',
+            DB::raw(Schema::hasColumn('jadwal_interview_kandidat', 'file_cv') ? 'jik.file_cv as file_cv' : 'NULL as file_cv'),
+            DB::raw(Schema::hasColumn('jadwal_interview_kandidat', 'file_foto') ? 'jik.file_foto as file_foto' : 'NULL as file_foto'),
+            DB::raw(Schema::hasColumn('jadwal_interview_kandidat', 'created_at') ? 'jik.created_at as created_at' : 'NULL as created_at'),
+            DB::raw(Schema::hasColumn('jadwal_interview_kandidat', 'updated_at') ? 'jik.updated_at as updated_at' : 'NULL as updated_at'),
+        ];
+
+        if (Schema::hasTable('jadwal_interview')) {
+            $query->leftJoin('jadwal_interview as ji', 'ji.id', '=', 'jik.jadwal_interview_id');
+
+            if (Schema::hasColumn('jadwal_interview', 'deleted_at')) {
+                $query->whereNull('ji.deleted_at');
+            }
+
+            $select[] = DB::raw(Schema::hasColumn('jadwal_interview', 'judul_interview') ? 'ji.judul_interview as judul_interview' : 'NULL as judul_interview');
+            $select[] = DB::raw(Schema::hasColumn('jadwal_interview', 'jadwal_interview') ? 'ji.jadwal_interview as jadwal_interview' : 'NULL as jadwal_interview');
+        } else {
+            $select[] = DB::raw('NULL as judul_interview');
+            $select[] = DB::raw('NULL as jadwal_interview');
+        }
+
+        $query->select($select);
+
+        if (Schema::hasColumn('jadwal_interview_kandidat', 'file_cv') || Schema::hasColumn('jadwal_interview_kandidat', 'file_foto')) {
+            $fileCvColumn = Schema::hasColumn('jadwal_interview_kandidat', 'file_cv') ? 'jik.file_cv' : 'NULL';
+            $fileFotoColumn = Schema::hasColumn('jadwal_interview_kandidat', 'file_foto') ? 'jik.file_foto' : 'NULL';
+
+            $query->orderByRaw("(CASE WHEN {$fileCvColumn} IS NOT NULL OR {$fileFotoColumn} IS NOT NULL THEN 1 ELSE 0 END) DESC");
+        }
+
+        if (Schema::hasTable('jadwal_interview') && Schema::hasColumn('jadwal_interview', 'jadwal_interview')) {
+            $query->orderByDesc('ji.jadwal_interview');
+        } elseif (Schema::hasColumn('jadwal_interview_kandidat', 'created_at')) {
+            $query->orderByDesc('jik.created_at');
+        }
+
+        if (Schema::hasColumn('jadwal_interview_kandidat', 'updated_at')) {
+            $query->orderByDesc('jik.updated_at');
+        }
+
+        $row = $query->first();
+
+        if (!$row) {
+            return $empty;
+        }
+
+        $fileCv = $this->normalizeFileUrl($row->file_cv ?? null);
+        $fileFoto = $this->normalizeFileUrl($row->file_foto ?? null);
+        $hasDocument = !empty($fileCv) || !empty($fileFoto);
+
+        return [
+            'jadwal_interview_kandidat_id' => $row->jadwal_interview_kandidat_id ?? null,
+            'jadwalInterviewKandidatId' => $row->jadwal_interview_kandidat_id ?? null,
+            'jadwal_interview_id' => $row->jadwal_interview_id ?? null,
+            'jadwalInterviewId' => $row->jadwal_interview_id ?? null,
+            'judul_interview' => $row->judul_interview ?? null,
+            'judulInterview' => $row->judul_interview ?? null,
+            'jadwal_interview' => $row->jadwal_interview ?? null,
+            'jadwalInterview' => $row->jadwal_interview ?? null,
+            'tanggal_interview' => $row->jadwal_interview ?? null,
+            'tanggalInterview' => $row->jadwal_interview ?? null,
+            'file_cv' => $fileCv,
+            'fileCv' => $fileCv,
+            'file_cv_url' => $fileCv,
+            'fileCvUrl' => $fileCv,
+            'file_foto' => $fileFoto,
+            'fileFoto' => $fileFoto,
+            'file_foto_url' => $fileFoto,
+            'fileFotoUrl' => $fileFoto,
+            'ada_dokumen' => $hasDocument,
+            'adaDokumen' => $hasDocument,
+            'created_at' => $row->created_at ?? null,
+            'updated_at' => $row->updated_at ?? null,
+        ];
+    }
+
+    private function normalizeFileUrl(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (Str::startsWith($value, ['http://', 'https://'])) {
+            return $value;
+        }
+
+        if (Str::startsWith($value, '/storage/')) {
+            return url($value);
+        }
+
+        if (Str::startsWith($value, 'storage/')) {
+            return url('/' . $value);
+        }
+
+        return url(Storage::url(ltrim($value, '/')));
     }
 
     private function normalizeTokenApiWa(?string $value): ?string

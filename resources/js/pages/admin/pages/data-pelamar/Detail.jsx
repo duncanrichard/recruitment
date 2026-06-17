@@ -121,6 +121,7 @@ export default function DetailDataPelamarPage({ id, onBack }) {
     const saudaraKandung = normalizeArray(rel.saudaraKandung);
     const saudaraIpar = normalizeArray(rel.saudaraIpar);
     const riwayatPekerjaan = normalizeArray(rel.riwayatPekerjaan);
+    const dokumenInterview = normalizeDokumenInterview(data);
 
     const kontakDarurat = normalizeArrayFromJson(keluarga.kontak_darurat);
     const hubunganKerabatInstansi = normalizeArrayFromJson(
@@ -473,6 +474,11 @@ export default function DetailDataPelamarPage({ id, onBack }) {
             ),
         },
         {
+            key: "dokumen",
+            label: "Dokumen Interview",
+            content: <DokumenInterviewBlock dokumen={dokumenInterview} />,
+        },
+        {
             key: "sistem",
             label: "Sistem",
             content: (
@@ -544,6 +550,123 @@ export default function DetailDataPelamarPage({ id, onBack }) {
 
                     {activeTabData.content}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+
+function DokumenInterviewBlock({ dokumen }) {
+    const fileCv = dokumen?.file_cv || dokumen?.fileCv || dokumen?.file_cv_url || dokumen?.fileCvUrl || null;
+    const fileFoto = dokumen?.file_foto || dokumen?.fileFoto || dokumen?.file_foto_url || dokumen?.fileFotoUrl || null;
+    const hasDocument = Boolean(fileCv || fileFoto);
+
+    if (!hasDocument) {
+        return (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                <p className="text-sm font-black text-slate-700">
+                    Dokumen interview belum tersedia.
+                </p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                    Jika kandidat sudah upload CV atau foto dari halaman Cek Tahapan, dokumen akan muncul di sini.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            <InfoGrid>
+                <InfoItem
+                    label="Judul Interview"
+                    value={dokumen?.judul_interview || dokumen?.judulInterview}
+                />
+                <InfoItem
+                    label="Jadwal Interview"
+                    value={formatDateTime(
+                        dokumen?.jadwal_interview ||
+                            dokumen?.jadwalInterview ||
+                            dokumen?.tanggal_interview ||
+                            dokumen?.tanggalInterview
+                    )}
+                />
+                <InfoItem
+                    label="ID Jadwal Interview Kandidat"
+                    value={
+                        dokumen?.jadwal_interview_kandidat_id ||
+                        dokumen?.jadwalInterviewKandidatId
+                    }
+                />
+            </InfoGrid>
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <DokumenCard
+                    title="CV Interview"
+                    description="Dokumen CV yang di-upload kandidat pada halaman Cek Tahapan."
+                    url={fileCv}
+                    emptyText="CV belum di-upload."
+                    type="document"
+                />
+
+                <DokumenCard
+                    title="Foto Interview"
+                    description="Foto yang di-upload kandidat pada halaman Cek Tahapan."
+                    url={fileFoto}
+                    emptyText="Foto belum di-upload."
+                    type="image"
+                />
+            </div>
+        </div>
+    );
+}
+
+function DokumenCard({ title, description, url, emptyText, type = "document" }) {
+    if (!url) {
+        return (
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                    {title}
+                </p>
+                <p className="mt-2 text-sm font-bold text-slate-500">
+                    {emptyText || "Dokumen belum tersedia."}
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+            {type === "image" && isImageUrl(url) && (
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                        src={url}
+                        alt={title}
+                        className="h-56 w-full object-cover"
+                    />
+                </a>
+            )}
+
+            <div className="p-5">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                    {title}
+                </p>
+
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+                    {description}
+                </p>
+
+             {/*    <p className="mt-3 break-all rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-5 text-slate-600">
+                    {url}
+                </p> */}
+
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white transition hover:bg-teal-700"
+                >
+                    Buka Dokumen
+                </a>
             </div>
         </div>
     );
@@ -778,6 +901,82 @@ function DataTableBlock({ data = [], columns = [], emptyText }) {
             </div>
         </div>
     );
+}
+
+
+function normalizeDokumenInterview(data) {
+    if (!data) return {};
+
+    const source =
+        data.dokumen_interview ||
+        data.dokumenInterview ||
+        data.latest_dokumen_interview ||
+        data.latestDokumenInterview ||
+        data.jadwal_interview ||
+        data.jadwalInterview ||
+        {};
+
+    const fileCv = normalizeFileUrl(
+        source.file_cv ||
+            source.fileCv ||
+            source.file_cv_url ||
+            source.fileCvUrl ||
+            data.file_cv_interview ||
+            data.fileCvInterview ||
+            data.file_cv ||
+            data.fileCv ||
+            null
+    );
+
+    const fileFoto = normalizeFileUrl(
+        source.file_foto ||
+            source.fileFoto ||
+            source.file_foto_url ||
+            source.fileFotoUrl ||
+            data.file_foto_interview ||
+            data.fileFotoInterview ||
+            data.file_foto ||
+            data.fileFoto ||
+            null
+    );
+
+    return {
+        ...source,
+        file_cv: fileCv,
+        fileCv,
+        file_cv_url: fileCv,
+        fileCvUrl: fileCv,
+        file_foto: fileFoto,
+        fileFoto,
+        file_foto_url: fileFoto,
+        fileFotoUrl: fileFoto,
+        ada_dokumen: Boolean(fileCv || fileFoto),
+        adaDokumen: Boolean(fileCv || fileFoto),
+    };
+}
+
+function normalizeFileUrl(value) {
+    if (!value) return null;
+
+    const text = String(value).trim();
+
+    if (!text) return null;
+
+    if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("/storage/")) {
+        return text;
+    }
+
+    if (text.startsWith("storage/")) {
+        return `/${text}`;
+    }
+
+    return `/storage/${text.replace(/^\/+/, "")}`;
+}
+
+function isImageUrl(value) {
+    if (!value) return false;
+
+    return /\.(jpg|jpeg|png|webp|gif|bmp|svg)(\?.*)?$/i.test(String(value));
 }
 
 function getRelation(data, keys = []) {

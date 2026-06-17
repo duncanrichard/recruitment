@@ -878,8 +878,6 @@ public function masterPendidikan(): JsonResponse
             'data' => $this->appendPelamarExtraData($pelamar),
         ]);
     }
-
-
     public function updateRiwayatPekerjaanByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
@@ -892,6 +890,10 @@ public function masterPendidikan(): JsonResponse
                 'message' => 'Token pelamar tidak ditemukan.',
             ], 404);
         }
+
+        $riwayatPekerjaanLama = DataRiwayatPekerjaan::query()
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->first();
 
         $tahunMulai = $this->normalizeYearValue($request->input('tahun_mulai_bekerja'));
         $tahunSelesai = $this->normalizeYearValue($request->input('tahun_selesai_bekerja'));
@@ -906,6 +908,45 @@ public function masterPendidikan(): JsonResponse
             ?: $request->input('posisi_pekerjaan_terakhir')
             ?: null;
 
+        /*
+         * Support field typo lama "refrensi_kerja" dan field database benar "referensi_kerja".
+         * Jika user memilih "Tidak", nama dan telepon referensi harus dikosongkan di database.
+         * Jika field referensi tidak ikut dikirim, data lama tetap dipertahankan.
+         */
+        $referensiKerjaInput = $request->input('referensi_kerja');
+
+        if ($referensiKerjaInput === null || $referensiKerjaInput === '') {
+            $referensiKerjaInput = $request->input('refrensi_kerja');
+        }
+
+        $referensiKerja = ($referensiKerjaInput !== null && $referensiKerjaInput !== '')
+            ? $referensiKerjaInput
+            : (
+                optional($riwayatPekerjaanLama)->referensi_kerja
+                ?: optional($riwayatPekerjaanLama)->refrensi_kerja
+                ?: null
+            );
+
+        $referensiKerjaAdalahTidak =
+            strtolower(trim((string) $referensiKerja)) === 'tidak';
+
+        if ($referensiKerjaAdalahTidak) {
+            $namaReferensi = null;
+            $telpReferensi = null;
+        } else {
+            $namaReferensi = $request->input('nama_refrensi');
+
+            if ($namaReferensi === null || $namaReferensi === '') {
+                $namaReferensi = optional($riwayatPekerjaanLama)->nama_refrensi;
+            }
+
+            $telpReferensi = $request->input('telp_refrensi');
+
+            if ($telpReferensi === null || $telpReferensi === '') {
+                $telpReferensi = optional($riwayatPekerjaanLama)->telp_refrensi;
+            }
+        }
+
         $request->merge([
             'posisi_pekerjaan' => $posisiPekerjaan,
             'posisi_pekerjaan_terakhir' => $request->input('posisi_pekerjaan_terakhir')
@@ -915,6 +956,11 @@ public function masterPendidikan(): JsonResponse
             'periode_kerja_awal' => $periodeKerjaAwal,
             'periode_kerja_akhir' => $periodeKerjaAkhir,
             'lama_bekerja' => $this->calculateLamaBekerjaFromYear($tahunMulai, $tahunSelesai),
+
+            'referensi_kerja' => $referensiKerja,
+            'refrensi_kerja' => $referensiKerja,
+            'nama_refrensi' => $namaReferensi,
+            'telp_refrensi' => $telpReferensi,
         ]);
 
         $validated = $request->validate([
@@ -936,6 +982,7 @@ public function masterPendidikan(): JsonResponse
             'keahlian' => ['nullable', 'string'],
             'catatan_pekerjaan' => ['nullable', 'string'],
 
+            'referensi_kerja' => ['nullable', 'string', 'max:255'],
             'refrensi_kerja' => ['nullable', 'string', 'max:255'],
             'nama_refrensi' => ['nullable', 'string', 'max:255'],
             'telp_refrensi' => ['nullable', 'string', 'max:50'],
@@ -985,6 +1032,15 @@ public function masterPendidikan(): JsonResponse
                 $validated['periode_kerja_akhir'] ?? $this->yearToDate($tahunSelesai)
             );
 
+            $referensiAtasanValue = $validated['referensi_kerja']
+                ?? $validated['refrensi_kerja']
+                ?? $riwayatPekerjaan->referensi_kerja
+                ?? null;
+
+            $referensiAtasanTidak = strtolower(trim((string) $referensiAtasanValue)) === 'tidak';
+            $referensiRekanTidak = strtolower(trim((string) ($validated['refrensi_rekan_kerja'] ?? ''))) === 'tidak';
+            $referensiKerabatTidak = strtolower(trim((string) ($validated['refrensi_kerabat'] ?? ''))) === 'tidak';
+
             $data = [
                 'data_riwayat_diri_id' => $pelamar->id,
                 'nama_perusahaan' => $validated['nama_perusahaan'] ?? null,
@@ -1005,21 +1061,36 @@ public function masterPendidikan(): JsonResponse
                 'keahlian' => $validated['keahlian'] ?? null,
                 'catatan_pekerjaan' => $validated['catatan_pekerjaan'] ?? null,
 
-                'refrensi_kerja' => $validated['refrensi_kerja'] ?? null,
-                'nama_refrensi' => $validated['nama_refrensi'] ?? null,
-                'telp_refrensi' => $validated['telp_refrensi'] ?? null,
+                'referensi_kerja' => $referensiAtasanValue,
+                'refrensi_kerja' => $referensiAtasanValue,
+                'nama_refrensi' => $referensiAtasanTidak
+                    ? null
+                    : ($validated['nama_refrensi'] ?? $riwayatPekerjaan->nama_refrensi ?? null),
+                'telp_refrensi' => $referensiAtasanTidak
+                    ? null
+                    : ($validated['telp_refrensi'] ?? $riwayatPekerjaan->telp_refrensi ?? null),
 
                 'refrensi_rekan_kerja' => $validated['refrensi_rekan_kerja'] ?? null,
-                'nama_refrensi_rekan' => $validated['nama_refrensi_rekan'] ?? null,
-                'telp_refrensi_rekan' => $validated['telp_refrensi_rekan'] ?? null,
+                'nama_refrensi_rekan' => $referensiRekanTidak
+                    ? null
+                    : ($validated['nama_refrensi_rekan'] ?? null),
+                'telp_refrensi_rekan' => $referensiRekanTidak
+                    ? null
+                    : ($validated['telp_refrensi_rekan'] ?? null),
 
                 'refrensi_kerabat' => $validated['refrensi_kerabat'] ?? null,
-                'nama_refrensi_kerabat' => $validated['nama_refrensi_kerabat'] ?? null,
-                'telp_refrensi_kerabat' => $validated['telp_refrensi_kerabat'] ?? null,
+                'nama_refrensi_kerabat' => $referensiKerabatTidak
+                    ? null
+                    : ($validated['nama_refrensi_kerabat'] ?? null),
+                'telp_refrensi_kerabat' => $referensiKerabatTidak
+                    ? null
+                    : ($validated['telp_refrensi_kerabat'] ?? null),
             ];
 
             $data = collect($data)
-                ->filter(fn ($value, $column) => Schema::hasColumn($table, $column))
+                ->filter(function ($value, $column) use ($table) {
+                    return Schema::hasColumn($table, $column);
+                })
                 ->toArray();
 
             $riwayatPekerjaan->forceFill($data);
@@ -1036,8 +1107,6 @@ public function masterPendidikan(): JsonResponse
             'data' => $this->appendPelamarExtraData($pelamar),
         ]);
     }
-
-
     public function updateKesiapanBekerjaByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
@@ -1053,18 +1122,17 @@ public function masterPendidikan(): JsonResponse
 
         /*
         |--------------------------------------------------------------------------
-        | Kesiapan Bekerja - sesuai field tabel terbaru
+        | Kesiapan Bekerja
         |--------------------------------------------------------------------------
-        | Field yang dipakai:
-        | - kapan_siap_bekerja
-        | - ekpetasi_gaji
-        | - penempatan
-        | - proses_bkhang
-        | - dapat_dipertanggung_jawabkan
-        | - bersedia_training
-        |
-        | Alias dari form lama/React tetap diterima agar tidak memutus frontend.
+        | Referensi atasan tetap disimpan di tabel data_riwayat_pekerjaan.
+        | Perbaikan penting:
+        | - Jangan menimpa nama_refrensi / telp_refrensi menjadi null saat request kosong.
+        | - Support nama field benar "referensi_kerja" dan alias typo lama "refrensi_kerja".
         */
+        $riwayatPekerjaanLama = DataRiwayatPekerjaan::query()
+            ->where('data_riwayat_diri_id', $pelamar->id)
+            ->first();
+
         $kapanSiapBekerja = $this->normalizeKesiapanText(
             $request->input('kapan_siap_bekerja')
                 ?: $request->input('tanggal_siap_kerja')
@@ -1098,6 +1166,53 @@ public function masterPendidikan(): JsonResponse
                 ?: $request->input('bersedia_pelatihan')
         );
 
+        $backgroundBersedia = strtoupper((string) $prosesBkhang) === 'BERSEDIA';
+
+        $referensiKerjaInput = $request->input('referensi_kerja');
+
+        if ($referensiKerjaInput === null || $referensiKerjaInput === '') {
+            $referensiKerjaInput = $request->input('refrensi_kerja');
+        }
+
+        $referensiKerja = $this->normalizeKesiapanText(
+            ($referensiKerjaInput !== null && $referensiKerjaInput !== '')
+                ? $referensiKerjaInput
+                : (
+                    optional($riwayatPekerjaanLama)->referensi_kerja
+                    ?: optional($riwayatPekerjaanLama)->refrensi_kerja
+                )
+        );
+
+        if ($backgroundBersedia && !$referensiKerja) {
+            $referensiKerja = 'Ya';
+        }
+
+        $referensiKerjaAdalahTidak =
+            strtolower(trim((string) $referensiKerja)) === 'tidak';
+
+        $namaReferensiInput = $this->normalizeKesiapanText(
+            $request->input('nama_refrensi')
+        );
+
+        $telpReferensiInput = $this->normalizeKesiapanText(
+            $request->input('telp_refrensi')
+        );
+
+        /*
+         * Kalau referensi_kerja = Tidak, data nama/telp harus dikosongkan.
+         * Kalau input kosong dan bukan "Tidak", pakai data lama dari database agar tidak hilang saat edit Kesiapan Bekerja.
+         */
+        if ($referensiKerjaAdalahTidak) {
+            $namaReferensi = null;
+            $telpReferensi = null;
+        } else {
+            $namaReferensi = $namaReferensiInput
+                ?: optional($riwayatPekerjaanLama)->nama_refrensi;
+
+            $telpReferensi = $telpReferensiInput
+                ?: optional($riwayatPekerjaanLama)->telp_refrensi;
+        }
+
         $request->merge([
             'kapan_siap_bekerja' => $kapanSiapBekerja,
             'tanggal_siap_kerja' => $kapanSiapBekerja,
@@ -1116,6 +1231,11 @@ public function masterPendidikan(): JsonResponse
 
             'bersedia_training' => $bersediaTraining,
             'bersedia_pelatihan' => $bersediaTraining,
+
+            'referensi_kerja' => $referensiKerja,
+            'refrensi_kerja' => $referensiKerja,
+            'nama_refrensi' => $namaReferensi,
+            'telp_refrensi' => $telpReferensi,
         ]);
 
         $validated = $request->validate([
@@ -1136,6 +1256,11 @@ public function masterPendidikan(): JsonResponse
 
             'bersedia_training' => ['nullable', 'string', 'max:255'],
             'bersedia_pelatihan' => ['nullable', 'string', 'max:255'],
+
+            'referensi_kerja' => ['nullable', 'string', 'max:255'],
+            'refrensi_kerja' => ['nullable', 'string', 'max:255'],
+            'nama_refrensi' => ['nullable', 'string', 'max:255'],
+            'telp_refrensi' => ['nullable', 'string', 'max:50'],
         ], [
             'ekpetasi_gaji.numeric' => 'Ekspetasi gaji harus berupa angka.',
             'gaji_diharapkan.numeric' => 'Ekspetasi gaji harus berupa angka.',
@@ -1143,7 +1268,7 @@ public function masterPendidikan(): JsonResponse
             'gaji_diharapkan.max' => 'Ekspetasi gaji terlalu besar.',
         ]);
 
-        DB::transaction(function () use ($pelamar, $validated) {
+        DB::transaction(function () use ($pelamar, $validated, $backgroundBersedia) {
             $kesiapanBekerja = DataKesiapanBekerja::query()
                 ->where('data_riwayat_diri_id', $pelamar->id)
                 ->first();
@@ -1185,6 +1310,87 @@ public function masterPendidikan(): JsonResponse
 
             $kesiapanBekerja->forceFill($data);
             $kesiapanBekerja->save();
+
+            /*
+             * Update referensi atasan hanya saat background checking BERSEDIA
+             * atau saat form mengirim data referensi. Nilai kosong tidak akan
+             * menghapus nama_refrensi / telp_refrensi yang sudah ada.
+             */
+            $adaReferensiDalamRequest =
+                request()->has('referensi_kerja') ||
+                request()->has('refrensi_kerja') ||
+                request()->has('nama_refrensi') ||
+                request()->has('telp_refrensi');
+
+            if (($backgroundBersedia || $adaReferensiDalamRequest) && Schema::hasTable('data_riwayat_pekerjaan')) {
+                $riwayatPekerjaan = DataRiwayatPekerjaan::query()
+                    ->where('data_riwayat_diri_id', $pelamar->id)
+                    ->first();
+
+                if (!$riwayatPekerjaan) {
+                    $riwayatPekerjaan = new DataRiwayatPekerjaan();
+                    $riwayatPekerjaan->data_riwayat_diri_id = $pelamar->id;
+                }
+
+                $pekerjaanTable = $riwayatPekerjaan->getTable();
+
+                $referensiData = [
+                    'data_riwayat_diri_id' => $pelamar->id,
+                ];
+
+                $nilaiReferensiKerja =
+                    $validated['referensi_kerja']
+                    ?? $validated['refrensi_kerja']
+                    ?? $riwayatPekerjaan->referensi_kerja
+                    ?? $riwayatPekerjaan->refrensi_kerja
+                    ?? ($backgroundBersedia ? 'Ya' : null);
+
+                if (Schema::hasColumn($pekerjaanTable, 'referensi_kerja') && $nilaiReferensiKerja !== null && $nilaiReferensiKerja !== '') {
+                    $referensiData['referensi_kerja'] = $nilaiReferensiKerja;
+                }
+
+                if (Schema::hasColumn($pekerjaanTable, 'refrensi_kerja') && $nilaiReferensiKerja !== null && $nilaiReferensiKerja !== '') {
+                    $referensiData['refrensi_kerja'] = $nilaiReferensiKerja;
+                }
+
+                $nilaiReferensiKerjaAdalahTidak =
+                    strtolower(trim((string) $nilaiReferensiKerja)) === 'tidak';
+
+                if (Schema::hasColumn($pekerjaanTable, 'nama_refrensi')) {
+                    $referensiData['nama_refrensi'] = $nilaiReferensiKerjaAdalahTidak
+                        ? null
+                        : (
+                            !empty($validated['nama_refrensi'])
+                                ? $validated['nama_refrensi']
+                                : $riwayatPekerjaan->nama_refrensi
+                        );
+                }
+
+                if (Schema::hasColumn($pekerjaanTable, 'telp_refrensi')) {
+                    $referensiData['telp_refrensi'] = $nilaiReferensiKerjaAdalahTidak
+                        ? null
+                        : (
+                            !empty($validated['telp_refrensi'])
+                                ? $validated['telp_refrensi']
+                                : $riwayatPekerjaan->telp_refrensi
+                        );
+                }
+
+                /*
+                 * Jangan filter nilai null di sini, karena saat referensi_kerja = Tidak,
+                 * null memang diperlukan untuk menghapus nama_refrensi dan telp_refrensi.
+                 */
+                $referensiData = collect($referensiData)
+                    ->filter(function ($value, $column) use ($pekerjaanTable) {
+                        return Schema::hasColumn($pekerjaanTable, $column);
+                    })
+                    ->toArray();
+
+                if (!empty($referensiData)) {
+                    $riwayatPekerjaan->forceFill($referensiData);
+                    $riwayatPekerjaan->save();
+                }
+            }
         });
 
         $pelamar = $this->pelamarQuery()
@@ -1720,8 +1926,6 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         return $pelamar;
     }
-
-
     private function appendRiwayatPekerjaanData(DataRiwayatDiri $pelamar): DataRiwayatDiri
     {
         $pelamar->loadMissing([
@@ -1753,6 +1957,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
             'keahlian',
             'catatan_pekerjaan',
 
+            'referensi_kerja',
             'refrensi_kerja',
             'nama_refrensi',
             'telp_refrensi',
@@ -1763,9 +1968,37 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
             'nama_refrensi_kerabat',
             'telp_refrensi_kerabat',
         ] as $column) {
-            if ($pekerjaan->{$column} !== null) {
+            if (isset($pekerjaan->{$column}) && $pekerjaan->{$column} !== null) {
                 $pelamar->setAttribute($column, $pekerjaan->{$column});
             }
+        }
+
+        /*
+         * Database yang benar memakai referensi_kerja.
+         * Alias refrensi_kerja tetap dikirim untuk frontend lama.
+         */
+        if (!empty($pekerjaan->referensi_kerja)) {
+            $pelamar->setAttribute('referensi_kerja', $pekerjaan->referensi_kerja);
+            $pelamar->setAttribute('refrensi_kerja', $pekerjaan->referensi_kerja);
+        } elseif (!empty($pekerjaan->refrensi_kerja)) {
+            $pelamar->setAttribute('referensi_kerja', $pekerjaan->refrensi_kerja);
+            $pelamar->setAttribute('refrensi_kerja', $pekerjaan->refrensi_kerja);
+        }
+
+
+        if (strtolower(trim((string) ($pekerjaan->referensi_kerja ?? $pekerjaan->refrensi_kerja ?? ''))) === 'tidak') {
+            $pelamar->setAttribute('nama_refrensi', null);
+            $pelamar->setAttribute('telp_refrensi', null);
+        }
+
+        if (strtolower(trim((string) ($pekerjaan->refrensi_rekan_kerja ?? ''))) === 'tidak') {
+            $pelamar->setAttribute('nama_refrensi_rekan', null);
+            $pelamar->setAttribute('telp_refrensi_rekan', null);
+        }
+
+        if (strtolower(trim((string) ($pekerjaan->refrensi_kerabat ?? ''))) === 'tidak') {
+            $pelamar->setAttribute('nama_refrensi_kerabat', null);
+            $pelamar->setAttribute('telp_refrensi_kerabat', null);
         }
 
         if (empty($pelamar->posisi_pekerjaan) && !empty($pekerjaan->posisi_pekerjaan_terakhir)) {

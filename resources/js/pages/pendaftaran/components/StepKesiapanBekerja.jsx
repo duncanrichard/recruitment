@@ -16,6 +16,78 @@ export default function StepKesiapanBekerja({
         form.pernyataan_data_benar ||
         [];
 
+    const selectedBackgroundChecking = normalizeCheckboxValue(backgroundCheckingValue);
+    const isBackgroundCheckingBersedia = selectedBackgroundChecking.includes("BERSEDIA");
+
+    const referensiAtasanValue =
+        form.referensi_kerja ||
+        form.refrensi_kerja ||
+        (isBackgroundCheckingBersedia ? "Tidak" : "");
+
+    const isReferensiAtasanYa =
+        String(referensiAtasanValue || "").toLowerCase() === "ya";
+
+    const namaReferensiAtasan = isReferensiAtasanYa
+        ? form.nama_refrensi || ""
+        : "";
+
+    const telpReferensiAtasan = isReferensiAtasanYa
+        ? form.telp_refrensi || ""
+        : "";
+
+    const handleBackgroundCheckingChange = (event) => {
+        const nextValues = normalizeCheckboxValue(event.target.value);
+        const bersedia = nextValues.includes("BERSEDIA");
+
+        handleChange(event);
+
+        /*
+         * Jangan ubah / hapus nama_refrensi dan telp_refrensi di step ini.
+         * Referensi atasan sumbernya dari Riwayat Pekerjaan.
+         */
+        if (!bersedia) {
+            handleChange({
+                target: {
+                    name: "proses_bkhang",
+                    value: ["TIDAK BERSEDIA"],
+                    type: "checkbox-group",
+                    checked: true,
+                },
+            });
+
+            handleChange({
+                target: {
+                    name: "background_checking",
+                    value: ["TIDAK BERSEDIA"],
+                    type: "checkbox-group",
+                    checked: true,
+                },
+            });
+        }
+    };
+
+    const handleGajiChange = (event) => {
+        const numericOnly = String(event.target.value || "").replace(/[^\d]/g, "");
+
+        handleChange({
+            target: {
+                name: "ekpetasi_gaji",
+                value: numericOnly,
+                type: "text",
+                checked: false,
+            },
+        });
+
+        handleChange({
+            target: {
+                name: "gaji_diharapkan",
+                value: numericOnly,
+                type: "text",
+                checked: false,
+            },
+        });
+    };
+
     return (
         <div className="space-y-6">
             <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
@@ -48,7 +120,7 @@ export default function StepKesiapanBekerja({
                         label="Berapa ekspetasi gaji yang Anda harapkan? Sebutkan dalam bentuk angka"
                         name="ekpetasi_gaji"
                         value={form.ekpetasi_gaji || form.gaji_diharapkan || ""}
-                        onChange={handleChange}
+                        onChange={handleGajiChange}
                         placeholder="Contoh: 4000000"
                         error={errors.ekpetasi_gaji || errors.gaji_diharapkan}
                         inputMode="numeric"
@@ -82,12 +154,67 @@ export default function StepKesiapanBekerja({
                     label="Sebagai bagian dari prosedur rekrutmen perusahaan, kami melakukan proses background checking bagi kandidat yang lolos tahapan seleksi. Apakah Anda bersedia mengikuti proses tersebut?"
                     name="proses_bkhang"
                     value={backgroundCheckingValue}
-                    onChange={handleChange}
+                    onChange={handleBackgroundCheckingChange}
                     error={errors.proses_bkhang || errors.background_checking}
                     options={["BERSEDIA", "TIDAK BERSEDIA"]}
                     singleChoice
                     required
                 />
+
+                {isBackgroundCheckingBersedia && (
+                    <div className="mt-5 rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
+                        <div className="mb-4">
+                            <h5 className="text-base font-bold text-cyan-900">
+                                Referensi Atasan
+                            </h5>
+
+                            <p className="mt-1 text-sm font-medium text-cyan-700">
+                                Data ini otomatis mengambil referensi atasan dari Riwayat Pekerjaan.
+                                Untuk mengubah data referensi, silakan kembali ke step Riwayat Pekerjaan.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                            <Input
+                                label="Ada Referensi Atasan?"
+                                name="referensi_kerja"
+                                value={referensiAtasanValue || "Tidak"}
+                                onChange={handleChange}
+                                error={errors.referensi_kerja || errors.refrensi_kerja}
+                                disabled
+                            />
+
+                            <Input
+                                label="Nama Referensi Atasan"
+                                name="nama_refrensi"
+                                value={namaReferensiAtasan}
+                                onChange={handleChange}
+                                placeholder={
+                                    isReferensiAtasanYa
+                                        ? "Nama atasan"
+                                        : "Tidak ada referensi atasan"
+                                }
+                                error={errors.nama_refrensi}
+                                disabled
+                            />
+
+                            <Input
+                                label="Telepon Referensi Atasan"
+                                name="telp_refrensi"
+                                value={telpReferensiAtasan}
+                                onChange={handleChange}
+                                placeholder={
+                                    isReferensiAtasanYa
+                                        ? "Nomor telepon atasan"
+                                        : "Tidak ada nomor referensi"
+                                }
+                                error={errors.telp_refrensi}
+                                inputMode="tel"
+                                disabled
+                            />
+                        </div>
+                    </div>
+                )}
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">

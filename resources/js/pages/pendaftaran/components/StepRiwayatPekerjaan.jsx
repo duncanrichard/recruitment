@@ -13,6 +13,30 @@ export default function StepRiwayatPekerjaan({
 
     const isWorkFieldsDisabled = isBelumBekerja;
 
+    const isReferensiAtasanDisabled =
+        isWorkFieldsDisabled ||
+        String(form.referensi_kerja || "").toLowerCase() !== "ya";
+
+    const isReferensiRekanDisabled =
+        isWorkFieldsDisabled ||
+        String(form.refrensi_rekan_kerja || "").toLowerCase() !== "ya";
+
+    const isReferensiKerabatDisabled =
+        isWorkFieldsDisabled ||
+        String(form.refrensi_kerabat || "").toLowerCase() !== "ya";
+
+    const referensiAtasanTidak = String(form.referensi_kerja || "")
+        .trim()
+        .toLowerCase() === "tidak";
+
+    const referensiRekanTidak = String(form.refrensi_rekan_kerja || "")
+        .trim()
+        .toLowerCase() === "tidak";
+
+    const referensiKerabatTidak = String(form.refrensi_kerabat || "")
+        .trim()
+        .toLowerCase() === "tidak";
+
     const handlePosisiChange = (e) => {
         const value = e.target.value;
 
@@ -78,6 +102,84 @@ export default function StepRiwayatPekerjaan({
                 checked: false,
             },
         });
+    };
+
+    const handleReferensiAtasanChange = (e) => {
+        const value = e.target.value;
+
+        handleChange(e);
+
+        if (String(value).toLowerCase() !== "ya") {
+            handleChange({
+                target: {
+                    name: "nama_refrensi",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+
+            handleChange({
+                target: {
+                    name: "telp_refrensi",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+        }
+    };
+
+    const handleReferensiRekanChange = (e) => {
+        const value = e.target.value;
+
+        handleChange(e);
+
+        if (String(value).toLowerCase() !== "ya") {
+            handleChange({
+                target: {
+                    name: "nama_refrensi_rekan",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+
+            handleChange({
+                target: {
+                    name: "telp_refrensi_rekan",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+        }
+    };
+
+    const handleReferensiKerabatChange = (e) => {
+        const value = e.target.value;
+
+        handleChange(e);
+
+        if (String(value).toLowerCase() !== "ya") {
+            handleChange({
+                target: {
+                    name: "nama_refrensi_kerabat",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+
+            handleChange({
+                target: {
+                    name: "telp_refrensi_kerabat",
+                    value: "",
+                    type: "text",
+                    checked: false,
+                },
+            });
+        }
     };
 
     return (
@@ -321,44 +423,44 @@ export default function StepRiwayatPekerjaan({
 
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h4 className="mb-5 text-lg font-bold text-slate-800">
-                    Referensi Kerja
+                    Referensi Atasan
                 </h4>
 
                 {isBelumBekerja && (
                     <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
-                        Referensi kerja tidak perlu diisi karena status pekerjaan
+                        Referensi atasan tidak perlu diisi karena status pekerjaan
                         adalah <span className="font-black">Belum Bekerja</span>.
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                     <SelectYaTidak
-                        label="Ada Referensi Kerja?"
+                        label="Ada Referensi Atasan?"
                         name="referensi_kerja"
                         value={form.referensi_kerja}
-                        onChange={handleChange}
+                        onChange={handleReferensiAtasanChange}
                         error={errors.referensi_kerja}
                         disabled={isWorkFieldsDisabled}
                     />
 
                     <Input
-                        label="Nama Referensi"
+                        label="Nama Referensi Atasan"
                         name="nama_refrensi"
-                        value={form.nama_refrensi}
+                        value={referensiAtasanTidak ? "" : form.nama_refrensi}
                         onChange={handleChange}
-                        placeholder="Nama referensi"
+                        placeholder="Nama atasan"
                         error={errors.nama_refrensi}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiAtasanDisabled}
                     />
 
                     <Input
-                        label="Telepon Referensi"
+                        label="Telepon Referensi Atasan"
                         name="telp_refrensi"
-                        value={form.telp_refrensi}
+                        value={referensiAtasanTidak ? "" : form.telp_refrensi}
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiAtasanDisabled}
                     />
                 </div>
             </section>
@@ -373,7 +475,7 @@ export default function StepRiwayatPekerjaan({
                         label="Ada Referensi Rekan Kerja?"
                         name="refrensi_rekan_kerja"
                         value={form.refrensi_rekan_kerja}
-                        onChange={handleChange}
+                        onChange={handleReferensiRekanChange}
                         error={errors.refrensi_rekan_kerja}
                         disabled={isWorkFieldsDisabled}
                     />
@@ -381,21 +483,21 @@ export default function StepRiwayatPekerjaan({
                     <Input
                         label="Nama Referensi Rekan"
                         name="nama_refrensi_rekan"
-                        value={form.nama_refrensi_rekan}
+                        value={referensiRekanTidak ? "" : form.nama_refrensi_rekan}
                         onChange={handleChange}
                         placeholder="Nama rekan kerja"
                         error={errors.nama_refrensi_rekan}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiRekanDisabled}
                     />
 
                     <Input
                         label="Telepon Referensi Rekan"
                         name="telp_refrensi_rekan"
-                        value={form.telp_refrensi_rekan}
+                        value={referensiRekanTidak ? "" : form.telp_refrensi_rekan}
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi_rekan}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiRekanDisabled}
                     />
                 </div>
             </section>
@@ -410,7 +512,7 @@ export default function StepRiwayatPekerjaan({
                         label="Ada Referensi Kerabat?"
                         name="refrensi_kerabat"
                         value={form.refrensi_kerabat}
-                        onChange={handleChange}
+                        onChange={handleReferensiKerabatChange}
                         error={errors.refrensi_kerabat}
                         disabled={isWorkFieldsDisabled}
                     />
@@ -418,21 +520,21 @@ export default function StepRiwayatPekerjaan({
                     <Input
                         label="Nama Referensi Kerabat"
                         name="nama_refrensi_kerabat"
-                        value={form.nama_refrensi_kerabat}
+                        value={referensiKerabatTidak ? "" : form.nama_refrensi_kerabat}
                         onChange={handleChange}
                         placeholder="Nama kerabat"
                         error={errors.nama_refrensi_kerabat}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiKerabatDisabled}
                     />
 
                     <Input
                         label="Telepon Referensi Kerabat"
                         name="telp_refrensi_kerabat"
-                        value={form.telp_refrensi_kerabat}
+                        value={referensiKerabatTidak ? "" : form.telp_refrensi_kerabat}
                         onChange={handleChange}
                         placeholder="Nomor telepon"
                         error={errors.telp_refrensi_kerabat}
-                        disabled={isWorkFieldsDisabled}
+                        disabled={isReferensiKerabatDisabled}
                     />
                 </div>
             </section>

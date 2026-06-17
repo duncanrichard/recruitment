@@ -491,7 +491,7 @@ class CekTahapanPelamarController extends Controller
                 'public'
             );
 
-            $payload['file_cv'] = '/storage/' . $storedPath;
+            $payload['file_cv'] = $this->storagePathToPublicUrl($storedPath);
         }
 
         if ($request->hasFile('file_foto')) {
@@ -516,7 +516,7 @@ class CekTahapanPelamarController extends Controller
                 'public'
             );
 
-            $payload['file_foto'] = '/storage/' . $storedPath;
+            $payload['file_foto'] = $this->storagePathToPublicUrl($storedPath);
         }
 
         if (empty($payload)) {
@@ -2110,20 +2110,20 @@ class CekTahapanPelamarController extends Controller
             return null;
         }
 
-        if (!str_starts_with($value, 'http://') &&
-            !str_starts_with($value, 'https://') &&
-            !str_starts_with($value, '/storage/')
-        ) {
-            return '/storage/' . ltrim($value, '/');
-        }
-
         if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
-            $path = parse_url($value, PHP_URL_PATH);
-
-            return $path ?: $value;
+            return $value;
         }
 
-        return $value;
+        if (str_starts_with($value, '/storage/')) {
+            return url($value);
+        }
+
+        return url(Storage::url(ltrim($value, '/')));
+    }
+
+    private function storagePathToPublicUrl(string $storedPath): string
+    {
+        return url(Storage::url($storedPath));
     }
 
     private function convertPublicUrlToStoragePath(?string $url): ?string

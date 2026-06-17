@@ -211,7 +211,7 @@ function PendaftaranPage() {
         keahlian: "",
         catatan_pekerjaan: "",
 
-        refrensi_kerja: "",
+        referensi_kerja: "",
         nama_refrensi: "",
         telp_refrensi: "",
         refrensi_rekan_kerja: "",
@@ -460,7 +460,7 @@ function PendaftaranPage() {
         "gaji_terakhir",
         "keahlian",
         "catatan_pekerjaan",
-        "refrensi_kerja",
+        "referensi_kerja",
         "nama_refrensi",
         "telp_refrensi",
         "refrensi_rekan_kerja",
@@ -845,6 +845,21 @@ function PendaftaranPage() {
         );
     };
 
+
+    const firstFilledValue = (...values) => {
+        for (const value of values) {
+            if (value !== undefined && value !== null && String(value).trim() !== "") {
+                return value;
+            }
+        }
+
+        return "";
+    };
+
+    const isTidakValue = (value) => {
+        return String(value || "").trim().toLowerCase() === "tidak";
+    };
+
     const getStatusPernikahanLabel = (pelamar) => {
         return (
             getRelationName(
@@ -1084,6 +1099,47 @@ function PendaftaranPage() {
             kesehatan?.nama_alergi ||
             pelamar?.alergi ||
             "";
+
+        const referensiAtasanStatus = firstFilledValue(
+            pelamar?.referensi_kerja,
+            pelamar?.refrensi_kerja,
+            pekerjaan?.referensi_kerja,
+            pekerjaan?.refrensi_kerja
+        );
+
+        const namaReferensiAtasan = isTidakValue(referensiAtasanStatus)
+            ? ""
+            : firstFilledValue(pelamar?.nama_refrensi, pekerjaan?.nama_refrensi);
+
+        const telpReferensiAtasan = isTidakValue(referensiAtasanStatus)
+            ? ""
+            : firstFilledValue(pelamar?.telp_refrensi, pekerjaan?.telp_refrensi);
+
+        const referensiRekanStatus = firstFilledValue(
+            pelamar?.refrensi_rekan_kerja,
+            pekerjaan?.refrensi_rekan_kerja
+        );
+
+        const namaReferensiRekan = isTidakValue(referensiRekanStatus)
+            ? ""
+            : firstFilledValue(pelamar?.nama_refrensi_rekan, pekerjaan?.nama_refrensi_rekan);
+
+        const telpReferensiRekan = isTidakValue(referensiRekanStatus)
+            ? ""
+            : firstFilledValue(pelamar?.telp_refrensi_rekan, pekerjaan?.telp_refrensi_rekan);
+
+        const referensiKerabatStatus = firstFilledValue(
+            pelamar?.refrensi_kerabat,
+            pekerjaan?.refrensi_kerabat
+        );
+
+        const namaReferensiKerabat = isTidakValue(referensiKerabatStatus)
+            ? ""
+            : firstFilledValue(pelamar?.nama_refrensi_kerabat, pekerjaan?.nama_refrensi_kerabat);
+
+        const telpReferensiKerabat = isTidakValue(referensiKerabatStatus)
+            ? ""
+            : firstFilledValue(pelamar?.telp_refrensi_kerabat, pekerjaan?.telp_refrensi_kerabat);
 
         return {
             token: pelamar?.token || "",
@@ -1430,50 +1486,23 @@ function PendaftaranPage() {
                 pekerjaan?.catatan_pekerjaan ||
                 "",
 
-            refrensi_kerja:
-                pelamar?.refrensi_kerja ||
-                pekerjaan?.refrensi_kerja ||
-                "",
+            referensi_kerja: referensiAtasanStatus,
 
-            nama_refrensi:
-                pelamar?.nama_refrensi ||
-                pekerjaan?.nama_refrensi ||
-                "",
+            nama_refrensi: namaReferensiAtasan,
 
-            telp_refrensi:
-                pelamar?.telp_refrensi ||
-                pekerjaan?.telp_refrensi ||
-                "",
+            telp_refrensi: telpReferensiAtasan,
 
-            refrensi_rekan_kerja:
-                pelamar?.refrensi_rekan_kerja ||
-                pekerjaan?.refrensi_rekan_kerja ||
-                "",
+            refrensi_rekan_kerja: referensiRekanStatus,
 
-            nama_refrensi_rekan:
-                pelamar?.nama_refrensi_rekan ||
-                pekerjaan?.nama_refrensi_rekan ||
-                "",
+            nama_refrensi_rekan: namaReferensiRekan,
 
-            telp_refrensi_rekan:
-                pelamar?.telp_refrensi_rekan ||
-                pekerjaan?.telp_refrensi_rekan ||
-                "",
+            telp_refrensi_rekan: telpReferensiRekan,
 
-            refrensi_kerabat:
-                pelamar?.refrensi_kerabat ||
-                pekerjaan?.refrensi_kerabat ||
-                "",
+            refrensi_kerabat: referensiKerabatStatus,
 
-            nama_refrensi_kerabat:
-                pelamar?.nama_refrensi_kerabat ||
-                pekerjaan?.nama_refrensi_kerabat ||
-                "",
+            nama_refrensi_kerabat: namaReferensiKerabat,
 
-            telp_refrensi_kerabat:
-                pelamar?.telp_refrensi_kerabat ||
-                pekerjaan?.telp_refrensi_kerabat ||
-                "",
+            telp_refrensi_kerabat: telpReferensiKerabat,
 
             bersedia_ditempatkan:
                 pelamar?.bersedia_ditempatkan ||
@@ -2045,6 +2074,10 @@ function PendaftaranPage() {
             tahunSelesaiBekerja
         );
 
+        const referensiAtasanTidak = isTidakValue(form.referensi_kerja);
+        const referensiRekanTidak = isTidakValue(form.refrensi_rekan_kerja);
+        const referensiKerabatTidak = isTidakValue(form.refrensi_kerabat);
+
         const payload = {
             status_pekerjaan: form.status_pekerjaan || "",
 
@@ -2067,17 +2100,17 @@ function PendaftaranPage() {
             keahlian: form.keahlian || "",
             catatan_pekerjaan: form.catatan_pekerjaan || "",
 
-            refrensi_kerja: form.refrensi_kerja || "",
-            nama_refrensi: form.nama_refrensi || "",
-            telp_refrensi: form.telp_refrensi || "",
+            referensi_kerja: form.referensi_kerja || "",
+            nama_refrensi: referensiAtasanTidak ? "" : (form.nama_refrensi || ""),
+            telp_refrensi: referensiAtasanTidak ? "" : (form.telp_refrensi || ""),
 
             refrensi_rekan_kerja: form.refrensi_rekan_kerja || "",
-            nama_refrensi_rekan: form.nama_refrensi_rekan || "",
-            telp_refrensi_rekan: form.telp_refrensi_rekan || "",
+            nama_refrensi_rekan: referensiRekanTidak ? "" : (form.nama_refrensi_rekan || ""),
+            telp_refrensi_rekan: referensiRekanTidak ? "" : (form.telp_refrensi_rekan || ""),
 
             refrensi_kerabat: form.refrensi_kerabat || "",
-            nama_refrensi_kerabat: form.nama_refrensi_kerabat || "",
-            telp_refrensi_kerabat: form.telp_refrensi_kerabat || "",
+            nama_refrensi_kerabat: referensiKerabatTidak ? "" : (form.nama_refrensi_kerabat || ""),
+            telp_refrensi_kerabat: referensiKerabatTidak ? "" : (form.telp_refrensi_kerabat || ""),
         };
 
         const response = await fetch(
@@ -2485,7 +2518,7 @@ function PendaftaranPage() {
                 updatedForm.gaji_terakhir = "";
                 updatedForm.keahlian = "";
                 updatedForm.catatan_pekerjaan = "";
-                updatedForm.refrensi_kerja = "";
+                updatedForm.referensi_kerja = "";
                 updatedForm.nama_refrensi = "";
                 updatedForm.telp_refrensi = "";
                 updatedForm.refrensi_rekan_kerja = "";
