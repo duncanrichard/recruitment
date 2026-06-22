@@ -344,11 +344,9 @@ class CekTahapanPelamarController extends Controller
          |--------------------------------------------------------------------------
          | Normalisasi nama input file
          |--------------------------------------------------------------------------
-         | Frontend yang lama/berbeda kadang mengirim nama field:
-         | - cv / fileCv / file_cv
-         | - foto / fileFoto / file_foto
-         | Supaya upload tidak gagal hanya karena nama field berbeda,
-         | semua alias diarahkan ke file_cv dan file_foto.
+         | Frontend utama mengirim field file_cv dan file_foto.
+         | Alias tetap didukung supaya upload tidak gagal jika frontend lama
+         | mengirim nama field berbeda.
          |--------------------------------------------------------------------------
          */
         if (!$request->hasFile('file_cv')) {
@@ -437,14 +435,9 @@ class CekTahapanPelamarController extends Controller
          |--------------------------------------------------------------------------
          | Cari jadwal interview kandidat
          |--------------------------------------------------------------------------
-         | Error yang sering terjadi:
-         | Frontend mengirim ji.id dari tabel jadwal_interview, bukan jik.id dari
-         | tabel jadwal_interview_kandidat.
-         |
-         | Karena file_cv dan file_foto tersimpan di jadwal_interview_kandidat,
-         | controller ini dibuat menerima dua kemungkinan:
-         | 1. jik.id
-         | 2. jik.jadwal_interview_id
+         | Menerima dua kemungkinan ID:
+         | 1. jadwal_interview_kandidat.id
+         | 2. jadwal_interview_kandidat.jadwal_interview_id
          |--------------------------------------------------------------------------
          */
         $jadwal = JadwalInterviewKandidat::query()
@@ -464,6 +457,7 @@ class CekTahapanPelamarController extends Controller
             ], 404);
         }
 
+        $disk = $this->uploadDiskName();
         $payload = [];
 
         $folderNama = $this->sanitizeFolderName($pelamar->nama_lengkap ?: 'tanpa nama');
@@ -472,8 +466,8 @@ class CekTahapanPelamarController extends Controller
         if ($request->hasFile('file_cv')) {
             $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_cv ?? null);
 
-            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
-                Storage::disk('public')->delete($oldPath);
+            if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
+                Storage::disk($disk)->delete($oldPath);
             }
 
             $extension = strtolower($request->file('file_cv')->getClientOriginalExtension());
@@ -488,17 +482,28 @@ class CekTahapanPelamarController extends Controller
             $storedPath = $request->file('file_cv')->storeAs(
                 $folder,
                 $fileName,
-                'public'
+                $disk
             );
 
-            $payload['file_cv'] = $this->storagePathToPublicUrl($storedPath);
+            if (!$storedPath) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File CV gagal disimpan ke storage.',
+                ], 500);
+            }
+
+            /*
+             | Simpan path ke database, bukan URL.
+             | Contoh: interview/nama/dokumen/cv-interview-xxx.pdf
+             */
+            $payload['file_cv'] = $storedPath;
         }
 
         if ($request->hasFile('file_foto')) {
             $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_foto ?? null);
 
-            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
-                Storage::disk('public')->delete($oldPath);
+            if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
+                Storage::disk($disk)->delete($oldPath);
             }
 
             $extension = strtolower($request->file('file_foto')->getClientOriginalExtension());
@@ -513,10 +518,20 @@ class CekTahapanPelamarController extends Controller
             $storedPath = $request->file('file_foto')->storeAs(
                 $folder,
                 $fileName,
-                'public'
+                $disk
             );
 
-            $payload['file_foto'] = $this->storagePathToPublicUrl($storedPath);
+            if (!$storedPath) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File foto gagal disimpan ke storage.',
+                ], 500);
+            }
+
+            /*
+             | Simpan path ke database, bukan URL.
+             */
+            $payload['file_foto'] = $storedPath;
         }
 
         if (empty($payload)) {
@@ -2098,6 +2113,15 @@ class CekTahapanPelamarController extends Controller
         return '-';
     }
 
+    private function uploadDiskName(): string
+    {
+        /*
+         | Mengikuti konfigurasi .env:
+         | FILESYSTEM_DISK=s3
+         */
+        return config('filesystems.default', 's3');
+    }
+
     private function normalizeFileUrl(?string $value): ?string
     {
         if (!$value) {
@@ -2118,39 +2142,85 @@ class CekTahapanPelamarController extends Controller
             return url($value);
         }
 
-        return url(Storage::url(ltrim($value, '/')));
+        $path = ltrim($value, '/');
+        $disk = $this->uploadDiskName();
+
+        /*
+         | Untuk MinIO/private bucket, temporaryUrl lebih aman.
+         | Kalau driver tidak mendukung, fallback ke url().
+         */
+        try {
+            return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(60));
+        } catch (\Throwable $e) {
+            try {
+                return Storage::disk($disk)->url($path);
+            } catch (\Throwable $e) {
+                return $path;
+            }
+        }
     }
 
     private function storagePathToPublicUrl(string $storedPath): string
     {
-        return url(Storage::url($storedPath));
+        return $this->normalizeFileUrl($storedPath) ?: $storedPath;
     }
 
-    private function convertPublicUrlToStoragePath(?string $url): ?string
+    private function convertPublicUrlToStoragePath(?string $value): ?string
     {
-        if (!$url) {
+        if (!$value) {
             return null;
         }
 
-        $url = $this->normalizeFileUrl($url);
+        $value = trim($value);
 
-        if (!$url) {
+        if ($value === '') {
             return null;
         }
 
-        $path = parse_url($url, PHP_URL_PATH);
+        /*
+         | Kalau sudah berupa path storage:
+         | interview/nama/dokumen/file.pdf
+         */
+        if (
+            !str_starts_with($value, 'http://') &&
+            !str_starts_with($value, 'https://') &&
+            !str_starts_with($value, '/storage/')
+        ) {
+            return ltrim($value, '/');
+        }
+
+        /*
+         | Support data lama dari public disk:
+         | /storage/interview/...
+         */
+        if (str_starts_with($value, '/storage/')) {
+            return ltrim(substr($value, strlen('/storage/')), '/');
+        }
+
+        /*
+         | Support URL lama dan URL MinIO.
+         */
+        $path = parse_url($value, PHP_URL_PATH);
 
         if (!$path) {
             return null;
         }
 
-        $storagePrefix = '/storage/';
-
-        if (!str_starts_with($path, $storagePrefix)) {
-            return null;
+        if (str_starts_with($path, '/storage/')) {
+            return ltrim(substr($path, strlen('/storage/')), '/');
         }
 
-        return urldecode(substr($path, strlen($storagePrefix)));
+        /*
+         | Support URL MinIO:
+         | http://100.123.102.52:9000/recruitment/interview/...
+         */
+        $bucket = config('filesystems.disks.s3.bucket');
+
+        if ($bucket && str_starts_with($path, '/' . $bucket . '/')) {
+            return ltrim(substr($path, strlen('/' . $bucket . '/')), '/');
+        }
+
+        return ltrim($path, '/');
     }
 
     private function sanitizeFolderName(string $value): string
