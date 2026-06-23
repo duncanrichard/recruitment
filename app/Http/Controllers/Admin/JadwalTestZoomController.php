@@ -14,17 +14,33 @@ use Illuminate\Validation\Rule;
 
 class JadwalTestZoomController extends Controller
 {
-    public function list(): JsonResponse
+    public function list(Request $request): JsonResponse
     {
-        $rows = JadwalTestZoom::query()
+        $request->validate([
+            'tanggal_test' => ['nullable', 'date'],
+            'filter_tanggal_test' => ['nullable', 'date'],
+            'tanggal_test_mulai' => ['nullable', 'date'],
+            'tanggal_test_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_test_mulai'],
+        ], [
+            'tanggal_test.date' => 'Tanggal test tidak valid.',
+            'filter_tanggal_test.date' => 'Tanggal test tidak valid.',
+            'tanggal_test_mulai.date' => 'Tanggal test mulai tidak valid.',
+            'tanggal_test_selesai.date' => 'Tanggal test selesai tidak valid.',
+            'tanggal_test_selesai.after_or_equal' => 'Tanggal test selesai harus sama atau setelah tanggal test mulai.',
+        ]);
+
+        $query = JadwalTestZoom::query()
             ->with([
                 'dataRiwayatDiri:id,nama_lengkap,nama_panggil,email,no_wa,token,tanggal_skrining,posisi_yang_dilamar,perusahaan_dilamar',
                 'dataRiwayatDiri.posisi:id,nama_posisi',
                 'dataRiwayatDiri.perusahaan:id,nama_perusahaan',
             ])
             ->latest('jadwal_mulai')
-            ->latest('jadwal')
-            ->get();
+            ->latest('jadwal');
+
+        $this->applyTanggalTestFilter($query, $request);
+
+        $rows = $query->get();
 
         $data = $rows
             ->groupBy(function ($item) {
@@ -537,6 +553,73 @@ class JadwalTestZoomController extends Controller
                 'message' => 'Group jadwal test Zoom tidak bisa dihapus.',
             ], 409);
         }
+    }
+
+
+    private function applyTanggalTestFilter($query, Request $request): void
+    {
+        $tanggalTest = $request->input('tanggal_test')
+            ?: $request->input('filter_tanggal_test')
+            ?: null;
+
+        $tanggalMulai = $request->input('tanggal_test_mulai')
+            ?: $tanggalTest
+            ?: null;
+
+        $tanggalSelesai = $request->input('tanggal_test_selesai')
+            ?: $tanggalTest
+            ?: null;
+
+        $tanggalMulaiCarbon = $this->parseDate($tanggalMulai);
+        $tanggalSelesaiCarbon = $this->parseDate($tanggalSelesai);
+
+        if (!$tanggalMulaiCarbon && !$tanggalSelesaiCarbon) {
+            return;
+        }
+
+        $query->where(function ($mainQuery) use ($tanggalMulaiCarbon, $tanggalSelesaiCarbon) {
+            $mainQuery
+                ->where(function ($jadwalMulaiQuery) use ($tanggalMulaiCarbon, $tanggalSelesaiCarbon) {
+                    $jadwalMulaiQuery->whereNotNull('jadwal_mulai');
+
+                    if ($tanggalMulaiCarbon) {
+                        $jadwalMulaiQuery->whereDate(
+                            'jadwal_mulai',
+                            '>=',
+                            $tanggalMulaiCarbon->toDateString()
+                        );
+                    }
+
+                    if ($tanggalSelesaiCarbon) {
+                        $jadwalMulaiQuery->whereDate(
+                            'jadwal_mulai',
+                            '<=',
+                            $tanggalSelesaiCarbon->toDateString()
+                        );
+                    }
+                })
+                ->orWhere(function ($jadwalLegacyQuery) use ($tanggalMulaiCarbon, $tanggalSelesaiCarbon) {
+                    $jadwalLegacyQuery
+                        ->whereNull('jadwal_mulai')
+                        ->whereNotNull('jadwal');
+
+                    if ($tanggalMulaiCarbon) {
+                        $jadwalLegacyQuery->whereDate(
+                            'jadwal',
+                            '>=',
+                            $tanggalMulaiCarbon->toDateString()
+                        );
+                    }
+
+                    if ($tanggalSelesaiCarbon) {
+                        $jadwalLegacyQuery->whereDate(
+                            'jadwal',
+                            '<=',
+                            $tanggalSelesaiCarbon->toDateString()
+                        );
+                    }
+                });
+        });
     }
 
     private function jadwalDetailQuery()

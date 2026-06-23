@@ -23,9 +23,23 @@ class MmpiController extends Controller
 
     public function list(Request $request): JsonResponse
     {
+        $request->merge([
+            'tanggal_mulai' => $request->input('tanggal_mulai')
+                ?: $request->input('tanggal_test_mmpi_mulai')
+                ?: $request->input('tanggal_test_mulai'),
+
+            'tanggal_selesai' => $request->input('tanggal_selesai')
+                ?: $request->input('tanggal_test_mmpi_selesai')
+                ?: $request->input('tanggal_test_selesai'),
+        ]);
+
         $validated = $request->validate([
             'tanggal_mulai' => ['nullable', 'date'],
             'tanggal_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_mulai'],
+        ], [
+            'tanggal_mulai.date' => 'Format Tanggal Test MMPI Mulai tidak valid.',
+            'tanggal_selesai.date' => 'Format Tanggal Test MMPI Selesai tidak valid.',
+            'tanggal_selesai.after_or_equal' => 'Tanggal Test MMPI Selesai tidak boleh lebih kecil dari Tanggal Test MMPI Mulai.',
         ]);
 
         $pelamarColumns = $this->getPelamarColumns();

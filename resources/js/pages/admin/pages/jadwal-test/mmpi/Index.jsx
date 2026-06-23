@@ -11,6 +11,9 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
     const [saving, setSaving] = useState(false);
     const [modalOpen, setModalOpen] = useState(false);
 
+    const [filterTanggalMmpiMulai, setFilterTanggalMmpiMulai] = useState("");
+    const [filterTanggalMmpiSelesai, setFilterTanggalMmpiSelesai] = useState("");
+
     const isFirstActionSignalRender = useRef(true);
 
     const getCsrfToken = () => {
@@ -19,11 +22,44 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
             ?.getAttribute("content");
     };
 
-    const fetchJadwalMmpi = async () => {
+    const isFilterTanggalMmpiInvalid =
+        filterTanggalMmpiMulai &&
+        filterTanggalMmpiSelesai &&
+        filterTanggalMmpiSelesai < filterTanggalMmpiMulai;
+
+    const fetchJadwalMmpi = async (filters = null) => {
+        const activeFilters = filters || {
+            tanggal_mulai: filterTanggalMmpiMulai,
+            tanggal_selesai: filterTanggalMmpiSelesai,
+        };
+
+        if (
+            activeFilters.tanggal_mulai &&
+            activeFilters.tanggal_selesai &&
+            activeFilters.tanggal_selesai < activeFilters.tanggal_mulai
+        ) {
+            setJadwalMmpi([]);
+            return [];
+        }
+
         setLoadingList(true);
 
         try {
-            const response = await fetch("/admin/jadwal-test/mmpi/list", {
+            const params = new URLSearchParams();
+
+            if (activeFilters.tanggal_mulai) {
+                params.append("tanggal_mulai", activeFilters.tanggal_mulai);
+            }
+
+            if (activeFilters.tanggal_selesai) {
+                params.append("tanggal_selesai", activeFilters.tanggal_selesai);
+            }
+
+            const url = params.toString()
+                ? `/admin/jadwal-test/mmpi/list?${params.toString()}`
+                : "/admin/jadwal-test/mmpi/list";
+
+            const response = await fetch(url, {
                 headers: {
                     Accept: "application/json",
                 },
@@ -45,6 +81,11 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
         } finally {
             setLoadingList(false);
         }
+    };
+
+    const resetFilterTanggalMmpi = () => {
+        setFilterTanggalMmpiMulai("");
+        setFilterTanggalMmpiSelesai("");
     };
 
     const fetchKandidat = async (currentJadwalMmpi = jadwalMmpi) => {
@@ -91,8 +132,10 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
     };
 
     useEffect(() => {
+        if (isFilterTanggalMmpiInvalid) return;
+
         fetchJadwalMmpi();
-    }, []);
+    }, [filterTanggalMmpiMulai, filterTanggalMmpiSelesai]);
 
     useEffect(() => {
         if (isFirstActionSignalRender.current) {
@@ -313,6 +356,67 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                             Kandidat yang sudah mendapatkan jadwal MMPI tidak akan tampil lagi di modal pemilihan kandidat.
                         </p>
                     </div>
+                </div>
+
+                <div className="border-b border-slate-100 px-6 py-5">
+                    <p className="text-sm font-black text-slate-700">
+                        Filter Range Tanggal Test MMPI
+                    </p>
+
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                        Tampilkan jadwal MMPI berdasarkan rentang tanggal test MMPI.
+                    </p>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                        <div>
+                            <label className="mb-2 block text-sm font-black text-slate-700">
+                                Tanggal Test MMPI Mulai
+                            </label>
+
+                            <input
+                                type="date"
+                                value={filterTanggalMmpiMulai}
+                                onChange={(event) =>
+                                    setFilterTanggalMmpiMulai(event.target.value)
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-sm font-black text-slate-700">
+                                Tanggal Test MMPI Selesai
+                            </label>
+
+                            <input
+                                type="date"
+                                value={filterTanggalMmpiSelesai}
+                                min={filterTanggalMmpiMulai || undefined}
+                                onChange={(event) =>
+                                    setFilterTanggalMmpiSelesai(event.target.value)
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            />
+                        </div>
+
+                        {(filterTanggalMmpiMulai || filterTanggalMmpiSelesai) && (
+                            <button
+                                type="button"
+                                onClick={resetFilterTanggalMmpi}
+                                className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            >
+                                Reset Filter
+                            </button>
+                        )}
+                    </div>
+
+                    {isFilterTanggalMmpiInvalid && (
+                        <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
+                            <p className="text-sm font-black text-rose-700">
+                                Tanggal Test MMPI Selesai tidak boleh lebih kecil dari Tanggal Test MMPI Mulai.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto">

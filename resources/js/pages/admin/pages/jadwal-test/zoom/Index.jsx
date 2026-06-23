@@ -38,6 +38,13 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         link_zoom: "",
     });
 
+    const [filterTanggalTestMulai, setFilterTanggalTestMulai] = useState("");
+    const [filterTanggalTestSelesai, setFilterTanggalTestSelesai] = useState("");
+
+    const hasFilterTanggalTest = Boolean(
+        filterTanggalTestMulai || filterTanggalTestSelesai
+    );
+
     const scheduledPelamarIds = useMemo(() => {
         const ids = [];
 
@@ -120,6 +127,33 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         );
     }, [dataJadwal]);
 
+    const filteredDataJadwal = useMemo(() => {
+        if (!hasFilterTanggalTest) return dataJadwal;
+
+        return dataJadwal.filter((item) => {
+            const tanggal = normalizeDate(
+                item?.tanggal_test || item?.jadwal_mulai || item?.jadwal
+            );
+
+            if (!tanggal) return false;
+
+            if (filterTanggalTestMulai && tanggal < filterTanggalTestMulai) {
+                return false;
+            }
+
+            if (filterTanggalTestSelesai && tanggal > filterTanggalTestSelesai) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [
+        dataJadwal,
+        filterTanggalTestMulai,
+        filterTanggalTestSelesai,
+        hasFilterTanggalTest,
+    ]);
+
     const getCsrfToken = () => {
         return document
             .querySelector('meta[name="csrf-token"]')
@@ -155,9 +189,26 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         return result;
     };
 
-    const fetchData = async () => {
+    const fetchData = async (
+        tanggalMulai = filterTanggalTestMulai,
+        tanggalSelesai = filterTanggalTestSelesai
+    ) => {
         try {
-            const result = await fetchJson("/admin/jadwal-test/zoom/list");
+            const params = new URLSearchParams();
+
+            if (tanggalMulai) {
+                params.set("tanggal_test_mulai", tanggalMulai);
+            }
+
+            if (tanggalSelesai) {
+                params.set("tanggal_test_selesai", tanggalSelesai);
+            }
+
+            const url = params.toString()
+                ? `/admin/jadwal-test/zoom/list?${params.toString()}`
+                : "/admin/jadwal-test/zoom/list";
+
+            const result = await fetchJson(url);
 
             if (result.success) {
                 setDataJadwal(Array.isArray(result.data) ? result.data : []);
@@ -181,13 +232,16 @@ export default function JadwalTestZoomPage({ actionSignals }) {
         }
     };
 
-    const refreshAllData = async () => {
-        await Promise.all([fetchData(), fetchPelamar()]);
+    const refreshAllData = async (
+        tanggalMulai = filterTanggalTestMulai,
+        tanggalSelesai = filterTanggalTestSelesai
+    ) => {
+        await Promise.all([fetchData(tanggalMulai, tanggalSelesai), fetchPelamar()]);
     };
 
     useEffect(() => {
-        refreshAllData();
-    }, []);
+        refreshAllData(filterTanggalTestMulai, filterTanggalTestSelesai);
+    }, [filterTanggalTestMulai, filterTanggalTestSelesai]);
 
     useEffect(() => {
         if (isFirstActionSignalRender.current) {
@@ -839,8 +893,70 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                     </div>
                 </div>
 
+                <div className="border-b border-slate-100 px-6 py-5">
+                    <div className="max-w-3xl">
+                        <p className="text-sm font-bold text-slate-500">
+                            Filter berdasarkan range tanggal test Zoom.
+                        </p>
+
+                        <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                            <div>
+                                <label className="mb-3 block text-sm font-black text-slate-700">
+                                    Tanggal Test Mulai
+                                </label>
+
+                                <input
+                                    type="date"
+                                    value={filterTanggalTestMulai}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFilterTanggalTestMulai(value);
+
+                                        if (
+                                            filterTanggalTestSelesai &&
+                                            value &&
+                                            filterTanggalTestSelesai < value
+                                        ) {
+                                            setFilterTanggalTestSelesai(value);
+                                        }
+                                    }}
+                                    max={filterTanggalTestSelesai || undefined}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-3 block text-sm font-black text-slate-700">
+                                    Tanggal Test Selesai
+                                </label>
+
+                                <input
+                                    type="date"
+                                    value={filterTanggalTestSelesai}
+                                    onChange={(e) => setFilterTanggalTestSelesai(e.target.value)}
+                                    min={filterTanggalTestMulai || undefined}
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                />
+                            </div>
+
+                            {hasFilterTanggalTest && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFilterTanggalTestMulai("");
+                                        setFilterTanggalTestSelesai("");
+                                    }}
+                                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <DataTable
-                    data={dataJadwal}
+                    data={filteredDataJadwal}
                     columns={columns}
                     searchPlaceholder="Cari tanggal test, sesi, jam, group, jumlah, status kehadiran..."
                     emptyTitle="Jadwal Zoom tidak ditemukan"
