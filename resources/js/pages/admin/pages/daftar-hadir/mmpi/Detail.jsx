@@ -104,30 +104,105 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
     };
 
     const applyUpdatedRow = (jadwalTestMmpiId, resultData, fallback = {}) => {
-        const hasilTest = resultData?.hasil_test ?? fallback.hasil_test ?? null;
-
         setItems((prev) =>
-            prev.map((row) =>
-                String(row.jadwal_test_mmpi_id) === String(jadwalTestMmpiId)
-                    ? {
-                          ...row,
-                          hasil_test: hasilTest,
-                          hasil_test_label:
-                              hasilTest === "lolos"
-                                  ? "Lolos"
-                                  : hasilTest === "gagal"
-                                  ? "Tidak Lolos"
-                                  : "Belum Ada",
-                          file_hasil_test_mmpi:
-                              resultData?.file_hasil_test_mmpi ??
-                              row.file_hasil_test_mmpi,
-                          file_hasil_test_mmpi_url:
-                              resultData?.file_hasil_test_mmpi_url ??
-                              row.file_hasil_test_mmpi_url,
-                      }
-                    : row
-            )
+            prev.map((row) => {
+                if (String(row.jadwal_test_mmpi_id) !== String(jadwalTestMmpiId)) {
+                    return row;
+                }
+
+                const statusKehadiran =
+                    resultData?.status_kehadiran ??
+                    fallback.status_kehadiran ??
+                    row.status_kehadiran ??
+                    null;
+
+                const hasilTest =
+                    resultData?.hasil_test ??
+                    fallback.hasil_test ??
+                    row.hasil_test ??
+                    null;
+
+                const normalizedHasilTest =
+                    statusKehadiran === "hadir" ? hasilTest : null;
+
+                return {
+                    ...row,
+                    status_kehadiran: statusKehadiran,
+                    status_kehadiran_label:
+                        statusKehadiran === "hadir"
+                            ? "Hadir"
+                            : statusKehadiran === "tidak_hadir"
+                            ? "Tidak Hadir"
+                            : "Belum Ada",
+                    hasil_test: normalizedHasilTest,
+                    hasil_test_label:
+                        normalizedHasilTest === "lolos"
+                            ? "Lolos"
+                            : normalizedHasilTest === "gagal"
+                            ? "Tidak Lolos"
+                            : "Belum Ada",
+                    file_hasil_test_mmpi:
+                        resultData?.file_hasil_test_mmpi ??
+                        (statusKehadiran === "hadir" ? row.file_hasil_test_mmpi : null),
+                    file_hasil_test_mmpi_url:
+                        resultData?.file_hasil_test_mmpi_url ??
+                        (statusKehadiran === "hadir" ? row.file_hasil_test_mmpi_url : null),
+                };
+            })
         );
+    };
+
+    const submitKehadiran = async (item, statusKehadiran) => {
+        const jadwalTestMmpiId = item?.jadwal_test_mmpi_id;
+
+        if (!jadwalTestMmpiId) {
+            alert("ID jadwal test MMPI tidak ditemukan.");
+            return;
+        }
+
+        if (!statusKehadiran) {
+            alert("Silakan pilih status kehadiran terlebih dahulu.");
+            return;
+        }
+
+        const key = `${jadwalTestMmpiId}:kehadiran`;
+        setSavingKey(key);
+
+        try {
+            const response = await fetch(
+                `/admin/daftar-hadir/mmpi/${jadwalTestMmpiId}/kehadiran`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        status_kehadiran: statusKehadiran,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                alert(result.message || "Gagal memperbarui status kehadiran MMPI.");
+                return;
+            }
+
+            applyUpdatedRow(jadwalTestMmpiId, result.data, {
+                status_kehadiran: statusKehadiran,
+            });
+
+            fetchData();
+        } catch (error) {
+            console.error("Gagal memperbarui status kehadiran MMPI:", error);
+            alert("Terjadi kesalahan saat memperbarui status kehadiran MMPI.");
+        } finally {
+            setSavingKey("");
+        }
     };
 
     const submitHasilTest = async ({
@@ -395,6 +470,8 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                 filteredItems.map((item, index) => {
                                     const hasilSaving =
                                         savingKey === `${item.jadwal_test_mmpi_id}:hasil`;
+                                    const kehadiranSaving =
+                                        savingKey === `${item.jadwal_test_mmpi_id}:kehadiran`;
                                     const uploadSaving =
                                         uploadingKey === `${item.jadwal_test_mmpi_id}:upload`;
                                     const hadir = item.status_kehadiran === "hadir";
@@ -447,7 +524,30 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                             </td>
 
                                             <td className="px-6 py-5">
-                                                {renderKehadiranBadge(item)}
+                                                <div className="min-w-[170px] space-y-2">
+                                                    <select
+                                                        value={item.status_kehadiran || ""}
+                                                        disabled={kehadiranSaving || hasilSaving || uploadSaving}
+                                                        onChange={(event) =>
+                                                            submitKehadiran(item, event.target.value)
+                                                        }
+                                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                                                    >
+                                                        <option value="">Belum Ada</option>
+                                                        <option value="hadir">Hadir</option>
+                                                        <option value="tidak_hadir">Tidak Hadir</option>
+                                                    </select>
+
+                                                    <div>
+                                                        {renderKehadiranBadge(item)}
+                                                    </div>
+
+                                                    {kehadiranSaving && (
+                                                        <p className="text-xs font-black text-teal-700">
+                                                            Menyimpan...
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             <td className="px-6 py-5">

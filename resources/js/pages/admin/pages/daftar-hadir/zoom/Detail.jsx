@@ -17,6 +17,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
     const [uploadingId, setUploadingId] = useState(null);
     const [search, setSearch] = useState("");
     const [selectedFiles, setSelectedFiles] = useState({});
+    const [testInputs, setTestInputs] = useState({});
 
     const getCsrfToken = () => {
         return document
@@ -52,7 +53,28 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 return;
             }
 
-            setDataPeserta(Array.isArray(result.data) ? result.data : []);
+            const rows = Array.isArray(result.data) ? result.data : [];
+
+            setDataPeserta(rows);
+            setTestInputs((prev) => {
+                const next = { ...prev };
+
+                rows.forEach((row) => {
+                    const rowId = getRowId(row);
+
+                    if (!rowId) {
+                        return;
+                    }
+
+                    next[rowId] = {
+                        hasil_test_iq: row.hasil_test_iq || "",
+                        hasil_test_disc: row.hasil_test_disc || "",
+                        hasil_test_eysenck: row.hasil_test_eysenck || "",
+                    };
+                });
+
+                return next;
+            });
             setSummary({
                 total: Number(result.summary?.total || 0),
                 hadir: Number(result.summary?.hadir || 0),
@@ -85,7 +107,10 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 String(item.email || "").toLowerCase().includes(keyword) ||
                 String(item.no_hp || "").toLowerCase().includes(keyword) ||
                 String(item.kehadiran_label || "").toLowerCase().includes(keyword) ||
-                String(item.hasil_test_label || "").toLowerCase().includes(keyword)
+                String(item.hasil_test_label || "").toLowerCase().includes(keyword) ||
+                String(item.hasil_test_iq || "").toLowerCase().includes(keyword) ||
+                String(item.hasil_test_disc || "").toLowerCase().includes(keyword) ||
+                String(item.hasil_test_eysenck || "").toLowerCase().includes(keyword)
             );
         });
     }, [dataPeserta, search]);
@@ -121,6 +146,18 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                   : hasilTest === "gagal"
                                   ? "Gagal"
                                   : "Belum Ada",
+                          hasil_test_iq:
+                              resultData?.hasil_test_iq ??
+                              fallback.hasil_test_iq ??
+                              row.hasil_test_iq,
+                          hasil_test_disc:
+                              resultData?.hasil_test_disc ??
+                              fallback.hasil_test_disc ??
+                              row.hasil_test_disc,
+                          hasil_test_eysenck:
+                              resultData?.hasil_test_eysenck ??
+                              fallback.hasil_test_eysenck ??
+                              row.hasil_test_eysenck,
                           file_hasil_test_zoom:
                               resultData?.file_hasil_test_zoom ??
                               row.file_hasil_test_zoom,
@@ -138,6 +175,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
         hasilTest,
         file = null,
         mode = "hasil",
+        psikotesData = null,
     }) => {
         const jadwalTestZoomId = getRowId(item);
 
@@ -146,8 +184,20 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
             return;
         }
 
-        if (!hasilTest) {
+        const hasPsikotesData = Boolean(
+            psikotesData &&
+                (String(psikotesData.hasil_test_iq || "").trim() !== "" ||
+                    String(psikotesData.hasil_test_disc || "").trim() !== "" ||
+                    String(psikotesData.hasil_test_eysenck || "").trim() !== "")
+        );
+
+        if (mode === "hasil" && !hasilTest) {
             alert("Silakan pilih hasil test terlebih dahulu.");
+            return;
+        }
+
+        if (mode === "psikotes" && !hasPsikotesData) {
+            alert("Silakan isi minimal salah satu hasil IQ, DISC, atau Eysenck terlebih dahulu.");
             return;
         }
 
@@ -165,7 +215,16 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
         try {
             const formData = new FormData();
             formData.append("_method", "PUT");
-            formData.append("hasil_test", hasilTest);
+
+            if (hasilTest) {
+                formData.append("hasil_test", hasilTest);
+            }
+
+            if (psikotesData) {
+                formData.append("hasil_test_iq", psikotesData.hasil_test_iq || "");
+                formData.append("hasil_test_disc", psikotesData.hasil_test_disc || "");
+                formData.append("hasil_test_eysenck", psikotesData.hasil_test_eysenck || "");
+            }
 
             if (file) {
                 formData.append("file_hasil_test_zoom", file);
@@ -193,7 +252,22 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
 
             applyUpdatedRow(jadwalTestZoomId, result.data, {
                 hasil_test: hasilTest,
+                ...(psikotesData || {}),
             });
+
+            if (psikotesData) {
+                setTestInputs((prev) => ({
+                    ...prev,
+                    [jadwalTestZoomId]: {
+                        hasil_test_iq:
+                            result.data?.hasil_test_iq ?? psikotesData.hasil_test_iq ?? "",
+                        hasil_test_disc:
+                            result.data?.hasil_test_disc ?? psikotesData.hasil_test_disc ?? "",
+                        hasil_test_eysenck:
+                            result.data?.hasil_test_eysenck ?? psikotesData.hasil_test_eysenck ?? "",
+                    },
+                }));
+            }
 
             if (mode === "upload") {
                 setSelectedFiles((prev) => ({
@@ -234,6 +308,56 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
             hasilTest: item.hasil_test,
             file: selectedFile,
             mode: "upload",
+        });
+    };
+
+
+    const handlePsikotesChange = (item, field, value) => {
+        const rowId = getRowId(item);
+
+        if (!rowId) {
+            alert("ID jadwal test Zoom tidak ditemukan.");
+            return;
+        }
+
+        setTestInputs((prev) => ({
+            ...prev,
+            [rowId]: {
+                hasil_test_iq:
+                    field === "hasil_test_iq"
+                        ? value
+                        : prev[rowId]?.hasil_test_iq ?? item.hasil_test_iq ?? "",
+                hasil_test_disc:
+                    field === "hasil_test_disc"
+                        ? value
+                        : prev[rowId]?.hasil_test_disc ?? item.hasil_test_disc ?? "",
+                hasil_test_eysenck:
+                    field === "hasil_test_eysenck"
+                        ? value
+                        : prev[rowId]?.hasil_test_eysenck ?? item.hasil_test_eysenck ?? "",
+            },
+        }));
+    };
+
+    const handleSavePsikotes = (item) => {
+        const rowId = getRowId(item);
+
+        if (!rowId) {
+            alert("ID jadwal test Zoom tidak ditemukan.");
+            return;
+        }
+
+        const psikotesData = testInputs[rowId] || {
+            hasil_test_iq: item.hasil_test_iq || "",
+            hasil_test_disc: item.hasil_test_disc || "",
+            hasil_test_eysenck: item.hasil_test_eysenck || "",
+        };
+
+        submitHasilTest({
+            item,
+            hasilTest: item.hasil_test || "",
+            mode: "psikotes",
+            psikotesData,
         });
     };
 
@@ -339,6 +463,52 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
         );
     };
 
+
+    const renderPsikotesInputs = (item, isRowSaving) => {
+        if (!isHadir(item)) {
+            return <Badge type="neutral">Tidak Ada Action</Badge>;
+        }
+
+        const rowId = getRowId(item);
+        const values = testInputs[rowId] || {
+            hasil_test_iq: item.hasil_test_iq || "",
+            hasil_test_disc: item.hasil_test_disc || "",
+            hasil_test_eysenck: item.hasil_test_eysenck || "",
+        };
+
+        return (
+            <div className="min-w-[260px] space-y-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <InputMini
+                        label="IQ"
+                        value={values.hasil_test_iq}
+                        disabled={isRowSaving}
+                        placeholder="Contoh: 110"
+                        onChange={(value) => handlePsikotesChange(item, "hasil_test_iq", value)}
+                    />
+                    <InputMini
+                        label="DISC"
+                        value={values.hasil_test_disc}
+                        disabled={isRowSaving}
+                        placeholder="Contoh: D/I/S/C"
+                        onChange={(value) => handlePsikotesChange(item, "hasil_test_disc", value)}
+                    />
+                    <InputMini
+                        label="Eysenck"
+                        value={values.hasil_test_eysenck}
+                        disabled={isRowSaving}
+                        placeholder="Contoh: Stabil"
+                        onChange={(value) => handlePsikotesChange(item, "hasil_test_eysenck", value)}
+                    />
+                </div>
+
+                {isRowSaving && (
+                    <p className="text-xs font-black text-teal-700">Menyimpan...</p>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
@@ -361,7 +531,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                         </h2>
 
                         <p className="mt-1 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                            Kehadiran Test Zoom, hasil test, dan dokumen hasil test.
+                            Kehadiran Test Zoom, hasil akhir, IQ, DISC, Eysenck, dan dokumen hasil test.
                         </p>
                     </div>
 
@@ -437,7 +607,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                             {tableLoading ? (
                                 <tr>
                                     <td
-                                        colSpan="8"
+                                        colSpan="9"
                                         className="px-6 py-16 text-center text-sm font-black text-slate-500"
                                     >
                                         Memuat data...
@@ -493,6 +663,10 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                             </td>
 
                                             <td className="px-6 py-5">
+                                                {renderPsikotesInputs(item, isRowSaving)}
+                                            </td>
+
+                                            <td className="px-6 py-5">
                                                 <div className="min-w-[240px] space-y-2">
                                                     {item.file_hasil_test_zoom_url ? (
                                                         <a
@@ -535,20 +709,35 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                             </td>
 
                                             <td className="px-6 py-5 text-right">
-                                                {isHadir(item) && selectedFile ? (
-                                                    <button
-                                                        type="button"
-                                                        disabled={isRowSaving || isRowUploading}
-                                                        onClick={() => handleUploadFile(item)}
-                                                        className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                                    >
-                                                        {isRowUploading ? "Upload..." : "Upload File"}
-                                                    </button>
+                                                {isHadir(item) ? (
+                                                    <div className="flex min-w-[170px] flex-col items-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={isRowSaving || isRowUploading}
+                                                            onClick={() => handleSavePsikotes(item)}
+                                                            className="rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        >
+                                                            {isRowSaving ? "Menyimpan..." : "Simpan IQ/DISC/Eysenck"}
+                                                        </button>
+
+                                                        {selectedFile ? (
+                                                            <button
+                                                                type="button"
+                                                                disabled={isRowSaving || isRowUploading}
+                                                                onClick={() => handleUploadFile(item)}
+                                                                className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            >
+                                                                {isRowUploading ? "Upload..." : "Upload File"}
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs font-black text-slate-400">
+                                                                Pilih file untuk upload
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs font-black text-slate-400">
-                                                        {isHadir(item)
-                                                            ? "Pilih file untuk upload"
-                                                            : "Tidak ada action"}
+                                                        Tidak ada action
                                                     </span>
                                                 )}
                                             </td>
@@ -557,7 +746,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                 })
                             ) : (
                                 <tr>
-                                    <td colSpan="8" className="px-6 py-16">
+                                    <td colSpan="9" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ◎
@@ -579,6 +768,25 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 </div>
             </div>
         </div>
+    );
+}
+
+
+function InputMini({ label, value, disabled = false, placeholder = "", onChange }) {
+    return (
+        <label className="block">
+            <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">
+                {label}
+            </span>
+            <input
+                type="text"
+                value={value || ""}
+                disabled={disabled}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+            />
+        </label>
     );
 }
 

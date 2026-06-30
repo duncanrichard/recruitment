@@ -123,181 +123,101 @@ export default function StepRiwayatKeluarga({
                 />
             </Card>
 
-            <Card title="Orang Tua Kandung">
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Nama Ayah Kandung"
-                        name="nama_ayah_kandung"
-                        value={form.nama_ayah_kandung}
-                        onChange={handleChange}
-                        error={errors.nama_ayah_kandung}
-                    />
+            <Card title="Data Orang Tua">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                        <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-sm font-black text-white">
+                                A
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800">
+                                    Data Ayah
+                                </h4>
+                                <p className="text-xs font-medium text-slate-500">
+                                    Isi nama, nomor WhatsApp, dan alamat ayah.
+                                </p>
+                            </div>
+                        </div>
 
-                    <Input
-                        label="Pekerjaan Ayah Kandung"
-                        name="pekerjaan_ayah_kandung"
-                        value={form.pekerjaan_ayah_kandung}
-                        onChange={handleChange}
-                        error={errors.pekerjaan_ayah_kandung}
-                    />
-                </div>
+                        <div className="space-y-5">
+                            <Input
+                                label="Nama Ayah"
+                                name="nama_ayah"
+                                value={form.nama_ayah ?? form.nama_ayah_kandung ?? ""}
+                                onChange={handleChange}
+                                placeholder="Masukkan nama ayah"
+                                error={errors.nama_ayah || errors.nama_ayah_kandung}
+                            />
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Nama Ibu Kandung"
-                        name="nama_ibu_kandung"
-                        value={form.nama_ibu_kandung}
-                        onChange={handleChange}
-                        error={errors.nama_ibu_kandung}
-                    />
+                            <Input
+                                label="No WA Ayah"
+                                type="tel"
+                                name="no_hp_ayah"
+                                value={form.no_hp_ayah ?? form.no_wa_ayah ?? ""}
+                                onChange={handleChange}
+                                placeholder="Contoh: 08xxxxxxxxxx"
+                                error={errors.no_hp_ayah || errors.no_wa_ayah}
+                            />
 
-                    <Input
-                        label="Pekerjaan Ibu Kandung"
-                        name="pekerjaan_ibu_kandung"
-                        value={form.pekerjaan_ibu_kandung}
-                        onChange={handleChange}
-                        error={errors.pekerjaan_ibu_kandung}
-                    />
-                </div>
-            </Card>
+                            <Textarea
+                                label="Alamat Ayah"
+                                name="alamat_ayah"
+                                value={form.alamat_ayah ?? ""}
+                                onChange={handleChange}
+                                placeholder="Masukkan alamat ayah"
+                                error={errors.alamat_ayah}
+                                rows={4}
+                            />
+                        </div>
+                    </div>
 
-            <Card title="Data Ayah">
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Nama Ayah"
-                        name="nama_ayah"
-                        value={form.nama_ayah}
-                        onChange={handleChange}
-                        error={errors.nama_ayah}
-                    />
+                    <div className="rounded-2xl border border-pink-100 bg-pink-50/70 p-4">
+                        <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-pink-600 text-sm font-black text-white">
+                                I
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-800">
+                                    Data Ibu
+                                </h4>
+                                <p className="text-xs font-medium text-slate-500">
+                                    Isi nama, nomor WhatsApp, dan alamat ibu.
+                                </p>
+                            </div>
+                        </div>
 
-                    <Input
-                        label="NIK Ayah"
-                        name="nik_ayah"
-                        value={form.nik_ayah}
-                        onChange={handleChange}
-                        error={errors.nik_ayah}
-                    />
-                </div>
+                        <div className="space-y-5">
+                            <Input
+                                label="Nama Ibu"
+                                name="nama_ibu"
+                                value={form.nama_ibu ?? form.nama_ibu_kandung ?? ""}
+                                onChange={handleChange}
+                                placeholder="Masukkan nama ibu"
+                                error={errors.nama_ibu || errors.nama_ibu_kandung}
+                            />
 
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Tempat Lahir Ayah"
-                        name="tempat_lahir_ayah"
-                        value={form.tempat_lahir_ayah}
-                        onChange={handleChange}
-                        error={errors.tempat_lahir_ayah}
-                    />
+                            <Input
+                                label="No WA Ibu"
+                                type="tel"
+                                name="no_hp_ibu"
+                                value={form.no_hp_ibu ?? form.no_wa_ibu ?? ""}
+                                onChange={handleChange}
+                                placeholder="Contoh: 08xxxxxxxxxx"
+                                error={errors.no_hp_ibu || errors.no_wa_ibu}
+                            />
 
-                    <Input
-                        label="Tanggal Lahir Ayah"
-                        type="date"
-                        name="tanggal_lahir_ayah"
-                        value={form.tanggal_lahir_ayah}
-                        onChange={handleChange}
-                        error={errors.tanggal_lahir_ayah}
-                        onlyPicker
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Pekerjaan Ayah"
-                        name="pekerjaan_ayah"
-                        value={form.pekerjaan_ayah}
-                        onChange={handleChange}
-                        error={errors.pekerjaan_ayah}
-                    />
-
-                    <Input
-                        label="No HP Ayah"
-                        name="no_hp_ayah"
-                        value={form.no_hp_ayah}
-                        onChange={handleChange}
-                        placeholder="Contoh: 08xxxxxxxxxx"
-                        error={errors.no_hp_ayah}
-                    />
-                </div>
-
-                <div className="mt-5">
-                    <Textarea
-                        label="Alamat Ayah"
-                        name="alamat_ayah"
-                        value={form.alamat_ayah}
-                        onChange={handleChange}
-                        placeholder="Masukkan alamat ayah"
-                        error={errors.alamat_ayah}
-                    />
-                </div>
-            </Card>
-
-            <Card title="Data Ibu">
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Nama Ibu"
-                        name="nama_ibu"
-                        value={form.nama_ibu}
-                        onChange={handleChange}
-                        error={errors.nama_ibu}
-                    />
-
-                    <Input
-                        label="NIK Ibu"
-                        name="nik_ibu"
-                        value={form.nik_ibu}
-                        onChange={handleChange}
-                        error={errors.nik_ibu}
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Tempat Lahir Ibu"
-                        name="tempat_lahir_ibu"
-                        value={form.tempat_lahir_ibu}
-                        onChange={handleChange}
-                        error={errors.tempat_lahir_ibu}
-                    />
-
-                    <Input
-                        label="Tanggal Lahir Ibu"
-                        type="date"
-                        name="tanggal_lahir_ibu"
-                        value={form.tanggal_lahir_ibu}
-                        onChange={handleChange}
-                        error={errors.tanggal_lahir_ibu}
-                        onlyPicker
-                    />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <Input
-                        label="Pekerjaan Ibu"
-                        name="pekerjaan_ibu"
-                        value={form.pekerjaan_ibu}
-                        onChange={handleChange}
-                        error={errors.pekerjaan_ibu}
-                    />
-
-                    <Input
-                        label="No HP Ibu"
-                        name="no_hp_ibu"
-                        value={form.no_hp_ibu}
-                        onChange={handleChange}
-                        placeholder="Contoh: 08xxxxxxxxxx"
-                        error={errors.no_hp_ibu}
-                    />
-                </div>
-
-                <div className="mt-5">
-                    <Textarea
-                        label="Alamat Ibu"
-                        name="alamat_ibu"
-                        value={form.alamat_ibu}
-                        onChange={handleChange}
-                        placeholder="Masukkan alamat ibu"
-                        error={errors.alamat_ibu}
-                    />
+                            <Textarea
+                                label="Alamat Ibu"
+                                name="alamat_ibu"
+                                value={form.alamat_ibu ?? ""}
+                                onChange={handleChange}
+                                placeholder="Masukkan alamat ibu"
+                                error={errors.alamat_ibu}
+                                rows={4}
+                            />
+                        </div>
+                    </div>
                 </div>
             </Card>
 
@@ -368,11 +288,15 @@ export default function StepRiwayatKeluarga({
                 </div>
             </Card>
 
-            <Card title="Kontak Darurat">
+            <Card title={<span>Kontak Darurat <span className="text-red-500">*</span></span>}>
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-slate-500">
-                        Tambahkan kontak darurat yang bisa dihubungi.
-                    </p>
+                    <div>
+                        <p className="text-sm text-slate-500">
+                            Tambahkan kontak darurat yang bisa dihubungi.
+                            Minimal 1 kontak darurat wajib diisi.
+                        </p>
+                        <ErrorMessage message={getError(errors, "kontak_darurat")} />
+                    </div>
 
                     <button
                         type="button"
@@ -420,12 +344,13 @@ export default function StepRiwayatKeluarga({
                                         )
                                     }
                                     placeholder="Contoh: Budi Santoso"
+                                    required
                                     error={
-                                        index === 0
-                                            ? errors.kontak_darurat_nama
-                                            : errors[
-                                                  `kontak_darurat_${index}_nama`
-                                              ]
+                                        getError(errors, `kontak_darurat.${index}.nama`) ||
+                                        getError(errors, `kontak_darurat_${index}_nama`) ||
+                                        (index === 0
+                                            ? getError(errors, "kontak_darurat_nama")
+                                            : null)
                                     }
                                 />
 
@@ -453,12 +378,13 @@ export default function StepRiwayatKeluarga({
                                         "Tetangga",
                                         "Lainnya",
                                     ]}
+                                    required
                                     error={
-                                        index === 0
-                                            ? errors.kontak_darurat_status
-                                            : errors[
-                                                  `kontak_darurat_${index}_status`
-                                              ]
+                                        getError(errors, `kontak_darurat.${index}.status`) ||
+                                        getError(errors, `kontak_darurat_${index}_status`) ||
+                                        (index === 0
+                                            ? getError(errors, "kontak_darurat_status")
+                                            : null)
                                     }
                                 />
 
@@ -474,12 +400,13 @@ export default function StepRiwayatKeluarga({
                                         )
                                     }
                                     placeholder="Contoh: 08xxxxxxxxxx"
+                                    required
                                     error={
-                                        index === 0
-                                            ? errors.kontak_darurat_nomor
-                                            : errors[
-                                                  `kontak_darurat_${index}_nomor`
-                                              ]
+                                        getError(errors, `kontak_darurat.${index}.nomor`) ||
+                                        getError(errors, `kontak_darurat_${index}_nomor`) ||
+                                        (index === 0
+                                            ? getError(errors, "kontak_darurat_nomor")
+                                            : null)
                                     }
                                 />
                             </div>
@@ -743,10 +670,11 @@ function Card({ title, children }) {
     );
 }
 
-function FieldLabel({ label }) {
+function FieldLabel({ label, required = false }) {
     return (
         <label className="mb-2 block text-sm font-semibold text-slate-700">
             {label}
+            {required && <span className="ml-1 text-red-500">*</span>}
         </label>
     );
 }
@@ -755,6 +683,18 @@ function ErrorMessage({ message }) {
     if (!message) return null;
 
     return <p className="mt-1 text-xs font-semibold text-red-500">{message}</p>;
+}
+
+function getError(errors, key) {
+    if (!errors || !key) return null;
+
+    const value = errors[key];
+
+    if (Array.isArray(value)) {
+        return value[0] || null;
+    }
+
+    return value || null;
 }
 
 function fieldClass(error, type, disabled = false) {
@@ -777,6 +717,7 @@ function Input({
     onChange,
     placeholder,
     error,
+    required = false,
     onlyPicker = false,
     disabled = false,
 }) {
@@ -820,7 +761,7 @@ function Input({
 
     return (
         <div>
-            <FieldLabel label={label} />
+            <FieldLabel label={label} required={required} />
 
             <div className="relative">
                 <input
@@ -838,6 +779,8 @@ function Input({
                     }
                     className={fieldClass(error, type, disabled)}
                     disabled={disabled}
+                    required={required}
+                    aria-required={required}
                     autoComplete="off"
                 />
 
@@ -865,17 +808,20 @@ function Select({
     onChange,
     options = [],
     error,
+    required = false,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} />
+            <FieldLabel label={label} required={required} />
 
             <select
                 name={name}
                 value={value ?? ""}
                 onChange={onChange}
                 disabled={disabled}
+                required={required}
+                aria-required={required}
                 className={fieldClass(error, "select", disabled)}
             >
                 <option value="">Pilih {label.toLowerCase()}</option>
@@ -898,11 +844,12 @@ function Textarea({
     onChange,
     placeholder,
     error,
+    required = false,
     disabled = false,
 }) {
     return (
         <div>
-            <FieldLabel label={label} />
+            <FieldLabel label={label} required={required} />
 
             <textarea
                 name={name}
@@ -911,6 +858,8 @@ function Textarea({
                 rows={3}
                 placeholder={placeholder || `Masukkan ${label.toLowerCase()}`}
                 disabled={disabled}
+                required={required}
+                aria-required={required}
                 className={`${fieldClass(error, "textarea", disabled)} resize-none`}
             />
 

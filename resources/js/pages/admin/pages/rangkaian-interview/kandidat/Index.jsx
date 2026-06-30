@@ -29,6 +29,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
 
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
+    const [reminderLoadingId, setReminderLoadingId] = useState(null);
     const [editId, setEditId] = useState(null);
 
     const [search, setSearch] = useState("");
@@ -584,6 +585,75 @@ export default function KandidatInterviewPage({ actionSignals }) {
         );
     };
 
+    const handleKirimReminderKandidat = async (jadwalInterviewId) => {
+        if (!jadwalInterviewId) {
+            alert("ID jadwal interview tidak ditemukan.");
+            return;
+        }
+
+        const confirmSend = confirm(
+            "Kirim reminder interview ke semua kandidat pada jadwal ini?"
+        );
+
+        if (!confirmSend) return;
+
+        setReminderLoadingId(jadwalInterviewId);
+
+        try {
+            const response = await fetch(
+                `/admin/rangkaian-interview/kandidat/${jadwalInterviewId}/reminder-kandidat`,
+                {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                    body: JSON.stringify({}),
+                }
+            );
+
+            const result = await response.json();
+            const waResult = result.wa_kandidat || result.data || {};
+            const totalDikirim = Number(waResult.total_dikirim || 0);
+            const totalDilewati = Number(waResult.total_dilewati || 0);
+            const totalGagalProvider = Number(waResult.total_gagal_provider || 0);
+            const firstSkippedReason = Array.isArray(waResult.skipped) && waResult.skipped.length > 0
+                ? waResult.skipped[0]?.reason
+                : null;
+            const firstProviderMessage = Array.isArray(waResult.responses) && waResult.responses.length > 0
+                ? waResult.responses[0]?.message
+                : null;
+
+            console.log("REMINDER INTERVIEW KANDIDAT RESULT:", result);
+
+            if (!response.ok || !result.success) {
+                alert(
+                    `${result.message || "Reminder interview gagal dikirim."}\n\n` +
+                        `Terkirim: ${totalDikirim}\n` +
+                        `Dilewati: ${totalDilewati}\n` +
+                        `Gagal Provider: ${totalGagalProvider}\n` +
+                        `${firstSkippedReason ? `\nAlasan dilewati: ${firstSkippedReason}` : ""}` +
+                        `${firstProviderMessage ? `\nResponse provider: ${firstProviderMessage}` : ""}`
+                );
+                return;
+            }
+
+            alert(
+                `${result.message || "Reminder interview selesai."}\n\n` +
+                    `Terkirim: ${totalDikirim}\n` +
+                    `Dilewati: ${totalDilewati}\n` +
+                    `Gagal Provider: ${totalGagalProvider}`
+            );
+        } catch (error) {
+            console.error("Gagal mengirim reminder interview:", error);
+            alert("Terjadi kesalahan saat mengirim reminder interview.");
+        } finally {
+            setReminderLoadingId(null);
+        }
+    };
+
     const handleDeleteGroup = async (id) => {
         if (!confirm("Yakin ingin menghapus semua kandidat dari jadwal ini?")) return;
 
@@ -824,6 +894,17 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                 className="whitespace-nowrap rounded-2xl bg-slate-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-slate-700"
                             >
                                 Edit Tanggal
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={String(reminderLoadingId) === String(detailData.jadwal_interview_id)}
+                                onClick={() => handleKirimReminderKandidat(detailData.jadwal_interview_id)}
+                                className="whitespace-nowrap rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {String(reminderLoadingId) === String(detailData.jadwal_interview_id)
+                                    ? "Mengirim..."
+                                    : "Kirim Reminder Kandidat"}
                             </button>
                         </div>
                     </div>
@@ -1067,6 +1148,17 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                                     className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
                                                 >
                                                     Edit Tanggal
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    disabled={String(reminderLoadingId) === String(item.jadwal_interview_id)}
+                                                    onClick={() => handleKirimReminderKandidat(item.jadwal_interview_id)}
+                                                    className="whitespace-nowrap rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {String(reminderLoadingId) === String(item.jadwal_interview_id)
+                                                        ? "Mengirim..."
+                                                        : "Reminder"}
                                                 </button>
 
                                                 <button

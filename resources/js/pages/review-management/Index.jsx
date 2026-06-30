@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+const STATUS_OPTIONS = ["Diterima", "Gagal"];
+const SOURCE_TABS = [
+    { key: "semua", label: "Semua" },
+    { key: "test_zoom", label: "Hasil Test Zoom" },
+    { key: "test_mmpi", label: "Hasil Test MMPI" },
+    { key: "interview", label: "Interview" },
+];
+
 export default function ReviewManagementPage() {
     const getTodayDate = () => {
         const date = new Date();
@@ -20,6 +28,7 @@ export default function ReviewManagementPage() {
     const [search, setSearch] = useState("");
     const [entriesPerPage, setEntriesPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
+    const [activeSource, setActiveSource] = useState("semua");
 
     const [tanggalMulai, setTanggalMulai] = useState(today);
     const [tanggalSelesai, setTanggalSelesai] = useState(today);
@@ -31,7 +40,10 @@ export default function ReviewManagementPage() {
     const [selectedItem, setSelectedItem] = useState(null);
 
     const [form, setForm] = useState({
+        review_source: "interview",
         hasil_interview_id: "",
+        hasil_test_zoom_id: "",
+        hasil_test_mmpi_id: "",
         review_management: "",
         status: "",
     });
@@ -97,7 +109,7 @@ export default function ReviewManagementPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, entriesPerPage, dataReview]);
+    }, [search, entriesPerPage, dataReview, activeSource]);
 
     const handleFilterTanggal = (event) => {
         event.preventDefault();
@@ -126,16 +138,47 @@ export default function ReviewManagementPage() {
         setTanggalMulai(today);
         setTanggalSelesai(today);
         setSearch("");
+        setActiveSource("semua");
         setCurrentPage(1);
         setAppliedFilter(defaultFilter);
         fetchData(defaultFilter);
     };
 
-    const openModal = (item) => {
-        setSelectedItem(item);
+    const getReviewSource = (item) => {
+        return item?.review_source || item?.sumber_review || "interview";
+    };
 
+    const getSourceLabel = (item) => {
+        const source = getReviewSource(item);
+
+        if (source === "test_zoom") return "Hasil Test Zoom";
+        if (source === "test_mmpi") return "Hasil Test MMPI";
+        return "Interview";
+    };
+
+    const getSourceId = (item) => {
+        const source = getReviewSource(item);
+
+        if (source === "test_zoom") {
+            return item?.hasil_test_zoom_id || item?.source_id || item?.id || "";
+        }
+
+        if (source === "test_mmpi") {
+            return item?.hasil_test_mmpi_id || item?.source_id || item?.id || "";
+        }
+
+        return item?.hasil_interview_id || item?.source_id || item?.id || "";
+    };
+
+    const openModal = (item) => {
+        const source = getReviewSource(item);
+
+        setSelectedItem(item);
         setForm({
-            hasil_interview_id: item.hasil_interview_id || item.id || "",
+            review_source: source,
+            hasil_interview_id: source === "interview" ? getSourceId(item) : "",
+            hasil_test_zoom_id: source === "test_zoom" ? getSourceId(item) : "",
+            hasil_test_mmpi_id: source === "test_mmpi" ? getSourceId(item) : "",
             review_management: item.review_management || "",
             status: item.status_review || "",
         });
@@ -148,7 +191,10 @@ export default function ReviewManagementPage() {
         setSelectedItem(null);
 
         setForm({
+            review_source: "interview",
             hasil_interview_id: "",
+            hasil_test_zoom_id: "",
+            hasil_test_mmpi_id: "",
             review_management: "",
             status: "",
         });
@@ -157,42 +203,46 @@ export default function ReviewManagementPage() {
     const filteredData = useMemo(() => {
         const keyword = search.toLowerCase().trim();
 
-        if (!keyword) {
-            return dataReview;
-        }
-
         return dataReview.filter((item) => {
-            const namaKandidat = String(item.nama_kandidat || "").toLowerCase();
-            const emailKandidat = String(item.email_kandidat || "").toLowerCase();
-            const noWaKandidat = String(item.no_wa_kandidat || "").toLowerCase();
-            const posisiLabel = String(item.posisi_label || "").toLowerCase();
-            const perusahaanLabel = String(item.perusahaan_label || "").toLowerCase();
-            const hasilInterview = String(item.hasil_interview || "").toLowerCase();
-            const statusKehadiran = String(item.status_kehadiran || "").toLowerCase();
-            const catatan = String(item.catatan || "").toLowerCase();
-            const reviewManagement = String(item.review_management || "").toLowerCase();
-            const statusReview = String(item.status_review || "").toLowerCase();
-            const judulInterview = String(item.judul_interview || "").toLowerCase();
-            const tanggalInterview = String(item.tanggal_interview || "").toLowerCase();
-            const tanggalInterviewFormat = String(item.tanggal_interview_format || "").toLowerCase();
+            const source = getReviewSource(item);
 
-            return (
-                namaKandidat.includes(keyword) ||
-                emailKandidat.includes(keyword) ||
-                noWaKandidat.includes(keyword) ||
-                posisiLabel.includes(keyword) ||
-                perusahaanLabel.includes(keyword) ||
-                hasilInterview.includes(keyword) ||
-                statusKehadiran.includes(keyword) ||
-                catatan.includes(keyword) ||
-                reviewManagement.includes(keyword) ||
-                statusReview.includes(keyword) ||
-                judulInterview.includes(keyword) ||
-                tanggalInterview.includes(keyword) ||
-                tanggalInterviewFormat.includes(keyword)
-            );
+            if (activeSource !== "semua" && source !== activeSource) {
+                return false;
+            }
+
+            if (!keyword) {
+                return true;
+            }
+
+            const searchable = [
+                item.nama_kandidat,
+                item.email_kandidat,
+                item.no_wa_kandidat,
+                item.posisi_label,
+                item.perusahaan_label,
+                item.hasil_interview,
+                item.hasil_test,
+                item.hasil_label,
+                item.hasil_test_iq,
+                item.hasil_test_disc,
+                item.hasil_test_eysenck,
+                item.status_kehadiran,
+                item.catatan,
+                item.review_management,
+                item.status_review,
+                item.judul_interview,
+                item.judul_tahapan,
+                item.tanggal_interview,
+                item.tanggal_interview_format,
+                item.tanggal_tahapan_format,
+                getSourceLabel(item),
+            ]
+                .map((value) => String(value || "").toLowerCase())
+                .join(" ");
+
+            return searchable.includes(keyword);
         });
-    }, [dataReview, search]);
+    }, [dataReview, search, activeSource]);
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length / entriesPerPage));
 
@@ -212,11 +262,7 @@ export default function ReviewManagementPage() {
         const pages = [];
         const maxVisiblePages = 5;
 
-        let startPage = Math.max(
-            1,
-            currentPage - Math.floor(maxVisiblePages / 2)
-        );
-
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
         let endPage = startPage + maxVisiblePages - 1;
 
         if (endPage > totalPages) {
@@ -231,8 +277,8 @@ export default function ReviewManagementPage() {
         return pages;
     }, [currentPage, totalPages]);
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
+    const handleChange = (event) => {
+        const { name, value } = event.target;
 
         setForm((prev) => ({
             ...prev,
@@ -240,13 +286,19 @@ export default function ReviewManagementPage() {
         }));
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
         setLoading(true);
 
         try {
             const payload = {
-                ...form,
+                review_source: form.review_source,
+                hasil_interview_id:
+                    form.review_source === "interview" ? form.hasil_interview_id : null,
+                hasil_test_zoom_id:
+                    form.review_source === "test_zoom" ? form.hasil_test_zoom_id : null,
+                hasil_test_mmpi_id:
+                    form.review_source === "test_mmpi" ? form.hasil_test_mmpi_id : null,
                 status: form.status || null,
                 review_management: form.review_management || null,
             };
@@ -316,24 +368,46 @@ export default function ReviewManagementPage() {
         }
     };
 
-    const rowColorClass = (hasilInterview) => {
-        if (hasilInterview === "Lolos Interview") {
+    const rowColorClass = (item) => {
+        const source = getReviewSource(item);
+        const hasil = item?.hasil_interview || item?.hasil_label || item?.hasil_test;
+
+        if (source === "test_zoom") {
+            return "bg-sky-50/70 hover:bg-sky-100/70";
+        }
+
+        if (source === "test_mmpi") {
+            return "bg-cyan-50/70 hover:bg-cyan-100/70";
+        }
+
+        if (hasil === "Lolos Interview") {
             return "bg-emerald-50/70 hover:bg-emerald-100/70";
         }
 
-        if (hasilInterview === "Dipertimbangkan") {
+        if (hasil === "Dipertimbangkan") {
             return "bg-amber-50/80 hover:bg-amber-100/80";
         }
 
         return "hover:bg-slate-50";
     };
 
-    const hasilBadgeClass = (hasilInterview) => {
-        if (hasilInterview === "Lolos Interview") {
+    const hasilBadgeClass = (item) => {
+        const source = getReviewSource(item);
+        const hasil = item?.hasil_interview || item?.hasil_label || item?.hasil_test;
+
+        if (source === "test_zoom") {
+            return "bg-sky-100 text-sky-700";
+        }
+
+        if (source === "test_mmpi") {
+            return "bg-cyan-100 text-cyan-700";
+        }
+
+        if (hasil === "Lolos Interview") {
             return "bg-emerald-100 text-emerald-700";
         }
 
-        if (hasilInterview === "Dipertimbangkan") {
+        if (hasil === "Dipertimbangkan") {
             return "bg-amber-100 text-amber-700";
         }
 
@@ -394,14 +468,93 @@ export default function ReviewManagementPage() {
         });
     };
 
-    const getTanggalInterview = (item) => {
+    const getTanggalTahapan = (item) => {
         return (
+            item?.tanggal_tahapan_format ||
             item?.tanggal_interview_format ||
-            formatDateTime(item?.tanggal_interview)
+            formatDateTime(item?.tanggal_tahapan || item?.tanggal_interview)
+        );
+    };
+
+    const getHasilLabel = (item) => {
+        return item?.hasil_label || item?.hasil_interview || item?.hasil_test || "-";
+    };
+
+    const isSelectedTestZoom = selectedItem && getReviewSource(selectedItem) === "test_zoom";
+    const isSelectedTestMmpi = selectedItem && getReviewSource(selectedItem) === "test_mmpi";
+    const isSelectedInterview = selectedItem && getReviewSource(selectedItem) === "interview";
+
+    const getFileHasilTest = (item) => {
+        return (
+            item?.file_hasil_test_zoom_url ||
+            item?.file_hasil_test_zoom ||
+            item?.file_hasil_test_mmpi_url ||
+            item?.file_hasil_test_mmpi ||
+            item?.file_hasil_test ||
+            null
+        );
+    };
+
+    const getAlamatLengkap = (pelamarData) => {
+        return (
+            pelamarData?.alamat_ktp ||
+            pelamarData?.alamat_domisili ||
+            pelamarData?.alamat ||
+            "-"
         );
     };
 
     const pelamar = selectedItem?.detail_kandidat || null;
+    const selectedSource = selectedItem ? getSourceLabel(selectedItem) : "-";
+    const selectedFileHasilTest = getFileHasilTest(selectedItem);
+
+    const sameKandidat = (row, item) => {
+        if (!row || !item) return false;
+
+        const rowKandidatId = String(row.data_riwayat_diri_id || row.kandidat_id || "").trim();
+        const itemKandidatId = String(item.data_riwayat_diri_id || item.kandidat_id || "").trim();
+
+        if (rowKandidatId && itemKandidatId && rowKandidatId === itemKandidatId) {
+            return true;
+        }
+
+        const rowEmail = String(row.email_kandidat || row.email || "").trim().toLowerCase();
+        const itemEmail = String(item.email_kandidat || item.email || "").trim().toLowerCase();
+
+        if (rowEmail && itemEmail && rowEmail === itemEmail) {
+            return true;
+        }
+
+        const rowWa = String(row.no_wa_kandidat || row.no_wa || "").replace(/[^0-9]/g, "");
+        const itemWa = String(item.no_wa_kandidat || item.no_wa || "").replace(/[^0-9]/g, "");
+
+        if (rowWa && itemWa && rowWa === itemWa) {
+            return true;
+        }
+
+        const rowNama = String(row.nama_kandidat || row.nama_lengkap || "").trim().toLowerCase();
+        const itemNama = String(item.nama_kandidat || item.nama_lengkap || "").trim().toLowerCase();
+
+        return Boolean(rowNama && itemNama && rowNama === itemNama);
+    };
+
+    const selectedZoomTest = selectedItem
+        ? selectedItem.latest_test_zoom ||
+          selectedItem.hasil_test_zoom_detail ||
+          dataReview.find((row) => getReviewSource(row) === "test_zoom" && sameKandidat(row, selectedItem))
+        : null;
+
+    const selectedMmpiTest = selectedItem
+        ? selectedItem.latest_test_mmpi ||
+          selectedItem.hasil_test_mmpi_detail ||
+          dataReview.find((row) => getReviewSource(row) === "test_mmpi" && sameKandidat(row, selectedItem))
+        : null;
+
+    const zoomTestData = isSelectedTestZoom ? selectedItem : selectedZoomTest;
+    const mmpiTestData = isSelectedTestMmpi ? selectedItem : selectedMmpiTest;
+
+    const zoomFileHasilTest = getFileHasilTest(zoomTestData);
+    const mmpiFileHasilTest = getFileHasilTest(mmpiTestData);
 
     return (
         <div className="space-y-6">
@@ -413,13 +566,13 @@ export default function ReviewManagementPage() {
                             className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-end"
                         >
                             <DateInput
-                                label="Tanggal Mulai Interview"
+                                label="Tanggal Mulai Tahapan"
                                 value={tanggalMulai}
                                 onChange={setTanggalMulai}
                             />
 
                             <DateInput
-                                label="Tanggal Selesai Interview"
+                                label="Tanggal Selesai Tahapan"
                                 value={tanggalSelesai}
                                 onChange={setTanggalSelesai}
                             />
@@ -443,6 +596,14 @@ export default function ReviewManagementPage() {
                         </form>
 
                         <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full bg-sky-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-sky-700">
+                                Hasil Test Zoom
+                            </span>
+
+                            <span className="rounded-full bg-cyan-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-cyan-700">
+                                Hasil Test MMPI
+                            </span>
+
                             <span className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-emerald-700">
                                 Lolos Interview
                             </span>
@@ -458,9 +619,7 @@ export default function ReviewManagementPage() {
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                         <div className="flex flex-col gap-4 md:flex-row md:items-center">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-slate-600">
-                                    Show
-                                </span>
+                                <span className="text-sm font-bold text-slate-600">Show</span>
 
                                 <select
                                     value={entriesPerPage}
@@ -476,23 +635,17 @@ export default function ReviewManagementPage() {
                                     <option value={100}>100</option>
                                 </select>
 
-                                <span className="text-sm font-bold text-slate-600">
-                                    entries
-                                </span>
+                                <span className="text-sm font-bold text-slate-600">entries</span>
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-slate-600">
-                                    Search:
-                                </span>
+                                <span className="text-sm font-bold text-slate-600">Search:</span>
 
                                 <input
                                     type="text"
                                     value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
-                                    placeholder="Cari nama, tanggal interview, hasil interview..."
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    placeholder="Cari nama, hasil test, interview, review..."
                                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
                                 />
                             </div>
@@ -502,6 +655,23 @@ export default function ReviewManagementPage() {
                             Filter aktif: {tanggalMulai || "-"} sampai {tanggalSelesai || "-"}
                         </p>
                     </div>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {SOURCE_TABS.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveSource(tab.key)}
+                                className={`rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-wide transition ${
+                                    activeSource === tab.key
+                                        ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+                                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -509,12 +679,13 @@ export default function ReviewManagementPage() {
                         <thead>
                             <tr className="bg-slate-50/80">
                                 <TableHead>No</TableHead>
-                                <TableHead>Tanggal Interview</TableHead>
+                                <TableHead>Sumber</TableHead>
+                                <TableHead>Tanggal Tahapan</TableHead>
                                 <TableHead>Nama Kandidat</TableHead>
                                 <TableHead>Posisi</TableHead>
-                                <TableHead>Hasil Interview</TableHead>
+                                <TableHead>Hasil</TableHead>
                                 <TableHead>Status Kehadiran</TableHead>
-                                <TableHead>Catatan Interview</TableHead>
+                                <TableHead>Detail Hasil / Catatan</TableHead>
                                 <TableHead>Review Management</TableHead>
                                 <TableHead>Status Review</TableHead>
                                 <TableHead align="right">Aksi</TableHead>
@@ -524,7 +695,7 @@ export default function ReviewManagementPage() {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="10" className="px-6 py-16">
+                                    <td colSpan="11" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -533,21 +704,25 @@ export default function ReviewManagementPage() {
                             ) : paginatedData.length > 0 ? (
                                 paginatedData.map((item, index) => (
                                     <tr
-                                        key={item.review_management_id || item.id}
-                                        className={`group transition ${rowColorClass(
-                                            item.hasil_interview
-                                        )}`}
+                                        key={`${getReviewSource(item)}-${getSourceId(item)}`}
+                                        className={`group transition ${rowColorClass(item)}`}
                                     >
                                         <td className="px-6 py-5 text-sm font-black text-slate-500">
                                             {showingFrom + index}
                                         </td>
 
                                         <td className="px-6 py-5">
+                                            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-700">
+                                                {getSourceLabel(item)}
+                                            </span>
+                                        </td>
+
+                                        <td className="px-6 py-5">
                                             <div className="text-sm font-black text-slate-800">
-                                                {getTanggalInterview(item)}
+                                                {getTanggalTahapan(item)}
                                             </div>
                                             <div className="mt-1 text-xs font-semibold text-slate-500">
-                                                {item.judul_interview || "-"}
+                                                {item.judul_tahapan || item.judul_interview || "-"}
                                             </div>
                                         </td>
 
@@ -572,10 +747,10 @@ export default function ReviewManagementPage() {
                                         <td className="px-6 py-5">
                                             <span
                                                 className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ${hasilBadgeClass(
-                                                    item.hasil_interview
+                                                    item
                                                 )}`}
                                             >
-                                                {item.hasil_interview || "-"}
+                                                {getHasilLabel(item)}
                                             </span>
                                         </td>
 
@@ -587,7 +762,16 @@ export default function ReviewManagementPage() {
 
                                         <td className="px-6 py-5">
                                             <div className="max-w-md text-sm font-semibold text-slate-600">
-                                                {item.catatan || "-"}
+                                                {getReviewSource(item) === "test_zoom" ? (
+                                                    <div className="space-y-1">
+                                                        <div>Hasil Test: {getHasilLabel(item)}</div>
+                                                        <div className="text-xs text-slate-500">IQ: {item.hasil_test_iq || "-"} • DISC: {item.hasil_test_disc || "-"} • Eysenck: {item.hasil_test_eysenck || "-"}</div>
+                                                    </div>
+                                                ) : getReviewSource(item) === "test_mmpi" ? (
+                                                    <div>Hasil Test MMPI: {getHasilLabel(item)}</div>
+                                                ) : (
+                                                    item.catatan || "-"
+                                                )}
                                             </div>
                                         </td>
 
@@ -620,9 +804,7 @@ export default function ReviewManagementPage() {
                                                 {item.review_management_id && (
                                                     <button
                                                         type="button"
-                                                        onClick={() =>
-                                                            handleDeleteReview(item)
-                                                        }
+                                                        onClick={() => handleDeleteReview(item)}
                                                         className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
                                                     >
                                                         Kosongkan
@@ -634,7 +816,7 @@ export default function ReviewManagementPage() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="10" className="px-6 py-16">
+                                    <td colSpan="11" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ◉
@@ -645,7 +827,7 @@ export default function ReviewManagementPage() {
                                             </h3>
 
                                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                                Belum ada data di tabel hasil_review_management pada tanggal interview ini.
+                                                Belum ada data hasil test atau interview pada tanggal ini.
                                             </p>
                                         </div>
                                     </td>
@@ -657,8 +839,7 @@ export default function ReviewManagementPage() {
 
                 <div className="flex flex-col gap-4 border-t border-slate-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
                     <p className="text-sm font-bold text-slate-500">
-                        Showing {showingFrom} to {showingTo} of{" "}
-                        {filteredData.length} entries
+                        Showing {showingFrom} to {showingTo} of {filteredData.length} entries
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -705,28 +886,19 @@ export default function ReviewManagementPage() {
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
                                     <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
-                                        Review Management
+                                        Review Management - {selectedSource}
                                     </div>
 
                                     <h2 className="mt-2 text-2xl font-black text-slate-950">
-                                        Edit Review
+                                        Review Kandidat
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Kandidat:{" "}
-                                        <span className="font-black text-slate-800">
-                                            {selectedItem?.nama_kandidat || "-"}
-                                        </span>
+                                        Kandidat: <span className="font-black text-slate-800">{selectedItem?.nama_kandidat || "-"}</span>
                                         {" • "}
-                                        Tanggal interview:{" "}
-                                        <span className="font-black text-slate-800">
-                                            {getTanggalInterview(selectedItem)}
-                                        </span>
+                                        Tahapan: <span className="font-black text-slate-800">{selectedSource}</span>
                                         {" • "}
-                                        Hasil interview:{" "}
-                                        <span className="font-black text-slate-800">
-                                            {selectedItem?.hasil_interview || "-"}
-                                        </span>
+                                        Hasil: <span className="font-black text-slate-800">{getHasilLabel(selectedItem)}</span>
                                     </p>
                                 </div>
 
@@ -742,33 +914,39 @@ export default function ReviewManagementPage() {
 
                         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-                                <div className="grid gap-6 lg:grid-cols-2">
+                                <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                                     <div className="space-y-5">
                                         <SectionTitle title="Detail Kandidat" />
 
                                         <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-5">
                                             <div className="grid gap-3 sm:grid-cols-2">
-                                                <DetailItem label="Nama Lengkap" value={pelamar?.nama_lengkap} />
+                                                <DetailItem label="Nama Lengkap" value={pelamar?.nama_lengkap || selectedItem?.nama_kandidat} />
                                                 <DetailItem label="Nama Panggil" value={pelamar?.nama_panggil} />
-                                                <DetailItem label="Email" value={pelamar?.email} />
-                                                <DetailItem label="No. WA" value={pelamar?.no_wa} />
-                                                <DetailItem label="Posisi Dilamar" value={pelamar?.posisi_label} />
-                                                <DetailItem label="Perusahaan" value={pelamar?.perusahaan_label} />
+                                                <DetailItem label="Email" value={pelamar?.email || selectedItem?.email_kandidat} />
+                                                <DetailItem label="No. WA" value={pelamar?.no_wa || selectedItem?.no_wa_kandidat} />
+                                                <DetailItem label="Posisi Dilamar" value={pelamar?.posisi_label || selectedItem?.posisi_label} />
+                                                <DetailItem label="Perusahaan" value={pelamar?.perusahaan_label || selectedItem?.perusahaan_label} />
                                                 <DetailItem label="Pendidikan" value={pelamar?.pendidikan_label} />
                                                 <DetailItem label="Jurusan" value={pelamar?.jurusan} />
                                                 <DetailItem label="Institusi" value={pelamar?.nama_institusi} />
                                                 <DetailItem label="Agama" value={pelamar?.agama_label} />
                                                 <DetailItem label="Tanggal Lahir" value={formatDate(pelamar?.tanggal_lahir)} />
                                                 <DetailItem label="Tanggal Skrining" value={formatDate(pelamar?.tanggal_skrining)} />
+                                                <DetailItem label="Tempat Lahir" value={pelamar?.tempat_lahir} />
+                                                <DetailItem label="Jenis Kelamin" value={pelamar?.jenis_kelamin} />
                                                 <DetailItem label="Kewarganegaraan" value={pelamar?.kewarganegaraan_label} />
                                                 <DetailItem label="Status Pernikahan" value={pelamar?.status_pernikahan_label} />
                                                 <DetailItem label="Golongan Darah" value={pelamar?.gol_darah || pelamar?.golongan_darah} />
-                                                <DetailItem label="Tinggi / Berat" value={`${pelamar?.tinggi_badan || "-"} cm / ${pelamar?.berat_badan || "-"} kg`} />
+                                                <DetailItem
+                                                    label="Tinggi / Berat"
+                                                    value={`${pelamar?.tinggi_badan || "-"} cm / ${pelamar?.berat_badan || "-"} kg`}
+                                                />
                                             </div>
 
                                             <div className="mt-4 grid gap-3">
                                                 <DetailItem label="Alamat KTP" value={pelamar?.alamat_ktp} />
                                                 <DetailItem label="Alamat Domisili" value={pelamar?.alamat_domisili} />
+                                                <DetailItem label="Alamat Utama" value={getAlamatLengkap(pelamar)} />
                                                 <DetailItem label="Sumber Informasi" value={pelamar?.sumber_informasi_label} />
                                             </div>
                                         </div>
@@ -808,7 +986,7 @@ export default function ReviewManagementPage() {
                                                     {pelamar.kelengkapan_form.steps.map((step) => (
                                                         <div
                                                             key={step.key}
-                                                            className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3"
+                                                            className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3"
                                                         >
                                                             <div>
                                                                 <div className="text-xs font-black text-slate-700">
@@ -836,15 +1014,53 @@ export default function ReviewManagementPage() {
                                     </div>
 
                                     <div className="space-y-5">
-                                        <SectionTitle title="Data Interview" />
+                                        <SectionTitle title="Data Tahapan" />
 
                                         <div className="rounded-3xl border border-slate-200 bg-white p-5">
                                             <div className="grid gap-3">
-                                                <DetailItem label="Judul Interview" value={selectedItem?.judul_interview} />
-                                                <DetailItem label="Tanggal Interview" value={getTanggalInterview(selectedItem)} />
-                                                <DetailItem label="Hasil Interview" value={selectedItem?.hasil_interview} />
+                                                <DetailItem label="Sumber Review" value={selectedSource} />
+                                                <DetailItem label="Judul Tahapan" value={selectedItem?.judul_tahapan || selectedItem?.judul_interview} />
+                                                <DetailItem label="Tanggal Tahapan" value={getTanggalTahapan(selectedItem)} />
                                                 <DetailItem label="Status Kehadiran" value={selectedItem?.status_kehadiran} />
-                                                <DetailItem label="Catatan Interview" value={selectedItem?.catatan} />
+                                                <DetailItem label="Hasil" value={getHasilLabel(selectedItem)} />
+                                                <DetailItem label="Catatan" value={selectedItem?.catatan} />
+
+                                                {isSelectedInterview && (
+                                                    <>
+                                                        <DetailItem label="Judul Interview" value={selectedItem?.judul_interview || selectedItem?.judul_tahapan} />
+                                                        <DetailItem label="Tanggal Interview" value={selectedItem?.tanggal_interview_format || getTanggalTahapan(selectedItem)} />
+                                                        <DetailItem label="Hasil Interview" value={selectedItem?.hasil_interview || selectedItem?.hasil_label} />
+                                                    </>
+                                                )}
+
+                                                <div className="rounded-3xl border border-sky-100 bg-sky-50/70 p-4">
+                                                    <div className="mb-3 text-xs font-black uppercase tracking-wide text-sky-700">
+                                                        Hasil Test Zoom
+                                                    </div>
+
+                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                        <DetailItem label="Tanggal Test Zoom" value={getTanggalTahapan(zoomTestData)} />
+                                                        <DetailItem label="Status Kehadiran Zoom" value={zoomTestData?.status_kehadiran} />
+                                                        <DetailItem label="Hasil Test Zoom" value={zoomTestData ? getHasilLabel(zoomTestData) : "-"} />
+                                                        <DetailItem label="File Hasil Test Zoom" value={<FileLink url={zoomFileHasilTest} />} />
+                                                        <DetailItem label="IQ" value={zoomTestData?.hasil_test_iq} />
+                                                        <DetailItem label="DISC" value={zoomTestData?.hasil_test_disc} />
+                                                        <DetailItem label="Eysenck" value={zoomTestData?.hasil_test_eysenck} />
+                                                    </div>
+                                                </div>
+
+                                                <div className="rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
+                                                    <div className="mb-3 text-xs font-black uppercase tracking-wide text-cyan-700">
+                                                        Hasil Test MMPI
+                                                    </div>
+
+                                                    <div className="grid gap-3 sm:grid-cols-2">
+                                                        <DetailItem label="Tanggal Test MMPI" value={getTanggalTahapan(mmpiTestData)} />
+                                                        <DetailItem label="Status Kehadiran MMPI" value={mmpiTestData?.status_kehadiran} />
+                                                        <DetailItem label="Hasil Test MMPI" value={mmpiTestData ? getHasilLabel(mmpiTestData) : "-"} />
+                                                        <DetailItem label="File Hasil Test MMPI" value={<FileLink url={mmpiFileHasilTest} />} />
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -870,8 +1086,11 @@ export default function ReviewManagementPage() {
                                                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
                                             >
                                                 <option value="">Pilih Status</option>
-                                                <option value="Diterima">Diterima</option>
-                                                <option value="Gagal">Gagal</option>
+                                                {STATUS_OPTIONS.map((option) => (
+                                                    <option key={option} value={option}>
+                                                        {option}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
@@ -908,9 +1127,7 @@ export default function ReviewManagementPage() {
 function DateInput({ label, value, onChange }) {
     return (
         <label className="block">
-            <span className="mb-2 block text-sm font-black text-slate-700">
-                {label}
-            </span>
+            <span className="mb-2 block text-sm font-black text-slate-700">{label}</span>
 
             <input
                 type="date"
@@ -949,21 +1166,29 @@ function DetailItem({ label, value }) {
             <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
                 {label}
             </div>
-            <div className="mt-1 text-sm font-bold text-slate-700">
-                {value || "-"}
-            </div>
+            <div className="mt-1 text-sm font-bold text-slate-700">{value || "-"}</div>
         </div>
     );
 }
 
-function Textarea({
-    label,
-    name,
-    value,
-    onChange,
-    required = false,
-    placeholder = "",
-}) {
+function FileLink({ url }) {
+    if (!url) {
+        return "-";
+    }
+
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex rounded-xl bg-white px-3 py-2 text-xs font-black text-teal-700 underline decoration-teal-300 underline-offset-4 transition hover:text-teal-900"
+        >
+            Lihat File
+        </a>
+    );
+}
+
+function Textarea({ label, name, value, onChange, required = false, placeholder = "" }) {
     return (
         <div>
             <label className="mb-2 block text-sm font-black text-slate-700">

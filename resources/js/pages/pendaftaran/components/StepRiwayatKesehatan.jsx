@@ -258,7 +258,7 @@ export default function StepRiwayatKesehatan({
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <RadioGroup
-                        label="Pernah Pengobatan Psikolog?"
+                        label="Apakah Anda Pernah Pengobatan Psikolog?"
                         name="pengobatan_psikolog"
                         value={form.pengobatan_psikolog}
                         onChange={handleChange}
@@ -285,7 +285,7 @@ export default function StepRiwayatKesehatan({
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <RadioGroup
-                        label="Pernah Kecelakaan?"
+                        label="Apakah Anda Pernah Kecelakaan?"
                         name="pernah_kecelakaan"
                         value={form.pernah_kecelakaan}
                         onChange={handleChange}
@@ -306,7 +306,7 @@ export default function StepRiwayatKesehatan({
 
                 <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
                     <RadioGroup
-                        label="Pernah Operasi?"
+                        label="Apakah Anda Pernah Operasi?"
                         name="pernah_operasi"
                         value={form.pernah_operasi}
                         onChange={handleChange}

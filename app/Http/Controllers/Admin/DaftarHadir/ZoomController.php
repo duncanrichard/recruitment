@@ -126,6 +126,24 @@ class ZoomController extends Controller
             $selects[] = DB::raw("NULL as file_hasil_test_zoom");
         }
 
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_iq')) {
+            $selects[] = 'dh.hasil_test_iq';
+        } else {
+            $selects[] = DB::raw("NULL as hasil_test_iq");
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_disc')) {
+            $selects[] = 'dh.hasil_test_disc';
+        } else {
+            $selects[] = DB::raw("NULL as hasil_test_disc");
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_eysenck')) {
+            $selects[] = 'dh.hasil_test_eysenck';
+        } else {
+            $selects[] = DB::raw("NULL as hasil_test_eysenck");
+        }
+
         if ($nameColumn) {
             $selects[] = DB::raw("drd.{$nameColumn} as nama");
         } else {
@@ -179,6 +197,9 @@ class ZoomController extends Controller
 
                 'hasil_test' => $hasilTest,
                 'hasil_test_label' => $this->labelHasilTest($hasilTest),
+                'hasil_test_iq' => $item->hasil_test_iq ?? null,
+                'hasil_test_disc' => $item->hasil_test_disc ?? null,
+                'hasil_test_eysenck' => $item->hasil_test_eysenck ?? null,
 
                 'file_hasil_test_zoom' => $fileUrl,
                 'file_hasil_test_zoom_url' => $fileUrl,
@@ -224,7 +245,10 @@ class ZoomController extends Controller
     public function updateHasilTest(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
-            'hasil_test' => ['required', Rule::in(['lolos', 'gagal'])],
+            'hasil_test' => ['nullable', Rule::in(['lolos', 'gagal'])],
+            'hasil_test_iq' => ['nullable', 'string', 'max:255'],
+            'hasil_test_disc' => ['nullable', 'string', 'max:255'],
+            'hasil_test_eysenck' => ['nullable', 'string', 'max:255'],
             'file_hasil_test_zoom' => [
                 'nullable',
                 'file',
@@ -232,6 +256,10 @@ class ZoomController extends Controller
                 'max:5120',
             ],
         ], [
+            'hasil_test.in' => 'Hasil test harus Lolos atau Gagal.',
+            'hasil_test_iq.max' => 'Hasil IQ maksimal 255 karakter.',
+            'hasil_test_disc.max' => 'Hasil DISC maksimal 255 karakter.',
+            'hasil_test_eysenck.max' => 'Hasil Eysenck maksimal 255 karakter.',
             'file_hasil_test_zoom.file' => 'File hasil test Zoom tidak valid.',
             'file_hasil_test_zoom.mimes' => 'File harus berupa PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, atau PNG.',
             'file_hasil_test_zoom.max' => 'Ukuran file maksimal 5 MB.',
@@ -244,14 +272,47 @@ class ZoomController extends Controller
             ], 500);
         }
 
-        if (!Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
+        if ($request->hasFile('file_hasil_test_zoom') && !Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom file_hasil_test_zoom belum tersedia. Jalankan migration terlebih dahulu.',
             ], 500);
         }
 
-        $hasilTest = $this->normalizeHasilTestValue($validated['hasil_test']);
+        $missingColumns = [];
+
+        foreach (['hasil_test_iq', 'hasil_test_disc', 'hasil_test_eysenck'] as $column) {
+            if ($request->has($column) && !Schema::hasColumn('daftar_hadir_test_zoom', $column)) {
+                $missingColumns[] = $column;
+            }
+        }
+
+        if (!empty($missingColumns)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom ' . implode(', ', $missingColumns) . ' belum tersedia. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        $hasHasilTestInput = $request->has('hasil_test');
+        $hasilTest = $hasHasilTestInput
+            ? $this->normalizeHasilTestValue($validated['hasil_test'] ?? null)
+            : null;
+
+        $hasilTestIq = $this->emptyToNull($validated['hasil_test_iq'] ?? null);
+        $hasilTestDisc = $this->emptyToNull($validated['hasil_test_disc'] ?? null);
+        $hasilTestEysenck = $this->emptyToNull($validated['hasil_test_eysenck'] ?? null);
+
+        $hasPsikotesInput = $request->has('hasil_test_iq')
+            || $request->has('hasil_test_disc')
+            || $request->has('hasil_test_eysenck');
+
+        if (!$hasHasilTestInput && !$hasPsikotesInput && !$request->hasFile('file_hasil_test_zoom')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada data hasil test yang dikirim.',
+            ], 422);
+        }
 
         $nameColumn = $this->firstExistingColumn('data_riwayat_diri', [
             'nama_lengkap',
@@ -337,13 +398,39 @@ class ZoomController extends Controller
             $fileUrl = '/storage/' . $storedPath;
         }
 
+        $updateData = [
+            'updated_at' => now(),
+        ];
+
+        if ($hasHasilTestInput) {
+            $updateData['hasil_test'] = $hasilTest;
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_iq') && $request->has('hasil_test_iq')) {
+            $updateData['hasil_test_iq'] = $hasilTestIq;
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_disc') && $request->has('hasil_test_disc')) {
+            $updateData['hasil_test_disc'] = $hasilTestDisc;
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_eysenck') && $request->has('hasil_test_eysenck')) {
+            $updateData['hasil_test_eysenck'] = $hasilTestEysenck;
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
+            $updateData['file_hasil_test_zoom'] = $fileUrl;
+        }
+
         DB::table('daftar_hadir_test_zoom')
             ->where('id', $daftarHadir->id)
-            ->update([
-                'hasil_test' => $hasilTest,
-                'file_hasil_test_zoom' => $fileUrl,
-                'updated_at' => now(),
-            ]);
+            ->update($updateData);
+
+        $freshDaftarHadir = DB::table('daftar_hadir_test_zoom')
+            ->where('id', $daftarHadir->id)
+            ->first();
+
+        $freshHasilTest = $this->normalizeHasilTestValue($freshDaftarHadir->hasil_test ?? null);
 
         return response()->json([
             'success' => true,
@@ -352,7 +439,11 @@ class ZoomController extends Controller
                 'jadwal_test_zoom_id' => $jadwal->id,
                 'daftar_hadir_test_zoom_id' => $daftarHadir->id,
                 'status_kehadiran' => $kehadiran,
-                'hasil_test' => $hasilTest,
+                'hasil_test' => $freshHasilTest,
+                'hasil_test_label' => $this->labelHasilTest($freshHasilTest),
+                'hasil_test_iq' => $freshDaftarHadir->hasil_test_iq ?? null,
+                'hasil_test_disc' => $freshDaftarHadir->hasil_test_disc ?? null,
+                'hasil_test_eysenck' => $freshDaftarHadir->hasil_test_eysenck ?? null,
                 'file_hasil_test_zoom' => $fileUrl,
                 'file_hasil_test_zoom_url' => $fileUrl,
             ],
@@ -470,6 +561,18 @@ class ZoomController extends Controller
         }
 
         return null;
+    }
+
+
+    private function emptyToNull($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value !== '' ? $value : null;
     }
 
     private function normalizeHasilTestValue($value): ?string

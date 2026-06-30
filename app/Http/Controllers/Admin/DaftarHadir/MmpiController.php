@@ -321,6 +321,9 @@ class MmpiController extends Controller
     {
         $validated = $request->validate([
             'status_kehadiran' => ['required', Rule::in(['hadir', 'tidak_hadir'])],
+        ], [
+            'status_kehadiran.required' => 'Status kehadiran wajib dipilih.',
+            'status_kehadiran.in' => 'Status kehadiran harus Hadir atau Tidak Hadir.',
         ]);
 
         $jadwal = JadwalTestMmpi::query()->findOrFail($jadwalTestMmpi);
@@ -329,15 +332,32 @@ class MmpiController extends Controller
             ->where('jadwal_test_mmpi_id', $jadwal->id)
             ->first();
 
+        $statusKehadiran = $this->normalizeKehadiranValue($validated['status_kehadiran']);
+
         $payload = [
             'jadwal_test_mmpi_id' => $jadwal->id,
             'data_riwayat_diri_id' => $jadwal->data_riwayat_diri_id,
             'tanggal_kehadiran' => Carbon::parse($jadwal->tanggal)->toDateString(),
-            'status_kehadiran' => $validated['status_kehadiran'],
+            'status_kehadiran' => $statusKehadiran,
+            'updated_at' => now(),
         ];
 
-        if ($validated['status_kehadiran'] !== 'hadir') {
+        if (!$daftarHadir) {
+            $payload['created_at'] = now();
+        }
+
+        if ($statusKehadiran !== 'hadir') {
             $payload['hasil_test'] = null;
+
+            if (Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
+                $oldFilePath = $this->convertPublicUrlToStoragePath($daftarHadir->file_hasil_test_mmpi ?? null);
+
+                if ($oldFilePath && Storage::disk('public')->exists($oldFilePath)) {
+                    Storage::disk('public')->delete($oldFilePath);
+                }
+
+                $payload['file_hasil_test_mmpi'] = null;
+            }
         }
 
         if ($daftarHadir) {
@@ -347,10 +367,29 @@ class MmpiController extends Controller
             $daftarHadir = DaftarHadirTestMmpi::query()->create($payload);
         }
 
+        $daftarHadir->refresh();
+
+        $hasilTest = $this->normalizeHasilTestValue($daftarHadir->hasil_test ?? null);
+        $fileUrl = $this->normalizeFileUrl($daftarHadir->file_hasil_test_mmpi ?? null);
+
         return response()->json([
             'success' => true,
-            'message' => 'Status kehadiran MMPI berhasil diperbarui.',
-            'data' => $daftarHadir,
+            'message' => $statusKehadiran === 'hadir'
+                ? 'Status kehadiran MMPI berhasil diperbarui: Hadir.'
+                : 'Status kehadiran MMPI berhasil diperbarui: Tidak Hadir.',
+            'data' => [
+                'id' => $daftarHadir->id,
+                'jadwal_test_mmpi_id' => $jadwal->id,
+                'daftar_hadir_test_mmpi_id' => $daftarHadir->id,
+                'data_riwayat_diri_id' => $jadwal->data_riwayat_diri_id,
+                'tanggal_kehadiran' => $daftarHadir->tanggal_kehadiran,
+                'status_kehadiran' => $statusKehadiran,
+                'status_kehadiran_label' => $this->labelKehadiran($statusKehadiran),
+                'hasil_test' => $hasilTest,
+                'hasil_test_label' => $this->labelHasilTest($hasilTest),
+                'file_hasil_test_mmpi' => $fileUrl,
+                'file_hasil_test_mmpi_url' => $fileUrl,
+            ],
         ]);
     }
 

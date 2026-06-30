@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
@@ -23,6 +27,16 @@ class ReviewManagementController extends Controller
     private array $hasilInterviewReviewOptions = [
         'Lolos Interview',
         'Dipertimbangkan',
+    ];
+
+    private array $hasilTestReviewOptions = [
+        'lolos',
+    ];
+
+    private array $reviewSourceOptions = [
+        'interview',
+        'test_zoom',
+        'test_mmpi',
     ];
 
     private array $pelamarRelations = [
@@ -287,7 +301,32 @@ class ReviewManagementController extends Controller
         $tanggalMulai = $validated['tanggal_mulai'] ?? now()->toDateString();
         $tanggalSelesai = $validated['tanggal_selesai'] ?? now()->toDateString();
 
-        $data = HasilReviewManagement::query()
+        $data = collect()
+            ->merge($this->listReviewInterview($tanggalMulai, $tanggalSelesai))
+            ->merge($this->listReviewHasilTestZoom($tanggalMulai, $tanggalSelesai))
+            ->merge($this->listReviewHasilTestMmpi($tanggalMulai, $tanggalSelesai))
+            ->sortByDesc('tanggal_sort')
+            ->values()
+            ->map(function (array $row) {
+                unset($row['tanggal_sort']);
+
+                return $row;
+            });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data review management berhasil diambil.',
+            'filter' => [
+                'tanggal_mulai' => $tanggalMulai,
+                'tanggal_selesai' => $tanggalSelesai,
+            ],
+            'data' => $data,
+        ]);
+    }
+
+    private function listReviewInterview(string $tanggalMulai, string $tanggalSelesai): Collection
+    {
+        return HasilReviewManagement::query()
             ->with([
                 'hasilInterview.jadwalInterview:id,judul_interview,jadwal_interview',
                 'hasilInterview.kandidat' => function ($query) {
@@ -313,17 +352,28 @@ class ReviewManagementController extends Controller
                     $kandidat = $this->appendExtraData($kandidat);
                 }
 
+                $latestTestZoom = $this->getLatestHasilTestZoomForKandidat($item?->data_riwayat_diri_id);
+                $latestTestMmpi = $this->getLatestHasilTestMmpiForKandidat($item?->data_riwayat_diri_id);
+
                 return [
                     'id' => $item?->id,
+                    'source_id' => $item?->id,
+                    'review_source' => 'interview',
+                    'review_source_label' => 'Interview',
+                    'jenis_review' => 'Interview',
                     'hasil_interview_id' => $item?->id,
+                    'hasil_test_zoom_id' => null,
+                    'hasil_test_mmpi_id' => null,
                     'jadwal_interview_id' => $item?->jadwal_interview_id,
                     'data_riwayat_diri_id' => $item?->data_riwayat_diri_id,
 
+                    'judul_tahapan' => $jadwalInterview?->judul_interview,
+                    'tanggal_tahapan' => $jadwalInterview?->jadwal_interview,
+                    'tanggal_tahapan_format' => $this->formatTanggalWaktuIndonesia($jadwalInterview?->jadwal_interview),
+
                     'judul_interview' => $jadwalInterview?->judul_interview,
                     'tanggal_interview' => $jadwalInterview?->jadwal_interview,
-                    'tanggal_interview_format' => $jadwalInterview?->jadwal_interview
-                        ? date('d F Y H:i', strtotime($jadwalInterview->jadwal_interview))
-                        : null,
+                    'tanggal_interview_format' => $this->formatTanggalWaktuIndonesia($jadwalInterview?->jadwal_interview),
 
                     'nama_kandidat' => $kandidat?->nama_lengkap ?? '-',
                     'email_kandidat' => $kandidat?->email,
@@ -333,6 +383,10 @@ class ReviewManagementController extends Controller
 
                     'status_kehadiran' => $item?->status_kehadiran,
                     'hasil_interview' => $item?->hasil_interview,
+                    'hasil_test' => null,
+                    'hasil_label' => $item?->hasil_interview,
+                    'latest_test_zoom' => $latestTestZoom,
+                    'latest_test_mmpi' => $latestTestMmpi,
                     'catatan' => $item?->catatan,
                     'created_at' => $review->created_at,
                     'updated_at' => $review->updated_at,
@@ -342,27 +396,457 @@ class ReviewManagementController extends Controller
                     'status_review' => $review->status,
 
                     'detail_kandidat' => $kandidat,
+                    'tanggal_sort' => $jadwalInterview?->jadwal_interview ? strtotime((string) $jadwalInterview->jadwal_interview) : 0,
                 ];
             });
+    }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Data review management berhasil diambil.',
-            'filter' => [
-                'tanggal_mulai' => $tanggalMulai,
-                'tanggal_selesai' => $tanggalSelesai,
-            ],
-            'data' => $data,
-        ]);
+    private function listReviewHasilTestZoom(string $tanggalMulai, string $tanggalSelesai): Collection
+    {
+        if (!Schema::hasTable('daftar_hadir_test_zoom') ||
+            !Schema::hasTable('jadwal_test_zoom') ||
+            !Schema::hasTable('hasil_review_management') ||
+            !Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+            return collect();
+        }
+
+        $query = DB::table('daftar_hadir_test_zoom as dhz')
+            ->join('jadwal_test_zoom as jtz', 'jtz.id', '=', 'dhz.jadwal_test_zoom_id')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhz.data_riwayat_diri_id')
+            ->leftJoin('hasil_review_management as hrm', 'hrm.daftar_hadir_test_zoom_id', '=', 'dhz.id')
+            ->leftJoin('posisi as p', 'p.id', '=', 'drd.posisi_yang_dilamar')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
+            ->whereDate('jtz.jadwal', '>=', $tanggalMulai)
+            ->whereDate('jtz.jadwal', '<=', $tanggalSelesai)
+            ->whereRaw("LOWER(REPLACE(REPLACE(TRIM(COALESCE(dhz.hasil_test, '')), ' ', '_'), '-', '_')) IN ('lolos', '1', 'true', 'ya', 'yes')");
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'deleted_at')) {
+            $query->whereNull('dhz.deleted_at');
+        }
+
+        if (Schema::hasColumn('jadwal_test_zoom', 'deleted_at')) {
+            $query->whereNull('jtz.deleted_at');
+        }
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        $selects = [
+            'dhz.id as hasil_test_zoom_id',
+            'dhz.jadwal_test_zoom_id',
+            'dhz.data_riwayat_diri_id',
+            'dhz.tanggal_kehadiran',
+            'dhz.status_kehadiran',
+            'dhz.hasil_test',
+            Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')
+                ? 'dhz.file_hasil_test_zoom'
+                : DB::raw('NULL as file_hasil_test_zoom'),
+            'dhz.created_at as hasil_test_created_at',
+            'dhz.updated_at as hasil_test_updated_at',
+            'jtz.jadwal as tanggal_test',
+            'drd.nama_lengkap',
+            'drd.nama_panggil',
+            'drd.email',
+            'drd.no_wa',
+            'p.nama_posisi',
+            'dp.nama_perusahaan',
+            'hrm.id as review_management_id',
+            'hrm.review_management',
+            'hrm.status as status_review',
+            'hrm.created_at as review_created_at',
+            'hrm.updated_at as review_updated_at',
+        ];
+
+        foreach (['hasil_test_iq', 'hasil_test_disc', 'hasil_test_eysenck'] as $column) {
+            $selects[] = Schema::hasColumn('daftar_hadir_test_zoom', $column)
+                ? "dhz.{$column}"
+                : DB::raw("NULL as {$column}");
+        }
+
+        return $query
+            ->select($selects)
+            ->orderByDesc('jtz.jadwal')
+            ->get()
+            ->map(function ($row) {
+                $kandidat = DataRiwayatDiri::query()
+                    ->with($this->safePelamarRelations())
+                    ->find($row->data_riwayat_diri_id);
+
+                if ($kandidat) {
+                    $kandidat = $this->appendExtraData($kandidat);
+                }
+
+                $nama = $kandidat?->nama_lengkap
+                    ?: ($row->nama_lengkap ?: ($row->nama_panggil ?: '-'));
+
+                $catatanTest = collect([
+                    'IQ' => $row->hasil_test_iq ?? null,
+                    'DISC' => $row->hasil_test_disc ?? null,
+                    'Eysenck' => $row->hasil_test_eysenck ?? null,
+                ])
+                    ->filter(fn ($value) => filled($value))
+                    ->map(fn ($value, $key) => "{$key}: {$value}")
+                    ->implode(' | ');
+
+                return [
+                    'id' => $row->hasil_test_zoom_id,
+                    'source_id' => $row->hasil_test_zoom_id,
+                    'review_source' => 'test_zoom',
+                    'review_source_label' => 'Hasil Test Zoom',
+                    'jenis_review' => 'Hasil Test Zoom',
+                    'hasil_interview_id' => null,
+                    'hasil_test_zoom_id' => $row->hasil_test_zoom_id,
+                    'hasil_test_mmpi_id' => null,
+                    'jadwal_test_zoom_id' => $row->jadwal_test_zoom_id,
+                    'data_riwayat_diri_id' => $row->data_riwayat_diri_id,
+
+                    'judul_tahapan' => 'Hasil Test Zoom',
+                    'tanggal_tahapan' => $row->tanggal_test,
+                    'tanggal_tahapan_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test),
+
+                    'judul_interview' => 'Hasil Test Zoom',
+                    'tanggal_interview' => $row->tanggal_test,
+                    'tanggal_interview_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test),
+
+                    'nama_kandidat' => $nama,
+                    'email_kandidat' => $kandidat?->email ?? $row->email,
+                    'no_wa_kandidat' => $kandidat?->no_wa ?? $row->no_wa,
+                    'posisi_label' => $kandidat?->posisi_label ?? $row->nama_posisi,
+                    'perusahaan_label' => $kandidat?->perusahaan_label ?? $row->nama_perusahaan,
+
+                    'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran),
+                    'hasil_interview' => null,
+                    'hasil_test' => $this->normalizeHasilTest($row->hasil_test),
+                    'hasil_label' => $this->labelHasilTest($row->hasil_test),
+                    'file_hasil_test_zoom' => $row->file_hasil_test_zoom ?? null,
+                    'file_hasil_test_zoom_url' => $this->makeFileUrl($row->file_hasil_test_zoom ?? null),
+                    'hasil_test_iq' => $row->hasil_test_iq ?? null,
+                    'hasil_test_disc' => $row->hasil_test_disc ?? null,
+                    'hasil_test_eysenck' => $row->hasil_test_eysenck ?? null,
+                    'catatan' => $catatanTest ?: null,
+                    'created_at' => $row->review_created_at ?? $row->hasil_test_created_at,
+                    'updated_at' => $row->review_updated_at ?? $row->hasil_test_updated_at,
+
+                    'review_management_id' => $row->review_management_id,
+                    'review_management' => $row->review_management,
+                    'status_review' => $row->status_review,
+
+                    'detail_kandidat' => $kandidat,
+                    'tanggal_sort' => $row->tanggal_test ? strtotime((string) $row->tanggal_test) : 0,
+                ];
+            });
+    }
+
+    private function listReviewHasilTestMmpi(string $tanggalMulai, string $tanggalSelesai): Collection
+    {
+        if (!Schema::hasTable('daftar_hadir_test_mmpi') ||
+            !Schema::hasTable('jadwal_test_mmpi') ||
+            !Schema::hasTable('hasil_review_management') ||
+            !Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+            return collect();
+        }
+
+        $query = DB::table('daftar_hadir_test_mmpi as dhm')
+            ->join('jadwal_test_mmpi as jtm', 'jtm.id', '=', 'dhm.jadwal_test_mmpi_id')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhm.data_riwayat_diri_id')
+            ->leftJoin('hasil_review_management as hrm', 'hrm.daftar_hadir_test_mmpi_id', '=', 'dhm.id')
+            ->leftJoin('posisi as p', 'p.id', '=', 'drd.posisi_yang_dilamar')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
+            ->whereDate('jtm.tanggal', '>=', $tanggalMulai)
+            ->whereDate('jtm.tanggal', '<=', $tanggalSelesai)
+            ->whereRaw("LOWER(REPLACE(REPLACE(TRIM(COALESCE(dhm.hasil_test, '')), ' ', '_'), '-', '_')) IN ('lolos', '1', 'true', 'ya', 'yes')");
+
+        if (Schema::hasColumn('daftar_hadir_test_mmpi', 'deleted_at')) {
+            $query->whereNull('dhm.deleted_at');
+        }
+
+        if (Schema::hasColumn('jadwal_test_mmpi', 'deleted_at')) {
+            $query->whereNull('jtm.deleted_at');
+        }
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        return $query
+            ->select([
+                'dhm.id as hasil_test_mmpi_id',
+                'dhm.jadwal_test_mmpi_id',
+                'dhm.data_riwayat_diri_id',
+                'dhm.tanggal_kehadiran',
+                'dhm.status_kehadiran',
+                'dhm.hasil_test',
+                Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')
+                    ? 'dhm.file_hasil_test_mmpi'
+                    : DB::raw('NULL as file_hasil_test_mmpi'),
+                'dhm.created_at as hasil_test_created_at',
+                'dhm.updated_at as hasil_test_updated_at',
+                'jtm.tanggal as tanggal_test',
+                'drd.nama_lengkap',
+                'drd.nama_panggil',
+                'drd.email',
+                'drd.no_wa',
+                'p.nama_posisi',
+                'dp.nama_perusahaan',
+                'hrm.id as review_management_id',
+                'hrm.review_management',
+                'hrm.status as status_review',
+                'hrm.created_at as review_created_at',
+                'hrm.updated_at as review_updated_at',
+            ])
+            ->orderByDesc('jtm.tanggal')
+            ->get()
+            ->map(function ($row) {
+                $kandidat = DataRiwayatDiri::query()
+                    ->with($this->safePelamarRelations())
+                    ->find($row->data_riwayat_diri_id);
+
+                if ($kandidat) {
+                    $kandidat = $this->appendExtraData($kandidat);
+                }
+
+                $nama = $kandidat?->nama_lengkap
+                    ?: ($row->nama_lengkap ?: ($row->nama_panggil ?: '-'));
+
+                return [
+                    'id' => $row->hasil_test_mmpi_id,
+                    'source_id' => $row->hasil_test_mmpi_id,
+                    'review_source' => 'test_mmpi',
+                    'review_source_label' => 'Hasil Test MMPI',
+                    'jenis_review' => 'Hasil Test MMPI',
+                    'hasil_interview_id' => null,
+                    'hasil_test_zoom_id' => null,
+                    'hasil_test_mmpi_id' => $row->hasil_test_mmpi_id,
+                    'jadwal_test_mmpi_id' => $row->jadwal_test_mmpi_id,
+                    'data_riwayat_diri_id' => $row->data_riwayat_diri_id,
+
+                    'judul_tahapan' => 'Hasil Test MMPI',
+                    'tanggal_tahapan' => $row->tanggal_test,
+                    'tanggal_tahapan_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test),
+
+                    'judul_interview' => 'Hasil Test MMPI',
+                    'tanggal_interview' => $row->tanggal_test,
+                    'tanggal_interview_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test),
+
+                    'nama_kandidat' => $nama,
+                    'email_kandidat' => $kandidat?->email ?? $row->email,
+                    'no_wa_kandidat' => $kandidat?->no_wa ?? $row->no_wa,
+                    'posisi_label' => $kandidat?->posisi_label ?? $row->nama_posisi,
+                    'perusahaan_label' => $kandidat?->perusahaan_label ?? $row->nama_perusahaan,
+
+                    'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran),
+                    'hasil_interview' => null,
+                    'hasil_test' => $this->normalizeHasilTest($row->hasil_test),
+                    'hasil_label' => $this->labelHasilTest($row->hasil_test),
+                    'file_hasil_test_mmpi' => $row->file_hasil_test_mmpi ?? null,
+                    'file_hasil_test_mmpi_url' => $this->makeFileUrl($row->file_hasil_test_mmpi ?? null),
+                    'catatan' => null,
+                    'created_at' => $row->review_created_at ?? $row->hasil_test_created_at,
+                    'updated_at' => $row->review_updated_at ?? $row->hasil_test_updated_at,
+
+                    'review_management_id' => $row->review_management_id,
+                    'review_management' => $row->review_management,
+                    'status_review' => $row->status_review,
+
+                    'detail_kandidat' => $kandidat,
+                    'tanggal_sort' => $row->tanggal_test ? strtotime((string) $row->tanggal_test) : 0,
+                ];
+            });
+    }
+
+    private function getLatestHasilTestZoomForKandidat(?string $kandidatId): ?array
+    {
+        if (!$kandidatId || !Schema::hasTable('daftar_hadir_test_zoom')) {
+            return null;
+        }
+
+        $query = DB::table('daftar_hadir_test_zoom as dhz')
+            ->where('dhz.data_riwayat_diri_id', $kandidatId);
+
+        if (Schema::hasTable('jadwal_test_zoom')) {
+            $query->leftJoin('jadwal_test_zoom as jtz', 'jtz.id', '=', 'dhz.jadwal_test_zoom_id');
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'deleted_at')) {
+            $query->whereNull('dhz.deleted_at');
+        }
+
+        if (Schema::hasTable('jadwal_test_zoom') && Schema::hasColumn('jadwal_test_zoom', 'deleted_at')) {
+            $query->whereNull('jtz.deleted_at');
+        }
+
+        $selects = [
+            'dhz.id as hasil_test_zoom_id',
+            'dhz.jadwal_test_zoom_id',
+            'dhz.data_riwayat_diri_id',
+            'dhz.tanggal_kehadiran',
+            'dhz.status_kehadiran',
+            'dhz.hasil_test',
+            Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')
+                ? 'dhz.file_hasil_test_zoom'
+                : DB::raw('NULL as file_hasil_test_zoom'),
+            'dhz.created_at as hasil_test_created_at',
+            'dhz.updated_at as hasil_test_updated_at',
+        ];
+
+        $selects[] = Schema::hasTable('jadwal_test_zoom') && Schema::hasColumn('jadwal_test_zoom', 'jadwal')
+            ? 'jtz.jadwal as tanggal_test'
+            : DB::raw('dhz.tanggal_kehadiran as tanggal_test');
+
+        foreach (['hasil_test_iq', 'hasil_test_disc', 'hasil_test_eysenck'] as $column) {
+            $selects[] = Schema::hasColumn('daftar_hadir_test_zoom', $column)
+                ? "dhz.{$column}"
+                : DB::raw("NULL as {$column}");
+        }
+
+        $row = $query
+            ->select($selects)
+            ->orderByDesc(DB::raw('COALESCE(' . (Schema::hasTable('jadwal_test_zoom') && Schema::hasColumn('jadwal_test_zoom', 'jadwal') ? 'jtz.jadwal, ' : '') . 'dhz.tanggal_kehadiran, dhz.created_at)'))
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return $this->mapLatestTestZoomRow($row);
+    }
+
+    private function getLatestHasilTestMmpiForKandidat(?string $kandidatId): ?array
+    {
+        if (!$kandidatId || !Schema::hasTable('daftar_hadir_test_mmpi')) {
+            return null;
+        }
+
+        $query = DB::table('daftar_hadir_test_mmpi as dhm')
+            ->where('dhm.data_riwayat_diri_id', $kandidatId);
+
+        if (Schema::hasTable('jadwal_test_mmpi')) {
+            $query->leftJoin('jadwal_test_mmpi as jtm', 'jtm.id', '=', 'dhm.jadwal_test_mmpi_id');
+        }
+
+        if (Schema::hasColumn('daftar_hadir_test_mmpi', 'deleted_at')) {
+            $query->whereNull('dhm.deleted_at');
+        }
+
+        if (Schema::hasTable('jadwal_test_mmpi') && Schema::hasColumn('jadwal_test_mmpi', 'deleted_at')) {
+            $query->whereNull('jtm.deleted_at');
+        }
+
+        $selects = [
+            'dhm.id as hasil_test_mmpi_id',
+            'dhm.jadwal_test_mmpi_id',
+            'dhm.data_riwayat_diri_id',
+            'dhm.tanggal_kehadiran',
+            'dhm.status_kehadiran',
+            'dhm.hasil_test',
+            Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')
+                ? 'dhm.file_hasil_test_mmpi'
+                : DB::raw('NULL as file_hasil_test_mmpi'),
+            'dhm.created_at as hasil_test_created_at',
+            'dhm.updated_at as hasil_test_updated_at',
+        ];
+
+        $selects[] = Schema::hasTable('jadwal_test_mmpi') && Schema::hasColumn('jadwal_test_mmpi', 'tanggal')
+            ? 'jtm.tanggal as tanggal_test'
+            : DB::raw('dhm.tanggal_kehadiran as tanggal_test');
+
+        $row = $query
+            ->select($selects)
+            ->orderByDesc(DB::raw('COALESCE(' . (Schema::hasTable('jadwal_test_mmpi') && Schema::hasColumn('jadwal_test_mmpi', 'tanggal') ? 'jtm.tanggal, ' : '') . 'dhm.tanggal_kehadiran, dhm.created_at)'))
+            ->first();
+
+        if (!$row) {
+            return null;
+        }
+
+        return $this->mapLatestTestMmpiRow($row);
+    }
+
+    private function mapLatestTestZoomRow($row): array
+    {
+        $catatanTest = collect([
+            'IQ' => $row->hasil_test_iq ?? null,
+            'DISC' => $row->hasil_test_disc ?? null,
+            'Eysenck' => $row->hasil_test_eysenck ?? null,
+        ])
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value, $key) => "{$key}: {$value}")
+            ->implode(' | ');
+
+        return [
+            'id' => $row->hasil_test_zoom_id,
+            'source_id' => $row->hasil_test_zoom_id,
+            'review_source' => 'test_zoom',
+            'review_source_label' => 'Hasil Test Zoom',
+            'jenis_review' => 'Hasil Test Zoom',
+            'hasil_test_zoom_id' => $row->hasil_test_zoom_id,
+            'jadwal_test_zoom_id' => $row->jadwal_test_zoom_id ?? null,
+            'data_riwayat_diri_id' => $row->data_riwayat_diri_id ?? null,
+            'judul_tahapan' => 'Hasil Test Zoom',
+            'tanggal_tahapan' => $row->tanggal_test ?? $row->tanggal_kehadiran ?? null,
+            'tanggal_tahapan_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test ?? $row->tanggal_kehadiran ?? null),
+            'tanggal_test_zoom' => $row->tanggal_test ?? $row->tanggal_kehadiran ?? null,
+            'tanggal_test_zoom_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test ?? $row->tanggal_kehadiran ?? null),
+            'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran ?? null),
+            'hasil_test' => $this->normalizeHasilTest($row->hasil_test ?? null),
+            'hasil_label' => $this->labelHasilTest($row->hasil_test ?? null),
+            'file_hasil_test_zoom' => $row->file_hasil_test_zoom ?? null,
+            'file_hasil_test_zoom_url' => $this->makeFileUrl($row->file_hasil_test_zoom ?? null),
+            'hasil_test_iq' => $row->hasil_test_iq ?? null,
+            'hasil_test_disc' => $row->hasil_test_disc ?? null,
+            'hasil_test_eysenck' => $row->hasil_test_eysenck ?? null,
+            'catatan' => $catatanTest ?: null,
+        ];
+    }
+
+    private function mapLatestTestMmpiRow($row): array
+    {
+        return [
+            'id' => $row->hasil_test_mmpi_id,
+            'source_id' => $row->hasil_test_mmpi_id,
+            'review_source' => 'test_mmpi',
+            'review_source_label' => 'Hasil Test MMPI',
+            'jenis_review' => 'Hasil Test MMPI',
+            'hasil_test_mmpi_id' => $row->hasil_test_mmpi_id,
+            'jadwal_test_mmpi_id' => $row->jadwal_test_mmpi_id ?? null,
+            'data_riwayat_diri_id' => $row->data_riwayat_diri_id ?? null,
+            'judul_tahapan' => 'Hasil Test MMPI',
+            'tanggal_tahapan' => $row->tanggal_test ?? $row->tanggal_kehadiran ?? null,
+            'tanggal_tahapan_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test ?? $row->tanggal_kehadiran ?? null),
+            'tanggal_test_mmpi' => $row->tanggal_test ?? $row->tanggal_kehadiran ?? null,
+            'tanggal_test_mmpi_format' => $this->formatTanggalWaktuIndonesia($row->tanggal_test ?? $row->tanggal_kehadiran ?? null),
+            'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran ?? null),
+            'hasil_test' => $this->normalizeHasilTest($row->hasil_test ?? null),
+            'hasil_label' => $this->labelHasilTest($row->hasil_test ?? null),
+            'file_hasil_test_mmpi' => $row->file_hasil_test_mmpi ?? null,
+            'file_hasil_test_mmpi_url' => $this->makeFileUrl($row->file_hasil_test_mmpi ?? null),
+            'catatan' => null,
+        ];
     }
 
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'review_source' => [
+                'nullable',
+                'string',
+                Rule::in($this->reviewSourceOptions),
+            ],
             'hasil_interview_id' => [
-                'required',
+                'nullable',
                 'uuid',
                 'exists:jadwal_interview_kandidat,id',
+            ],
+            'hasil_test_zoom_id' => [
+                'nullable',
+                'uuid',
+                'exists:daftar_hadir_test_zoom,id',
+            ],
+            'hasil_test_mmpi_id' => [
+                'nullable',
+                'uuid',
+                'exists:daftar_hadir_test_mmpi,id',
             ],
             'review_management' => [
                 'nullable',
@@ -374,6 +858,34 @@ class ReviewManagementController extends Controller
                 Rule::in($this->statusReviewOptions),
             ],
         ]);
+
+        $reviewSource = $validated['review_source'] ?? null;
+
+        if (!$reviewSource) {
+            $reviewSource = !empty($validated['hasil_test_zoom_id'])
+                ? 'test_zoom'
+                : (!empty($validated['hasil_test_mmpi_id']) ? 'test_mmpi' : 'interview');
+        }
+
+        if ($reviewSource === 'test_zoom') {
+            return $this->storeReviewHasilTestZoom($validated);
+        }
+
+        if ($reviewSource === 'test_mmpi') {
+            return $this->storeReviewHasilTestMmpi($validated);
+        }
+
+        return $this->storeReviewInterview($validated);
+    }
+
+    private function storeReviewInterview(array $validated): JsonResponse
+    {
+        if (empty($validated['hasil_interview_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID hasil interview wajib dikirim untuk review interview.',
+            ], 422);
+        }
 
         $jadwalKandidat = JadwalInterviewKandidat::query()
             ->where('id', $validated['hasil_interview_id'])
@@ -387,19 +899,177 @@ class ReviewManagementController extends Controller
             ], 422);
         }
 
-        $review = HasilReviewManagement::query()->updateOrCreate(
-            [
-                'hasil_interview_id' => $validated['hasil_interview_id'],
-            ],
-            [
-                'review_management' => $validated['review_management'] ?? null,
-                'status' => $validated['status'] ?? null,
-            ]
-        );
+        $review = HasilReviewManagement::query()
+            ->where('hasil_interview_id', $validated['hasil_interview_id'])
+            ->first();
+
+        if (!$review) {
+            $review = new HasilReviewManagement();
+            $review->id = (string) Str::uuid();
+            $review->hasil_interview_id = $validated['hasil_interview_id'];
+        }
+
+        if (Schema::hasColumn('hasil_review_management', 'sumber_review')) {
+            $review->sumber_review = 'interview';
+        }
+
+        if (Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+            $review->daftar_hadir_test_zoom_id = null;
+        }
+
+        if (Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+            $review->daftar_hadir_test_mmpi_id = null;
+        }
+
+        $review->review_management = $validated['review_management'] ?? null;
+        $review->status = $validated['status'] ?? null;
+        $review->save();
 
         return response()->json([
             'success' => true,
-            'message' => 'Review management berhasil disimpan.',
+            'message' => 'Review management interview berhasil disimpan.',
+            'data' => $review,
+        ]);
+    }
+
+    private function storeReviewHasilTestZoom(array $validated): JsonResponse
+    {
+        if (!Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom daftar_hadir_test_zoom_id belum tersedia di tabel hasil_review_management. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        if (empty($validated['hasil_test_zoom_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID hasil test Zoom wajib dikirim untuk review hasil test.',
+            ], 422);
+        }
+
+        $hasilTest = DB::table('daftar_hadir_test_zoom')
+            ->where('id', $validated['hasil_test_zoom_id'])
+            ->first();
+
+        if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data hanya bisa direview jika hasil test Zoom Lolos.',
+            ], 422);
+        }
+
+        $existing = DB::table('hasil_review_management')
+            ->where('daftar_hadir_test_zoom_id', $validated['hasil_test_zoom_id'])
+            ->first();
+
+        $payload = [
+            'hasil_interview_id' => null,
+            'daftar_hadir_test_zoom_id' => $validated['hasil_test_zoom_id'],
+            'review_management' => $validated['review_management'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+            $payload['daftar_hadir_test_mmpi_id'] = null;
+        }
+
+        if (Schema::hasColumn('hasil_review_management', 'sumber_review')) {
+            $payload['sumber_review'] = 'test_zoom';
+        }
+
+        if ($existing) {
+            DB::table('hasil_review_management')
+                ->where('id', $existing->id)
+                ->update($payload);
+
+            $reviewId = $existing->id;
+        } else {
+            $reviewId = (string) Str::uuid();
+
+            DB::table('hasil_review_management')->insert(array_merge($payload, [
+                'id' => $reviewId,
+                'created_at' => now(),
+            ]));
+        }
+
+        $review = HasilReviewManagement::query()->find($reviewId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Review management hasil test Zoom berhasil disimpan.',
+            'data' => $review,
+        ]);
+    }
+
+    private function storeReviewHasilTestMmpi(array $validated): JsonResponse
+    {
+        if (!Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kolom daftar_hadir_test_mmpi_id belum tersedia di tabel hasil_review_management. Jalankan migration terlebih dahulu.',
+            ], 500);
+        }
+
+        if (empty($validated['hasil_test_mmpi_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID hasil test MMPI wajib dikirim untuk review hasil test.',
+            ], 422);
+        }
+
+        $hasilTest = DB::table('daftar_hadir_test_mmpi')
+            ->where('id', $validated['hasil_test_mmpi_id'])
+            ->first();
+
+        if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data hanya bisa direview jika hasil test MMPI Lolos.',
+            ], 422);
+        }
+
+        $existing = DB::table('hasil_review_management')
+            ->where('daftar_hadir_test_mmpi_id', $validated['hasil_test_mmpi_id'])
+            ->first();
+
+        $payload = [
+            'hasil_interview_id' => null,
+            'daftar_hadir_test_mmpi_id' => $validated['hasil_test_mmpi_id'],
+            'review_management' => $validated['review_management'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+            $payload['daftar_hadir_test_zoom_id'] = null;
+        }
+
+        if (Schema::hasColumn('hasil_review_management', 'sumber_review')) {
+            $payload['sumber_review'] = 'test_mmpi';
+        }
+
+        if ($existing) {
+            DB::table('hasil_review_management')
+                ->where('id', $existing->id)
+                ->update($payload);
+
+            $reviewId = $existing->id;
+        } else {
+            $reviewId = (string) Str::uuid();
+
+            DB::table('hasil_review_management')->insert(array_merge($payload, [
+                'id' => $reviewId,
+                'created_at' => now(),
+            ]));
+        }
+
+        $review = HasilReviewManagement::query()->find($reviewId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Review management hasil test MMPI berhasil disimpan.',
             'data' => $review,
         ]);
     }
@@ -462,6 +1132,87 @@ class ReviewManagementController extends Controller
             'success' => true,
             'message' => 'Review management berhasil dikosongkan.',
         ]);
+    }
+
+    private function normalizeHasilTest($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        if (in_array($normalized, ['lolos', '1', 'true', 'ya', 'yes'], true)) {
+            return 'lolos';
+        }
+
+        if (in_array($normalized, ['gagal', 'tidak_lolos', 'tidaklolos', '0', 'false', 'tidak', 'no'], true)) {
+            return 'gagal';
+        }
+
+        return null;
+    }
+
+    private function labelHasilTest($value): string
+    {
+        return match ($this->normalizeHasilTest($value)) {
+            'lolos' => 'Lolos',
+            'gagal' => 'Tidak Lolos',
+            default => 'Belum Ada',
+        };
+    }
+
+    private function labelKehadiran($value): string
+    {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        $normalized = str_replace([' ', '-'], '_', $normalized);
+
+        return match ($normalized) {
+            'hadir', '1', 'true', 'ya', 'yes' => 'Hadir',
+            'tidak_hadir', 'tidakhadir', 'tidak', '0', 'false', 'no' => 'Tidak Hadir',
+            default => (string) $value,
+        };
+    }
+
+    private function formatTanggalWaktuIndonesia($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->locale('id')->translatedFormat('d F Y H:i');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    }
+
+    private function makeFileUrl(?string $path): ?string
+    {
+        $path = trim((string) $path);
+
+        if ($path === '') {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        if (str_starts_with($path, '/storage/')) {
+            return $path;
+        }
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . ltrim($path, '/'));
     }
 
     private function makePendaftaranUrl(?string $token): ?string

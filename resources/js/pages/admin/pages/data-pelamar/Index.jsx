@@ -558,11 +558,11 @@ export default function DataPelamarPage({
                     message_template:
                         "Halo {nama},\n\n" +
                         "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n" +
-                        "Tanggal skrining Anda: {tanggal_skrining}.\n\n" +
+                        
                         "Mohon untuk selalu mengecek link pendaftaran Anda dan melengkapi seluruh data diri sesuai informasi yang diminta pada formulir.\n" +
                         "Link pendaftaran Anda:\n{url_pendaftaran}\n\n" +
                         "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n" +
-                        "Jika ada kendala, silakan hubungi nomor perusahaan: {nomer_perusahaan}.\n\n" +
+                        "Jika ada kendala, silakan hubungi WA ini.\n\n" +
                         "Terima kasih.\n" +
                         "Tim Rekrutmen {perusahaan}",
                 }),

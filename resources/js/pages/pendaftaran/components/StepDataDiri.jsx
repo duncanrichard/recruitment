@@ -1,23 +1,81 @@
 import React from "react";
 import Select2 from "react-select";
 
+const CONTROLLER_REQUIRED_FIELDS = [
+    // Sesuai validasi PendaftaranController::updateDataDiriByToken
+    // Field required di controller:
+    // nama, nama_panggilan, email, no_hp, pendidikan,
+    // tanggal_lahir, agama, alamat_ktp, alamat_domisili,
+    // sosial_media minimal 1 data.
+    "nama",
+    "nama_lengkap",
+    "nama_panggilan",
+    "nama_panggil",
+    "email",
+    "no_hp",
+    "no_wa",
+    "pendidikan",
+    "pendidikan_id",
+    "tanggal_lahir",
+    "agama",
+    "agama_id",
+    "alamat_ktp",
+    "alamat_domisili",
+    "alamat",
+    "sosial_media",
+    "sosial_media.*.platform",
+    "sosial_media.*.nama_akun",
+    "sosial_media.*.nama_account",
+];
+
+// Field ini hanya wajib jika posisi mewajibkan STR
+// sesuai logic controller: $wajibStr ? 'required' : 'nullable'.
+const CONDITIONAL_REQUIRED_FIELDS = ["str_aktif"];
+
 export default function StepDataDiri({
     form,
     handleChange,
     errors = {},
-    requiredFields = [],
     handleSosialMediaChange,
     addSosialMedia,
     removeSosialMedia,
     masterOptions = {},
 }) {
-    const isRequired = (name) => requiredFields.includes(name);
+    /*
+     * Required mengikuti controller Laravel, bukan semua field di form.
+     * requiredFields dari parent tidak dipakai sebagai sumber utama agar
+     * tanda * tidak salah tampil untuk field yang nullable di controller.
+     */
+    const controllerRequiredFieldSet = React.useMemo(() => {
+        return new Set(CONTROLLER_REQUIRED_FIELDS);
+    }, []);
+
+    const isRequired = React.useCallback(
+        (...names) => {
+            return names.some((name) => controllerRequiredFieldSet.has(name));
+        },
+        [controllerRequiredFieldSet]
+    );
+
+    const isConditionalRequired = React.useCallback(
+        (...names) => {
+            return names.some((name) => CONDITIONAL_REQUIRED_FIELDS.includes(name));
+        },
+        []
+    );
     const posisiStrAktif = String(form.posisi_str_aktif || "").toLowerCase();
     const tampilkanStrAktif = posisiStrAktif === "active";
 
     const sosialMediaItems = Array.isArray(form.sosial_media)
         ? form.sosial_media
         : [];
+
+    const sosialMediaError =
+        getNestedError(errors, "sosial_media") ||
+        getNestedError(errors, "sosial_media.0") ||
+        null;
+
+    const hasSosialMediaError = Boolean(sosialMediaError);
 
     const selectedProvinsi = form.provinsi_id || form.provinsi || "";
     const selectedKabupaten = form.kabupaten_id || form.kabupaten || "";
@@ -311,7 +369,7 @@ export default function StepDataDiri({
                 <p className="mt-1 text-sm text-blue-600">
                     Lengkapi informasi pribadi sesuai identitas resmi. Field
                     bertanda <span className="font-bold text-red-500">*</span>{" "}
-                    wajib diisi.
+                    wajib diisi sesuai validasi sistem.
                 </p>
             </div>
 
@@ -327,7 +385,7 @@ export default function StepDataDiri({
                         value={form.posisi_dilamar_label || ""}
                         onChange={() => {}}
                         placeholder="Posisi yang dilamar"
-                        required={isRequired("posisi_dilamar")}
+                        required={isRequired("posisi_dilamar", "posisi_yang_dilamar")}
                         error={errors.posisi_dilamar}
                         disabled
                     />
@@ -362,7 +420,7 @@ export default function StepDataDiri({
                         value={form.nama}
                         onChange={handleChange}
                         placeholder="Masukkan nama lengkap"
-                        required={isRequired("nama")}
+                        required={isRequired("nama", "nama_lengkap")}
                         error={errors.nama}
                     />
 
@@ -372,7 +430,7 @@ export default function StepDataDiri({
                         value={form.nama_panggilan}
                         onChange={handleChange}
                         placeholder="Contoh: Rani"
-                        required={isRequired("nama_panggilan")}
+                        required={isRequired("nama_panggilan", "nama_panggil")}
                         error={errors.nama_panggilan}
                     />
 
@@ -381,7 +439,7 @@ export default function StepDataDiri({
                         name="pendidikan"
                         value={form.pendidikan}
                         onChange={handleChange}
-                        required={isRequired("pendidikan")}
+                        required={isRequired("pendidikan", "pendidikan_id")}
                         error={errors.pendidikan}
                         options={masterOptions.pendidikan || []}
                     />
@@ -442,7 +500,7 @@ export default function StepDataDiri({
                         name="agama"
                         value={form.agama}
                         onChange={handleChange}
-                        required={isRequired("agama")}
+                        required={isRequired("agama", "agama_id")}
                         error={errors.agama}
                         options={masterOptions.agama || []}
                     />
@@ -472,7 +530,7 @@ export default function StepDataDiri({
                         name="kewarganegaraan"
                         value={form.kewarganegaraan}
                         onChange={handleChange}
-                        required={isRequired("kewarganegaraan")}
+                        required={isRequired("kewarganegaraan", "kewarganegaraan_id")}
                         error={errors.kewarganegaraan}
                         options={masterOptions.kewarganegaraan || []}
                     />
@@ -484,7 +542,8 @@ export default function StepDataDiri({
                             value={form.str_aktif}
                             onChange={handleChange}
                             required={
-                                isRequired("str_aktif") || tampilkanStrAktif
+                                isRequired("str_aktif") ||
+                                (isConditionalRequired("str_aktif") && tampilkanStrAktif)
                             }
                             error={errors.str_aktif}
                             options={masterOptions.str_aktif || []}
@@ -493,16 +552,23 @@ export default function StepDataDiri({
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div
+                className={`rounded-2xl border bg-white p-5 shadow-sm ${
+                    hasSosialMediaError
+                        ? "border-red-300"
+                        : "border-slate-200"
+                }`}
+            >
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
                             Sosial Media
+                            <span className="ml-1 text-red-500">*</span>
                         </h3>
 
                         <p className="mt-1 text-xs text-slate-500">
-                            Pilih platform sosial media, lalu masukkan nama
-                            akun.
+                            Wajib isi minimal 1 sosial media. Pilih platform,
+                            lalu masukkan nama akun.
                         </p>
                     </div>
 
@@ -516,9 +582,21 @@ export default function StepDataDiri({
                 </div>
 
                 {sosialMediaItems.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
-                        <p className="text-sm font-semibold text-slate-500">
-                            Belum ada sosial media.
+                    <div
+                        className={`rounded-2xl border border-dashed px-4 py-6 text-center ${
+                            hasSosialMediaError
+                                ? "border-red-300 bg-red-50"
+                                : "border-slate-300 bg-slate-50"
+                        }`}
+                    >
+                        <p
+                            className={`text-sm font-semibold ${
+                                hasSosialMediaError
+                                    ? "text-red-600"
+                                    : "text-slate-500"
+                            }`}
+                        >
+                            {sosialMediaError || "Belum ada sosial media."}
                         </p>
 
                         <button
@@ -574,6 +652,7 @@ export default function StepDataDiri({
                                             masterOptions.sosial_media || []
                                         }
                                         placeholder="Pilih platform"
+                                        required
                                         error={getNestedError(
                                             errors,
                                             `sosial_media.${index}.platform`
@@ -592,6 +671,7 @@ export default function StepDataDiri({
                                             )
                                         }
                                         placeholder="Contoh: @namaakun"
+                                        required
                                         error={
                                             getNestedError(
                                                 errors,
@@ -608,6 +688,12 @@ export default function StepDataDiri({
                         );
                     })}
                 </div>
+
+                {sosialMediaItems.length > 0 && sosialMediaError && (
+                    <p className="mt-3 text-xs font-semibold text-red-500">
+                        {sosialMediaError}
+                    </p>
+                )}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -634,7 +720,7 @@ export default function StepDataDiri({
                         value={form.no_hp}
                         onChange={handleChange}
                         placeholder="08xxxxxxxxxx"
-                        required={isRequired("no_hp")}
+                        required={isRequired("no_hp", "no_wa")}
                         error={errors.no_hp}
                     />
                 </div>
@@ -916,6 +1002,8 @@ function Input({
                     autoComplete="off"
                     disabled={disabled}
                     readOnly={disabled}
+                    required={required && !disabled}
+                    aria-required={required}
                 />
 
                 {type === "date" && !disabled && (
@@ -988,6 +1076,8 @@ function SelectField({
                 isSearchable
                 isDisabled={disabled}
                 isLoading={isLoading}
+                required={required}
+                aria-required={required}
                 placeholder={placeholder || `Pilih ${label.toLowerCase()}`}
                 noOptionsMessage={() =>
                     isLoading ? "Memuat data..." : "Data tidak ditemukan"
@@ -1112,6 +1202,8 @@ function Textarea({
                 onChange={onChange}
                 rows={rows}
                 placeholder={placeholder}
+                required={required}
+                aria-required={required}
                 className={`${fieldClass(error)} resize-none`}
             />
 

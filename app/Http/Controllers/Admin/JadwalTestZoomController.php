@@ -10,6 +10,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class JadwalTestZoomController extends Controller
@@ -33,7 +36,7 @@ class JadwalTestZoomController extends Controller
             ->with([
                 'dataRiwayatDiri:id,nama_lengkap,nama_panggil,email,no_wa,token,tanggal_skrining,posisi_yang_dilamar,perusahaan_dilamar',
                 'dataRiwayatDiri.posisi:id,nama_posisi',
-                'dataRiwayatDiri.perusahaan:id,nama_perusahaan',
+                'dataRiwayatDiri.perusahaan:id,nama_perusahaan,no_wa,token_api_wa',
             ])
             ->latest('jadwal_mulai')
             ->latest('jadwal');
@@ -333,11 +336,31 @@ class JadwalTestZoomController extends Controller
 
         $jumlahSkip = count($pelamarSudahDijadwalkan);
 
+        /*
+        |--------------------------------------------------------------------------
+        | Kirim WhatsApp otomatis setelah jadwal berhasil dibuat
+        |--------------------------------------------------------------------------
+        | Pesan dikirim memakai token_api_wa dan no_wa dari perusahaan masing-masing
+        | kandidat. Proses kirim WA tidak membatalkan penyimpanan jadwal.
+        */
+        $waResult = $this->sendJadwalZoomMessages($freshData);
+
+        $message = count($created) . ' jadwal test Zoom berhasil disimpan.'
+            . ($jumlahSkip > 0 ? ' ' . $jumlahSkip . ' pelamar dilewati karena sudah dijadwalkan.' : '');
+
+        if (($waResult['total_dikirim'] ?? 0) > 0 && ($waResult['total_gagal_provider'] ?? 0) === 0) {
+            $message .= ' Pesan WhatsApp jadwal Zoom berhasil dikirim ke kandidat sesuai perusahaan masing-masing.';
+        } elseif (($waResult['total_dikirim'] ?? 0) > 0) {
+            $message .= ' Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal. Cek detail wa_result.';
+        } else {
+            $message .= ' Jadwal tersimpan, tetapi pesan WhatsApp belum terkirim. Cek detail wa_result.';
+        }
+
         return response()->json([
             'success' => true,
-            'message' => count($created) . ' jadwal test Zoom berhasil disimpan.'
-                . ($jumlahSkip > 0 ? ' ' . $jumlahSkip . ' pelamar dilewati karena sudah dijadwalkan.' : ''),
+            'message' => $message,
             'data' => $freshData,
+            'wa_result' => $waResult,
         ], 201);
     }
 
@@ -493,9 +516,30 @@ class JadwalTestZoomController extends Controller
             })
             ->values();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Kirim WhatsApp otomatis setelah group jadwal berhasil diperbarui
+        |--------------------------------------------------------------------------
+        | Saat group test Zoom di-update, semua kandidat pada group tersebut akan
+        | menerima pesan jadwal terbaru. Pengiriman tetap menggunakan token_api_wa
+        | dan no_wa dari perusahaan masing-masing kandidat. Jika WA gagal, update
+        | jadwal tetap berhasil dan detail kegagalan dikembalikan pada wa_result.
+        */
+        $waResult = $this->sendJadwalZoomMessages($freshRows);
+
+        $message = 'Group jadwal test Zoom berhasil diperbarui.';
+
+        if (($waResult['total_dikirim'] ?? 0) > 0 && ($waResult['total_gagal_provider'] ?? 0) === 0) {
+            $message .= ' Pesan WhatsApp jadwal Zoom terbaru berhasil dikirim ke kandidat sesuai perusahaan masing-masing.';
+        } elseif (($waResult['total_dikirim'] ?? 0) > 0) {
+            $message .= ' Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal. Cek detail wa_result.';
+        } else {
+            $message .= ' Jadwal sudah diperbarui, tetapi pesan WhatsApp belum terkirim. Cek detail wa_result.';
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Group jadwal test Zoom berhasil diperbarui.',
+            'message' => $message,
             'data' => $this->formatDetailGroup(
                 $freshRows,
                 $jadwalMulai,
@@ -503,6 +547,7 @@ class JadwalTestZoomController extends Controller
                 $validated['sesi'],
                 $newGroupKey
             ),
+            'wa_result' => $waResult,
         ]);
     }
 
@@ -555,6 +600,449 @@ class JadwalTestZoomController extends Controller
         }
     }
 
+
+
+    private function sendJadwalZoomMessages($jadwals, ?string $template = null): array
+    {
+        $jadwals = collect($jadwals)
+            ->filter(fn ($item) => $item instanceof JadwalTestZoom)
+            ->values();
+
+        if ($jadwals->isEmpty()) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada jadwal Zoom untuk dikirim pesan.',
+                'total_data' => 0,
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => [],
+                'targets' => [],
+                'perusahaan_responses' => [],
+            ];
+        }
+
+        $groupedMessages = [];
+        $skipped = [];
+        $validatedCompanies = [];
+
+        foreach ($jadwals as $jadwal) {
+            $pelamar = $jadwal->dataRiwayatDiri;
+
+            if (!$pelamar) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $jadwal->data_riwayat_diri_id,
+                    'reason' => 'Data kandidat tidak ditemukan pada jadwal.',
+                ];
+
+                continue;
+            }
+
+            $target = $this->normalizeWhatsappNumber($pelamar->no_wa ?? null);
+            $perusahaan = $pelamar->perusahaan;
+
+            if (!$target) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    'reason' => 'Nomor WhatsApp kandidat kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$perusahaan) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'reason' => 'Data perusahaan kandidat tidak ditemukan.',
+                ];
+
+                continue;
+            }
+
+            $tokenApiWa = $this->normalizeTokenApiWa($perusahaan->token_api_wa ?? null);
+            $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
+
+            if (!$nomerPerusahaan) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    'reason' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$tokenApiWa) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'reason' => 'Token API WA perusahaan kosong.',
+                ];
+
+                continue;
+            }
+
+            $companyValidationKey = (string) ($perusahaan->id ?? $tokenApiWa);
+
+            if (!isset($validatedCompanies[$companyValidationKey])) {
+                $validatedCompanies[$companyValidationKey] = $this->checkFonnteCredentialForSending(
+                    $nomerPerusahaan,
+                    $tokenApiWa
+                );
+            }
+
+            $validasiWa = $validatedCompanies[$companyValidationKey];
+
+            if (!$validasiWa['success']) {
+                $skipped[] = [
+                    'jadwal_id' => $jadwal->id,
+                    'data_riwayat_diri_id' => $pelamar->id,
+                    'nama_lengkap' => $pelamar->nama_lengkap,
+                    'no_wa' => $pelamar->no_wa,
+                    'target' => $target,
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'reason' => $validasiWa['message'],
+                    'fonnte_device' => $validasiWa['device_number'] ?? null,
+                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                    'fonnte_response' => $validasiWa['fonnte_response'] ?? null,
+                ];
+
+                continue;
+            }
+
+            $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
+
+            if (!isset($groupedMessages[$groupKey])) {
+                $groupedMessages[$groupKey] = [
+                    'perusahaan_id' => $perusahaan->id ?? null,
+                    'perusahaan' => $perusahaan->nama_perusahaan ?? null,
+                    'nomer_perusahaan' => $nomerPerusahaan,
+                    'token_api_wa' => $tokenApiWa,
+                    'fonnte_device' => $validasiWa['device_number'] ?? null,
+                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                    'messages' => [],
+                ];
+            }
+
+            $groupedMessages[$groupKey]['messages'][] = [
+                'target' => $target,
+                'message' => $this->buildPesanJadwalZoom($jadwal, $pelamar, $template),
+                'delay' => '2',
+            ];
+        }
+
+        if (empty($groupedMessages)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada data valid untuk dikirim pesan WhatsApp jadwal Zoom.',
+                'total_data' => $jadwals->count(),
+                'total_dikirim' => 0,
+                'total_dilewati' => count($skipped),
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => $skipped,
+                'targets' => [],
+                'perusahaan_responses' => [],
+            ];
+        }
+
+        $responses = [];
+        $totalDikirim = 0;
+        $totalGagalProvider = 0;
+        $targets = [];
+
+        foreach ($groupedMessages as $group) {
+            try {
+                $response = Http::asForm()
+                    ->withoutVerifying()
+                    ->withHeaders([
+                        'Authorization' => $group['token_api_wa'],
+                    ])
+                    ->timeout(120)
+                    ->post('https://api.fonnte.com/send', [
+                        'data' => json_encode($group['messages']),
+                        'countryCode' => '62',
+                        'typing' => 'false',
+                        'preview' => 'true',
+                    ]);
+
+                $json = $response->json();
+                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
+                $isSuccess = $response->successful() && (bool) $fonnteStatus;
+                $countMessages = count($group['messages']);
+
+                if ($isSuccess) {
+                    $totalDikirim += $countMessages;
+                } else {
+                    $totalGagalProvider += $countMessages;
+                }
+
+                $groupTargets = collect($group['messages'])->pluck('target')->values()->all();
+                $targets = array_merge($targets, $groupTargets);
+
+                $responses[] = [
+                    'success' => $isSuccess,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'fonnte_device' => $group['fonnte_device'] ?? null,
+                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
+                    'total_data' => $countMessages,
+                    'targets' => $groupTargets,
+                    'fonnte_http_code' => $response->status(),
+                    'fonnte_response' => $json ?: $response->body(),
+                    'message' => $isSuccess
+                        ? 'Pesan jadwal Zoom berhasil dikirim ke antrean Fonnte untuk perusahaan ini.'
+                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan jadwal Zoom gagal dikirim melalui Fonnte untuk perusahaan ini.'),
+                ];
+            } catch (\Throwable $e) {
+                $countMessages = count($group['messages']);
+                $totalGagalProvider += $countMessages;
+
+                Log::error('Gagal mengirim pesan Fonnte jadwal Zoom per perusahaan', [
+                    'message' => $e->getMessage(),
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                ]);
+
+                $responses[] = [
+                    'success' => false,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'fonnte_device' => $group['fonnte_device'] ?? null,
+                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
+                    'total_data' => $countMessages,
+                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
+                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
+                ];
+            }
+        }
+
+        $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
+        $isPartialSuccess = $totalDikirim > 0 && $totalGagalProvider > 0;
+
+        return [
+            'success' => $totalDikirim > 0,
+            'message' => $isAllSuccess
+                ? 'Pesan WhatsApp jadwal Zoom berhasil dikirim sesuai perusahaan masing-masing.'
+                : ($isPartialSuccess
+                    ? 'Sebagian pesan WhatsApp jadwal Zoom berhasil dikirim, sebagian gagal.'
+                    : 'Pesan WhatsApp jadwal Zoom gagal dikirim.'),
+            'total_data' => $jadwals->count(),
+            'total_dikirim' => $totalDikirim,
+            'total_dilewati' => count($skipped),
+            'total_gagal_provider' => $totalGagalProvider,
+            'total_perusahaan' => count($groupedMessages),
+            'skipped' => $skipped,
+            'targets' => array_values(array_unique($targets)),
+            'perusahaan_responses' => $responses,
+        ];
+    }
+
+    private function buildPesanJadwalZoom(JadwalTestZoom $jadwal, DataRiwayatDiri $pelamar, ?string $template = null): string
+    {
+        $jadwalMulai = $this->getJadwalMulai($jadwal);
+        $jadwalSelesai = $this->getJadwalSelesai($jadwal);
+        $sesi = $this->getSesi($jadwal);
+        $perusahaan = $pelamar->perusahaan?->nama_perusahaan ?: '-';
+        $posisi = $pelamar->posisi?->nama_posisi ?: '-';
+        $nama = $pelamar->nama_panggil ?: ($pelamar->nama_lengkap ?: 'Kandidat');
+        $namaLengkap = $pelamar->nama_lengkap ?: $nama;
+        $linkZoom = $jadwal->link_zoom ?: '-';
+        $nomerPerusahaan = $this->normalizeWhatsappNumber($pelamar->perusahaan?->no_wa ?? null);
+        $nomerPerusahaanLabel = $nomerPerusahaan ?: ($pelamar->perusahaan?->no_wa ?? '-');
+
+        $tanggalTest = $jadwalMulai
+            ? $jadwalMulai->translatedFormat('d F Y')
+            : '-';
+
+        $jamTest = $this->formatJamRange($jadwalMulai, $jadwalSelesai);
+        $jadwalLabel = $this->formatJadwalLabel($jadwalMulai, $jadwalSelesai, $sesi);
+
+        $message = $template ?: "Halo {nama},\n\n"
+            . "Anda dijadwalkan mengikuti test melalui Zoom untuk posisi {posisi} di {perusahaan}.\n\n"
+            . "Detail jadwal:\n"
+            . "Sesi: {sesi}\n"
+            . "Tanggal: {tanggal_test}\n"
+            . "Jam: {jam_test}\n"
+            . "Link Zoom: {link_zoom}\n\n"
+            . "Mohon hadir tepat waktu dan pastikan koneksi internet, kamera, serta audio berjalan dengan baik.\n\n"
+            . "Jika ada kendala, silakan hubungi WhatsApp ini.\n\n"
+            . "Terima kasih.\n"
+            . "Tim Rekrutmen {perusahaan}";
+
+        return strtr($message, [
+            '{nama}' => $nama,
+            '{nama_lengkap}' => $namaLengkap,
+            '{posisi}' => $posisi,
+            '{perusahaan}' => $perusahaan,
+            '{sesi}' => $sesi,
+            '{tanggal_test}' => $tanggalTest,
+            '{jam_test}' => $jamTest,
+            '{jadwal}' => $jadwalLabel,
+            '{jadwal_zoom}' => $jadwalLabel,
+            '{link_zoom}' => $linkZoom,
+            '{nomer_perusahaan}' => (string) $nomerPerusahaanLabel,
+            '{nomor_perusahaan}' => (string) $nomerPerusahaanLabel,
+            '{no_wa_perusahaan}' => (string) $nomerPerusahaanLabel,
+        ]);
+    }
+
+    private function checkFonnteCredentialForSending(?string $nomerPerusahaan, ?string $tokenApiWa): array
+    {
+        if (!$nomerPerusahaan) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+            ];
+        }
+
+        if (!$tokenApiWa) {
+            return [
+                'success' => false,
+                'message' => 'Token API WA perusahaan kosong.',
+            ];
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders([
+                    'Authorization' => $tokenApiWa,
+                ])
+                ->timeout(30)
+                ->post('https://api.fonnte.com/device');
+
+            $json = $response->json();
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'message' => 'Gagal memvalidasi token API WA perusahaan ke Fonnte.',
+                    'fonnte_response' => $json ?: $response->body(),
+                ];
+            }
+
+            if (!($json['status'] ?? false)) {
+                return [
+                    'success' => false,
+                    'message' => $json['reason']
+                        ?? $json['message']
+                        ?? 'Token API WA perusahaan tidak valid.',
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            $deviceNumber = $this->normalizeWhatsappNumber($json['device'] ?? null);
+
+            if (!$deviceNumber) {
+                return [
+                    'success' => false,
+                    'message' => 'Nomor device pada token API WA tidak ditemukan.',
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            if ($deviceNumber !== $nomerPerusahaan) {
+                return [
+                    'success' => false,
+                    'message' => 'Token API WA tidak sesuai dengan nomor perusahaan. Token ini terdaftar untuk nomor ' . ($json['device'] ?? '-') . '.',
+                    'device_number' => $deviceNumber,
+                    'device_status' => $json['device_status'] ?? null,
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            if (($json['device_status'] ?? null) !== 'connect') {
+                return [
+                    'success' => false,
+                    'message' => 'Device WhatsApp perusahaan belum connect.',
+                    'device_number' => $deviceNumber,
+                    'device_status' => $json['device_status'] ?? null,
+                    'fonnte_response' => $json,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Token API WA dan nomor perusahaan valid.',
+                'device_number' => $deviceNumber,
+                'device_status' => $json['device_status'] ?? null,
+                'fonnte_response' => $json,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'message' => 'Gagal memvalidasi token API WA perusahaan: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private function normalizeTokenApiWa(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function normalizeWhatsappNumber(?string $number): ?string
+    {
+        if (!$number) {
+            return null;
+        }
+
+        $number = trim($number);
+        $number = preg_replace('/[^0-9+]/', '', $number);
+
+        if ($number === '') {
+            return null;
+        }
+
+        if (Str::startsWith($number, '+')) {
+            $number = substr($number, 1);
+        }
+
+        if (Str::startsWith($number, '0')) {
+            $number = '62' . substr($number, 1);
+        }
+
+        if (Str::startsWith($number, '8')) {
+            $number = '62' . $number;
+        }
+
+        if (!preg_match('/^62[0-9]{8,15}$/', $number)) {
+            return null;
+        }
+
+        return $number;
+    }
 
     private function applyTanggalTestFilter($query, Request $request): void
     {
@@ -628,7 +1116,7 @@ class JadwalTestZoomController extends Controller
             ->with([
                 'dataRiwayatDiri:id,nama_lengkap,nama_panggil,email,no_wa,token,tanggal_skrining,posisi_yang_dilamar,perusahaan_dilamar',
                 'dataRiwayatDiri.posisi:id,nama_posisi',
-                'dataRiwayatDiri.perusahaan:id,nama_perusahaan',
+                'dataRiwayatDiri.perusahaan:id,nama_perusahaan,no_wa,token_api_wa',
             ]);
     }
 

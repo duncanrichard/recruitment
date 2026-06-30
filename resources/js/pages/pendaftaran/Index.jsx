@@ -195,6 +195,7 @@ function PendaftaranPage() {
         catatan_kesehatan: "",
 
         status_pekerjaan: "",
+        riwayat_pekerjaan: [],
         nama_perusahaan: "",
         posisi_pekerjaan: "",
         posisi_pekerjaan_terakhir: "",
@@ -1008,6 +1009,131 @@ function PendaftaranPage() {
         return mappedRows.length > 0 ? mappedRows : [{ ...emptySaudara }];
     };
 
+
+    const EMPTY_RIWAYAT_PEKERJAAN = {
+        id: "",
+        nama_perusahaan: "",
+        posisi_pekerjaan_terakhir: "",
+        posisi_pekerjaan: "",
+        periode_kerja_awal: "",
+        periode_kerja_akhir: "",
+        gaji_terakhir: "",
+        bidang_pekerjaan: "",
+        lokasi_perusahaan: "",
+        deskripsi_pekerjaan: "",
+        alasan_berhenti: "",
+        keahlian: "",
+        referensi_kerja: "",
+        nama_refrensi: "",
+        telp_refrensi: "",
+        refrensi_rekan_kerja: "",
+        nama_refrensi_rekan: "",
+        telp_refrensi_rekan: "",
+        refrensi_kerabat: "",
+        nama_refrensi_kerabat: "",
+        telp_refrensi_kerabat: "",
+    };
+
+    const normalizeRiwayatPekerjaanRows = (rows) => {
+        if (!Array.isArray(rows)) {
+            return [];
+        }
+
+        return rows
+            .map((item) => {
+                const referensiKerja = firstFilledValue(
+                    item?.referensi_kerja,
+                    item?.refrensi_kerja
+                );
+
+                const posisiPekerjaan = firstFilledValue(
+                    item?.posisi_pekerjaan,
+                    item?.posisi_pekerjaan_terakhir
+                );
+
+                return {
+                    ...EMPTY_RIWAYAT_PEKERJAAN,
+                    id: item?.id || "",
+                    nama_perusahaan: item?.nama_perusahaan || "",
+                    posisi_pekerjaan_terakhir: firstFilledValue(
+                        item?.posisi_pekerjaan_terakhir,
+                        posisiPekerjaan
+                    ),
+                    posisi_pekerjaan: posisiPekerjaan,
+                    periode_kerja_awal: normalizeDateInput(item?.periode_kerja_awal),
+                    periode_kerja_akhir: normalizeDateInput(item?.periode_kerja_akhir),
+                    gaji_terakhir: item?.gaji_terakhir || "",
+                    bidang_pekerjaan: item?.bidang_pekerjaan || "",
+                    lokasi_perusahaan: item?.lokasi_perusahaan || "",
+                    deskripsi_pekerjaan: item?.deskripsi_pekerjaan || "",
+                    alasan_berhenti: item?.alasan_berhenti || "",
+                    keahlian: item?.keahlian || "",
+                    referensi_kerja: referensiKerja,
+                    nama_refrensi: isTidakValue(referensiKerja) ? "" : (item?.nama_refrensi || ""),
+                    telp_refrensi: isTidakValue(referensiKerja) ? "" : (item?.telp_refrensi || ""),
+                    refrensi_rekan_kerja: item?.refrensi_rekan_kerja || "",
+                    nama_refrensi_rekan: isTidakValue(item?.refrensi_rekan_kerja) ? "" : (item?.nama_refrensi_rekan || ""),
+                    telp_refrensi_rekan: isTidakValue(item?.refrensi_rekan_kerja) ? "" : (item?.telp_refrensi_rekan || ""),
+                    refrensi_kerabat: item?.refrensi_kerabat || "",
+                    nama_refrensi_kerabat: isTidakValue(item?.refrensi_kerabat) ? "" : (item?.nama_refrensi_kerabat || ""),
+                    telp_refrensi_kerabat: isTidakValue(item?.refrensi_kerabat) ? "" : (item?.telp_refrensi_kerabat || ""),
+                };
+            })
+            .filter((item) => {
+                return Object.entries(item).some(([key, value]) => {
+                    if (key === "id") {
+                        return false;
+                    }
+
+                    return value !== undefined && value !== null && String(value).trim() !== "";
+                });
+            });
+    };
+
+    const normalizeRiwayatPekerjaanFromPelamar = (pelamar) => {
+        const rows =
+            pelamar?.riwayat_pekerjaan ||
+            pelamar?.riwayatPekerjaan ||
+            pelamar?.dataRiwayatPekerjaan ||
+            [];
+
+        if (Array.isArray(rows) && rows.length > 0) {
+            return normalizeRiwayatPekerjaanRows(rows);
+        }
+
+        const single = {
+            id: pelamar?.riwayat_pekerjaan_id || pelamar?.pekerjaan_id || "",
+            nama_perusahaan: pelamar?.nama_perusahaan || "",
+            posisi_pekerjaan_terakhir: firstFilledValue(
+                pelamar?.posisi_pekerjaan_terakhir,
+                pelamar?.posisi_pekerjaan
+            ),
+            posisi_pekerjaan: firstFilledValue(
+                pelamar?.posisi_pekerjaan,
+                pelamar?.posisi_pekerjaan_terakhir
+            ),
+            periode_kerja_awal: pelamar?.periode_kerja_awal || "",
+            periode_kerja_akhir: pelamar?.periode_kerja_akhir || "",
+            gaji_terakhir: pelamar?.gaji_terakhir || "",
+            bidang_pekerjaan: pelamar?.bidang_pekerjaan || "",
+            lokasi_perusahaan: pelamar?.lokasi_perusahaan || "",
+            deskripsi_pekerjaan: pelamar?.deskripsi_pekerjaan || "",
+            alasan_berhenti: pelamar?.alasan_berhenti || "",
+            keahlian: pelamar?.keahlian || "",
+            referensi_kerja: firstFilledValue(pelamar?.referensi_kerja, pelamar?.refrensi_kerja),
+            nama_refrensi: pelamar?.nama_refrensi || "",
+            telp_refrensi: pelamar?.telp_refrensi || "",
+            refrensi_rekan_kerja: pelamar?.refrensi_rekan_kerja || "",
+            nama_refrensi_rekan: pelamar?.nama_refrensi_rekan || "",
+            telp_refrensi_rekan: pelamar?.telp_refrensi_rekan || "",
+            refrensi_kerabat: pelamar?.refrensi_kerabat || "",
+            nama_refrensi_kerabat: pelamar?.nama_refrensi_kerabat || "",
+            telp_refrensi_kerabat: pelamar?.telp_refrensi_kerabat || "",
+        };
+
+        return normalizeRiwayatPekerjaanRows([single]);
+    };
+
     const mapPelamarToForm = (pelamar) => {
         const posisiId =
             pelamar?.posisi_dilamar || pelamar?.posisi_yang_dilamar || "";
@@ -1031,7 +1157,8 @@ function PendaftaranPage() {
 
         const keluarga = pelamar?.riwayatKeluarga || {};
         const kesehatan = pelamar?.riwayatKesehatan || {};
-        const pekerjaan =
+        const pekerjaanRows = normalizeRiwayatPekerjaanFromPelamar(pelamar);
+        const pekerjaan = pekerjaanRows[0] ||
             pelamar?.riwayatPekerjaan ||
             pelamar?.riwayat_pekerjaan ||
             {};
@@ -1383,6 +1510,8 @@ function PendaftaranPage() {
                 pelamar?.status_pekerjaan ||
                 pekerjaan?.status_pekerjaan ||
                 "",
+
+            riwayat_pekerjaan: pekerjaanRows,
 
             nama_perusahaan:
                 pelamar?.nama_perusahaan ||
@@ -2041,6 +2170,86 @@ function PendaftaranPage() {
         return result.data;
     };
 
+    const buildRiwayatPekerjaanPayloadRows = () => {
+        const rowsFromArray = Array.isArray(form.riwayat_pekerjaan)
+            ? form.riwayat_pekerjaan
+            : [];
+
+        const sourceRows = rowsFromArray.length > 0
+            ? rowsFromArray
+            : [
+                  {
+                      id: form.riwayat_pekerjaan_id || form.pekerjaan_id || "",
+                      nama_perusahaan: form.nama_perusahaan || "",
+                      posisi_pekerjaan_terakhir:
+                          form.posisi_pekerjaan_terakhir || form.posisi_pekerjaan || "",
+                      posisi_pekerjaan:
+                          form.posisi_pekerjaan || form.posisi_pekerjaan_terakhir || "",
+                      periode_kerja_awal: form.periode_kerja_awal || "",
+                      periode_kerja_akhir: form.periode_kerja_akhir || "",
+                      gaji_terakhir: form.gaji_terakhir || "",
+                      bidang_pekerjaan: form.bidang_pekerjaan || "",
+                      lokasi_perusahaan: form.lokasi_perusahaan || "",
+                      deskripsi_pekerjaan: form.deskripsi_pekerjaan || "",
+                      alasan_berhenti: form.alasan_berhenti || "",
+                      keahlian: form.keahlian || "",
+                      referensi_kerja: form.referensi_kerja || form.refrensi_kerja || "",
+                      nama_refrensi: form.nama_refrensi || "",
+                      telp_refrensi: form.telp_refrensi || "",
+                      refrensi_rekan_kerja: form.refrensi_rekan_kerja || "",
+                      nama_refrensi_rekan: form.nama_refrensi_rekan || "",
+                      telp_refrensi_rekan: form.telp_refrensi_rekan || "",
+                      refrensi_kerabat: form.refrensi_kerabat || "",
+                      nama_refrensi_kerabat: form.nama_refrensi_kerabat || "",
+                      telp_refrensi_kerabat: form.telp_refrensi_kerabat || "",
+                  },
+              ];
+
+        return sourceRows
+            .map((item) => {
+                const posisiPekerjaan =
+                    item?.posisi_pekerjaan || item?.posisi_pekerjaan_terakhir || "";
+                const referensiKerja =
+                    item?.referensi_kerja || item?.refrensi_kerja || "";
+                const referensiAtasanTidak = isTidakValue(referensiKerja);
+                const referensiRekanTidak = isTidakValue(item?.refrensi_rekan_kerja);
+                const referensiKerabatTidak = isTidakValue(item?.refrensi_kerabat);
+
+                return {
+                    id: item?.id || "",
+                    nama_perusahaan: item?.nama_perusahaan || "",
+                    posisi_pekerjaan_terakhir: posisiPekerjaan,
+                    posisi_pekerjaan: posisiPekerjaan,
+                    periode_kerja_awal: normalizeDateForPayload(item?.periode_kerja_awal),
+                    periode_kerja_akhir: normalizeDateForPayload(item?.periode_kerja_akhir),
+                    gaji_terakhir: normalizeDecimalForPayload(item?.gaji_terakhir),
+                    bidang_pekerjaan: item?.bidang_pekerjaan || "",
+                    lokasi_perusahaan: item?.lokasi_perusahaan || "",
+                    deskripsi_pekerjaan: item?.deskripsi_pekerjaan || "",
+                    alasan_berhenti: item?.alasan_berhenti || "",
+                    keahlian: item?.keahlian || "",
+                    referensi_kerja: referensiKerja,
+                    nama_refrensi: referensiAtasanTidak ? "" : (item?.nama_refrensi || ""),
+                    telp_refrensi: referensiAtasanTidak ? "" : (item?.telp_refrensi || ""),
+                    refrensi_rekan_kerja: item?.refrensi_rekan_kerja || "",
+                    nama_refrensi_rekan: referensiRekanTidak ? "" : (item?.nama_refrensi_rekan || ""),
+                    telp_refrensi_rekan: referensiRekanTidak ? "" : (item?.telp_refrensi_rekan || ""),
+                    refrensi_kerabat: item?.refrensi_kerabat || "",
+                    nama_refrensi_kerabat: referensiKerabatTidak ? "" : (item?.nama_refrensi_kerabat || ""),
+                    telp_refrensi_kerabat: referensiKerabatTidak ? "" : (item?.telp_refrensi_kerabat || ""),
+                };
+            })
+            .filter((item) => {
+                return Object.entries(item).some(([key, value]) => {
+                    if (key === "id") {
+                        return false;
+                    }
+
+                    return value !== undefined && value !== null && String(value).trim() !== "";
+                });
+            });
+    };
+
     const saveRiwayatPekerjaan = async () => {
         const token = form.token || getInitialTokenFromPage();
 
@@ -2048,69 +2257,39 @@ function PendaftaranPage() {
             throw new Error("Token pelamar tidak tersedia.");
         }
 
-        const posisiPekerjaan =
-            form.posisi_pekerjaan ||
-            form.posisi_pekerjaan_terakhir ||
-            "";
+        const riwayatPekerjaanRows =
+            String(form.status_pekerjaan || "").trim().toLowerCase() === "belum bekerja"
+                ? []
+                : buildRiwayatPekerjaanPayloadRows();
 
-        const tahunMulaiBekerja = normalizeYearForPayload(
-            form.tahun_mulai_bekerja || getYearFromDate(form.periode_kerja_awal)
-        );
-
-        const tahunSelesaiBekerja = normalizeYearForPayload(
-            form.tahun_selesai_bekerja || getYearFromDate(form.periode_kerja_akhir)
-        );
-
-        const periodeKerjaAwal =
-            normalizeDateForPayload(form.periode_kerja_awal) ||
-            normalizeDateForPayload(tahunMulaiBekerja);
-
-        const periodeKerjaAkhir =
-            normalizeDateForPayload(form.periode_kerja_akhir) ||
-            normalizeDateForPayload(tahunSelesaiBekerja);
-
-        const lamaBekerja = hitungLamaBekerja(
-            tahunMulaiBekerja,
-            tahunSelesaiBekerja
-        );
-
-        const referensiAtasanTidak = isTidakValue(form.referensi_kerja);
-        const referensiRekanTidak = isTidakValue(form.refrensi_rekan_kerja);
-        const referensiKerabatTidak = isTidakValue(form.refrensi_kerabat);
+        const firstRow = riwayatPekerjaanRows[0] || {};
 
         const payload = {
             status_pekerjaan: form.status_pekerjaan || "",
+            riwayat_pekerjaan: riwayatPekerjaanRows,
 
-            nama_perusahaan: form.nama_perusahaan || "",
-            posisi_pekerjaan: posisiPekerjaan,
-            posisi_pekerjaan_terakhir: posisiPekerjaan,
-            bidang_pekerjaan: form.bidang_pekerjaan || "",
-            lokasi_perusahaan: form.lokasi_perusahaan || "",
-
-            tahun_mulai_bekerja: tahunMulaiBekerja,
-            tahun_selesai_bekerja: tahunSelesaiBekerja,
-            lama_bekerja: lamaBekerja,
-
-            periode_kerja_awal: periodeKerjaAwal,
-            periode_kerja_akhir: periodeKerjaAkhir,
-
-            deskripsi_pekerjaan: form.deskripsi_pekerjaan || "",
-            alasan_berhenti: form.alasan_berhenti || "",
-            gaji_terakhir: normalizeDecimalForPayload(form.gaji_terakhir),
-            keahlian: form.keahlian || "",
-            catatan_pekerjaan: form.catatan_pekerjaan || "",
-
-            referensi_kerja: form.referensi_kerja || "",
-            nama_refrensi: referensiAtasanTidak ? "" : (form.nama_refrensi || ""),
-            telp_refrensi: referensiAtasanTidak ? "" : (form.telp_refrensi || ""),
-
-            refrensi_rekan_kerja: form.refrensi_rekan_kerja || "",
-            nama_refrensi_rekan: referensiRekanTidak ? "" : (form.nama_refrensi_rekan || ""),
-            telp_refrensi_rekan: referensiRekanTidak ? "" : (form.telp_refrensi_rekan || ""),
-
-            refrensi_kerabat: form.refrensi_kerabat || "",
-            nama_refrensi_kerabat: referensiKerabatTidak ? "" : (form.nama_refrensi_kerabat || ""),
-            telp_refrensi_kerabat: referensiKerabatTidak ? "" : (form.telp_refrensi_kerabat || ""),
+            // Fallback field lama tetap dikirim dari baris pertama saja.
+            // Controller akan menyimpan semua data dari riwayat_pekerjaan.
+            nama_perusahaan: firstRow.nama_perusahaan || "",
+            posisi_pekerjaan: firstRow.posisi_pekerjaan || "",
+            posisi_pekerjaan_terakhir: firstRow.posisi_pekerjaan_terakhir || "",
+            bidang_pekerjaan: firstRow.bidang_pekerjaan || "",
+            lokasi_perusahaan: firstRow.lokasi_perusahaan || "",
+            periode_kerja_awal: firstRow.periode_kerja_awal || "",
+            periode_kerja_akhir: firstRow.periode_kerja_akhir || "",
+            deskripsi_pekerjaan: firstRow.deskripsi_pekerjaan || "",
+            alasan_berhenti: firstRow.alasan_berhenti || "",
+            gaji_terakhir: firstRow.gaji_terakhir || "",
+            keahlian: firstRow.keahlian || "",
+            referensi_kerja: firstRow.referensi_kerja || "",
+            nama_refrensi: firstRow.nama_refrensi || "",
+            telp_refrensi: firstRow.telp_refrensi || "",
+            refrensi_rekan_kerja: firstRow.refrensi_rekan_kerja || "",
+            nama_refrensi_rekan: firstRow.nama_refrensi_rekan || "",
+            telp_refrensi_rekan: firstRow.telp_refrensi_rekan || "",
+            refrensi_kerabat: firstRow.refrensi_kerabat || "",
+            nama_refrensi_kerabat: firstRow.nama_refrensi_kerabat || "",
+            telp_refrensi_kerabat: firstRow.telp_refrensi_kerabat || "",
         };
 
         const response = await fetch(
@@ -2502,7 +2681,8 @@ function PendaftaranPage() {
                 updatedForm.diagnosa_dokter = "";
             }
 
-            if (name === "status_pekerjaan" && nextValue === "Belum Bekerja") {
+            if (name === "status_pekerjaan" && String(nextValue).trim().toLowerCase() === "belum bekerja") {
+                updatedForm.riwayat_pekerjaan = [];
                 updatedForm.posisi_pekerjaan = "";
                 updatedForm.posisi_pekerjaan_terakhir = "";
                 updatedForm.nama_perusahaan = "";

@@ -16,39 +16,31 @@ class DataRiwayatKeluarga extends Model
     protected $fillable = [
         'data_riwayat_diri_id',
 
-        'nama_ayah_kandung',
-        'pekerjaan_ayah_kandung',
-        'nama_ibu_kandung',
-        'pekerjaan_ibu_kandung',
-
+        // Data orang tua
         'nama_ayah',
-        'nik_ayah',
-        'tempat_lahir_ayah',
-        'tanggal_lahir_ayah',
-        'pekerjaan_ayah',
         'no_hp_ayah',
         'alamat_ayah',
 
         'nama_ibu',
-        'nik_ibu',
-        'tempat_lahir_ibu',
-        'tanggal_lahir_ibu',
-        'pekerjaan_ibu',
         'no_hp_ibu',
         'alamat_ibu',
 
+        // Pasangan
         'nama_suami_istri',
         'pekerjaan_suami_istri',
         'tlpn_suami_istri',
 
+        // Mertua
         'nama_bapak_mertua',
         'pekerjaan_bapak_mertua',
         'nama_ibu_mertua',
         'pekerjaan_ibu_mertua',
 
+        // Hubungan kerabat
         'kerabat_bekerja_diinstansi',
         'hubungan_kerabat_instansi',
 
+        // Kontak darurat
         'tlpn_darurat',
         'kontak_darurat',
 
@@ -56,8 +48,6 @@ class DataRiwayatKeluarga extends Model
     ];
 
     protected $casts = [
-        'tanggal_lahir_ayah' => 'date',
-        'tanggal_lahir_ibu' => 'date',
         'hubungan_kerabat_instansi' => 'array',
         'kontak_darurat' => 'array',
     ];

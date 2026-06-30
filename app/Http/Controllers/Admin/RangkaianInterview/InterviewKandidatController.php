@@ -338,7 +338,12 @@ class InterviewKandidatController extends Controller
             DB::table('jadwal_interview_kandidat')->insert($rows);
         });
 
-        $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+        $waPanelisResult = $this->kirimPesanJadwalInterviewKePanelis(
+            $validated['jadwal_interview_id'],
+            $kandidatIds->all()
+        );
+
+        $waKandidatResult = $this->kirimPesanReminderInterviewKeKandidat(
             $validated['jadwal_interview_id'],
             $kandidatIds->all()
         );
@@ -350,8 +355,9 @@ class InterviewKandidatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Kandidat berhasil dimasukkan ke jadwal interview.',
-            'wa_panelis' => $waResult,
+            'message' => 'Kandidat berhasil dimasukkan ke jadwal interview. Informasi interview sudah diproses ke kandidat.',
+            'wa_panelis' => $waPanelisResult,
+            'wa_kandidat' => $waKandidatResult,
             'google_calendar' => $calendarResult,
         ]);
     }
@@ -424,7 +430,12 @@ class InterviewKandidatController extends Controller
             }
         });
 
-        $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+        $waPanelisResult = $this->kirimPesanJadwalInterviewKePanelis(
+            $jadwalInterviewId,
+            $kandidatIds->all()
+        );
+
+        $waKandidatResult = $this->kirimPesanReminderInterviewKeKandidat(
             $jadwalInterviewId,
             $kandidatIds->all()
         );
@@ -436,8 +447,9 @@ class InterviewKandidatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Kandidat jadwal interview berhasil diperbarui.',
-            'wa_panelis' => $waResult,
+            'message' => 'Kandidat jadwal interview berhasil diperbarui. Informasi interview sudah diproses ke kandidat.',
+            'wa_panelis' => $waPanelisResult,
+            'wa_kandidat' => $waKandidatResult,
             'google_calendar' => $calendarResult,
         ]);
     }
@@ -462,11 +474,17 @@ class InterviewKandidatController extends Controller
             ->values()
             ->all();
 
-        $waResult = [];
+        $waPanelisResult = [];
+        $waKandidatResult = [];
         $calendarResult = [];
 
         if (!empty($kandidatIds)) {
-            $waResult = $this->kirimPesanJadwalInterviewKePanelis(
+            $waPanelisResult = $this->kirimPesanJadwalInterviewKePanelis(
+                $jadwalInterviewId,
+                $kandidatIds
+            );
+
+            $waKandidatResult = $this->kirimPesanReminderInterviewKeKandidat(
                 $jadwalInterviewId,
                 $kandidatIds
             );
@@ -479,11 +497,62 @@ class InterviewKandidatController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Tanggal interview berhasil diperbarui.',
+            'message' => 'Tanggal interview berhasil diperbarui. Informasi interview terbaru sudah diproses ke kandidat.',
             'jadwal_interview' => $this->formatDateTimeForJson($jadwal->fresh()->jadwal_interview),
-            'wa_panelis' => $waResult,
+            'wa_panelis' => $waPanelisResult,
+            'wa_kandidat' => $waKandidatResult,
             'google_calendar' => $calendarResult,
         ]);
+    }
+
+    public function kirimReminderKandidat(string $jadwalInterviewId)
+    {
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->find($jadwalInterviewId);
+
+        if (!$jadwal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jadwal interview tidak ditemukan atau sudah dihapus.',
+            ], 404);
+        }
+
+        $kandidatIds = JadwalInterviewKandidat::query()
+            ->where('jadwal_interview_id', $jadwalInterviewId)
+            ->pluck('data_riwayat_diri_id')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($kandidatIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada kandidat pada jadwal interview ini.',
+                'wa_kandidat' => [
+                    'success' => false,
+                    'message' => 'Tidak ada kandidat pada jadwal interview ini.',
+                    'total_dikirim' => 0,
+                    'total_dilewati' => 0,
+                    'total_gagal_provider' => 0,
+                    'total_perusahaan' => 0,
+                    'skipped' => [],
+                    'targets' => [],
+                    'responses' => [],
+                ],
+            ], 422);
+        }
+
+        $waResult = $this->kirimPesanReminderInterviewKeKandidat(
+            $jadwalInterviewId,
+            $kandidatIds
+        );
+
+        return response()->json([
+            'success' => (bool) ($waResult['success'] ?? false),
+            'message' => $waResult['message'] ?? 'Proses kirim reminder interview selesai.',
+            'wa_kandidat' => $waResult,
+        ], ($waResult['success'] ?? false) ? 200 : 422);
     }
 
     public function updateHasil(Request $request, string $jadwalInterviewId, string $pivotId)
@@ -1018,6 +1087,287 @@ class InterviewKandidatController extends Controller
         }
     }
 
+
+    private function kirimPesanReminderInterviewKeKandidat(string $jadwalInterviewId, array $kandidatIds): array
+    {
+        $jadwal = JadwalInterview::query()
+            ->whereNull('deleted_at')
+            ->find($jadwalInterviewId);
+
+        if (!$jadwal) {
+            return [
+                'success' => false,
+                'message' => 'Jadwal interview tidak ditemukan.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => [],
+                'targets' => [],
+                'responses' => [],
+            ];
+        }
+
+        $kandidatIds = collect($kandidatIds)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($kandidatIds)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada kandidat untuk dikirim reminder interview.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => [],
+                'targets' => [],
+                'responses' => [],
+            ];
+        }
+
+        $kandidats = DB::table('data_riwayat_diri')
+            ->leftJoin('posisi', 'posisi.id', '=', 'data_riwayat_diri.posisi_yang_dilamar')
+            ->leftJoin('data_perusahaan', 'data_perusahaan.id', '=', 'data_riwayat_diri.perusahaan_dilamar')
+            ->whereIn('data_riwayat_diri.id', $kandidatIds)
+            ->select([
+                'data_riwayat_diri.id',
+                'data_riwayat_diri.nama_lengkap',
+                'data_riwayat_diri.nama_panggil',
+                'data_riwayat_diri.no_wa',
+                'data_riwayat_diri.email',
+                'data_riwayat_diri.perusahaan_dilamar',
+                'data_riwayat_diri.posisi_yang_dilamar',
+                'posisi.nama_posisi',
+                'data_perusahaan.id as perusahaan_id',
+                'data_perusahaan.nama_perusahaan',
+                'data_perusahaan.no_wa as no_wa_perusahaan',
+                'data_perusahaan.token_api_wa',
+            ])
+            ->get();
+
+        if ($kandidats->isEmpty()) {
+            return [
+                'success' => false,
+                'message' => 'Data kandidat tidak ditemukan.',
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => [],
+                'targets' => [],
+                'responses' => [],
+            ];
+        }
+
+        $groupedMessages = [];
+        $skipped = [];
+
+        foreach ($kandidats as $kandidat) {
+            $target = $this->normalizeWhatsappNumber($kandidat->no_wa ?? null);
+
+            if (!$target) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'no_wa' => $kandidat->no_wa,
+                    'reason' => 'Nomor WhatsApp kandidat kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (empty($kandidat->perusahaan_id)) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'target' => $target,
+                    'reason' => 'Data perusahaan kandidat tidak ditemukan.',
+                ];
+
+                continue;
+            }
+
+            $tokenApiWa = $this->normalizeTokenApiWa($kandidat->token_api_wa ?? null);
+            $nomorPerusahaan = $this->normalizeWhatsappNumber($kandidat->no_wa_perusahaan ?? null);
+
+            if (!$nomorPerusahaan) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'target' => $target,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'reason' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
+                ];
+
+                continue;
+            }
+
+            if (!$tokenApiWa) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'target' => $target,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'reason' => 'Token API WA perusahaan kosong.',
+                ];
+
+                continue;
+            }
+
+            $groupKey = (string) $kandidat->perusahaan_id;
+
+            if (!isset($groupedMessages[$groupKey])) {
+                $groupedMessages[$groupKey] = [
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'token_api_wa' => $tokenApiWa,
+                    'messages' => [],
+                ];
+            }
+
+            $groupedMessages[$groupKey]['messages'][] = [
+                'target' => $target,
+                'message' => $this->buildPesanReminderInterviewUntukKandidat($jadwal, $kandidat),
+                'delay' => '2',
+            ];
+        }
+
+        if (empty($groupedMessages)) {
+            return [
+                'success' => false,
+                'message' => 'Tidak ada kandidat valid untuk dikirim reminder interview. Pastikan nomor WhatsApp kandidat, nomor WhatsApp perusahaan, dan token_api_wa perusahaan tersedia.',
+                'total_dikirim' => 0,
+                'total_dilewati' => count($skipped),
+                'total_gagal_provider' => 0,
+                'total_perusahaan' => 0,
+                'skipped' => $skipped,
+                'targets' => [],
+                'responses' => [],
+            ];
+        }
+
+        $responses = [];
+        $totalDikirim = 0;
+        $totalGagalProvider = 0;
+        $targets = [];
+
+        foreach ($groupedMessages as $group) {
+            try {
+                $response = Http::asForm()
+                    ->withoutVerifying()
+                    ->withHeaders([
+                        'Authorization' => $group['token_api_wa'],
+                    ])
+                    ->timeout(120)
+                    ->post('https://api.fonnte.com/send', [
+                        'data' => json_encode($group['messages']),
+                        'countryCode' => '62',
+                        'typing' => 'false',
+                        'preview' => 'true',
+                    ]);
+
+                $json = $response->json();
+                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
+                $isSuccess = $response->successful() && (bool) $fonnteStatus;
+                $countMessages = count($group['messages']);
+
+                if ($isSuccess) {
+                    $totalDikirim += $countMessages;
+                } else {
+                    $totalGagalProvider += $countMessages;
+                }
+
+                $targetGroup = collect($group['messages'])->pluck('target')->values()->all();
+                $targets = array_merge($targets, $targetGroup);
+
+                $responses[] = [
+                    'success' => $isSuccess,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_pesan' => $countMessages,
+                    'targets' => $targetGroup,
+                    'fonnte_http_code' => $response->status(),
+                    'fonnte_response' => $json ?: $response->body(),
+                    'message' => $isSuccess
+                        ? 'Reminder interview berhasil dikirim ke kandidat untuk perusahaan ini.'
+                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Reminder interview gagal dikirim melalui Fonnte.'),
+                ];
+            } catch (\Throwable $e) {
+                $countMessages = count($group['messages']);
+                $totalGagalProvider += $countMessages;
+
+                Log::error('Gagal mengirim reminder interview ke kandidat', [
+                    'message' => $e->getMessage(),
+                    'jadwal_interview_id' => $jadwal->id ?? null,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                ]);
+
+                $responses[] = [
+                    'success' => false,
+                    'perusahaan_id' => $group['perusahaan_id'],
+                    'perusahaan' => $group['perusahaan'],
+                    'nomer_perusahaan' => $group['nomer_perusahaan'],
+                    'total_pesan' => $countMessages,
+                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
+                    'message' => 'Terjadi kesalahan saat mengirim reminder interview: ' . $e->getMessage(),
+                ];
+            }
+        }
+
+        $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
+        $isPartialSuccess = $totalDikirim > 0 && $totalGagalProvider > 0;
+
+        return [
+            'success' => $totalDikirim > 0,
+            'message' => $isAllSuccess
+                ? 'Reminder interview berhasil dikirim ke kandidat sesuai perusahaan masing-masing.'
+                : ($isPartialSuccess
+                    ? 'Sebagian reminder interview berhasil dikirim, sebagian gagal.'
+                    : 'Reminder interview gagal dikirim.'),
+            'total_dikirim' => $totalDikirim,
+            'total_dilewati' => count($skipped),
+            'total_gagal_provider' => $totalGagalProvider,
+            'total_perusahaan' => count($groupedMessages),
+            'skipped' => $skipped,
+            'targets' => array_values(array_unique($targets)),
+            'responses' => $responses,
+        ];
+    }
+
+    private function buildPesanReminderInterviewUntukKandidat(JadwalInterview $jadwal, $kandidat): string
+    {
+        $nama = $kandidat->nama_panggil ?: ($kandidat->nama_lengkap ?: 'Kandidat');
+        $perusahaan = $kandidat->nama_perusahaan ?: '-';
+        $posisi = $kandidat->nama_posisi ?: '-';
+        $tanggalInterview = $this->formatDateTimeForDisplay($jadwal->jadwal_interview);
+        $judulInterview = $jadwal->judul_interview ?: 'Interview';
+        $linkInterview = $this->getJadwalInterviewAttribute($jadwal, 'google_meet_link')
+            ?: $this->getJadwalInterviewAttribute($jadwal, 'google_calendar_html_link');
+
+        $linkText = $linkInterview
+            ? "Link Interview: {$linkInterview}\n"
+            : "";
+
+        return "Halo {$nama},\n\n"
+            . "Ini adalah reminder jadwal interview Anda untuk posisi {$posisi} di {$perusahaan}.\n\n"
+            . "Detail interview:\n"
+            . "Judul Interview: {$judulInterview}\n"
+            . "Tanggal Interview: {$tanggalInterview}\n"
+            . "{$linkText}\n"
+            . "Mohon hadir tepat waktu dan mempersiapkan diri dengan baik.\n\n"
+            . "Jika ada kendala, silakan hubungi WhatsApp ini.\n\n"
+            . "Terima kasih.\n"
+            . "Tim Rekrutmen {$perusahaan}";
+    }
 
     private function kirimPesanJadwalInterviewKePanelis(string $jadwalInterviewId, array $kandidatIds): array
     {

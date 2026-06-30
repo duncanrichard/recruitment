@@ -1010,16 +1010,13 @@ function JadwalTestDalamTahapan({
 }
 
 
-function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState("");
+function JadwalMmpiDalamTahapan({ jadwalMmpi }) {
     const [localJadwalMmpi, setLocalJadwalMmpi] = useState(
         normalizeJadwalMmpi(jadwalMmpi)
     );
 
     useEffect(() => {
         setLocalJadwalMmpi(normalizeJadwalMmpi(jadwalMmpi));
-        setMessage("");
     }, [jadwalMmpi]);
 
     const normalized = localJadwalMmpi;
@@ -1028,120 +1025,33 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
     const kehadiran = normalizeKehadiran(normalized?.kehadiran);
     const hasilTestMmpi = normalizeHasilTest(normalized?.hasil_test || normalized?.hasilTest);
     const sudahMengisiKehadiran = Boolean(kehadiran);
-    const bolehIsiKehadiran = isJadwalHariIni(normalized);
-
-    async function submitKehadiran(value) {
-        if (!bolehIsiKehadiran) {
-            setMessage("Kehadiran Test MMPI hanya dapat diisi pada tanggal jadwal test.");
-            return;
-        }
-
-        if (sudahMengisiKehadiran) {
-            setMessage("Status kehadiran Test MMPI sudah tersimpan dan tidak dapat diubah.");
-            return;
-        }
-
-        if (saving) return;
-
-        if (!token || !normalized?.id) {
-            setMessage("Data jadwal Test MMPI tidak lengkap.");
-            return;
-        }
-
-        const pilihan = value === "hadir" ? "hadir" : "tidak_hadir";
-
-        setSaving(true);
-        setMessage("");
-
-        try {
-            const response = await fetch(
-                `/pendaftaran/api/token/${encodeURIComponent(token)}/jadwal-test-mmpi/${encodeURIComponent(normalized.id)}/kehadiran`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        Accept: "application/json",
-                        "Content-Type": "application/json",
-                        "X-Requested-With": "XMLHttpRequest",
-                        "X-CSRF-TOKEN": getCsrfToken(),
-                    },
-                    body: JSON.stringify({
-                        kehadiran: pilihan,
-                    }),
-                }
-            );
-
-            const json = await parseJsonResponse(response);
-
-            if (!response.ok || json?.success === false) {
-                const serverJadwalMmpi = getJadwalMmpiFromHasil(json?.data);
-
-                if (serverJadwalMmpi?.kehadiran) {
-                    setLocalJadwalMmpi(serverJadwalMmpi);
-                }
-
-                setMessage(
-                    json?.message ||
-                        "Gagal menyimpan kehadiran Test MMPI. Silakan coba lagi."
-                );
-
-                return;
-            }
-
-            const serverJadwalMmpi = getJadwalMmpiFromHasil(json?.data);
-            const updatedJadwalMmpi = normalizeJadwalMmpi({
-                ...normalized,
-                ...(serverJadwalMmpi || {}),
-                kehadiran: serverJadwalMmpi?.kehadiran || pilihan,
-                status_kehadiran: serverJadwalMmpi?.status_kehadiran || pilihan,
-            });
-
-            setLocalJadwalMmpi(updatedJadwalMmpi);
-            setMessage(
-                pilihan === "hadir"
-                    ? "Kehadiran Test MMPI berhasil disimpan: Hadir."
-                    : "Kehadiran Test MMPI berhasil disimpan: Tidak Hadir."
-            );
-
-            if (json?.data) {
-                onUpdated?.(json.data);
-            }
-        } catch (error) {
-            setMessage("Gagal menyimpan kehadiran Test MMPI.");
-        } finally {
-            setSaving(false);
-        }
-    }
 
     return (
         <div className="mt-4 rounded-2xl border border-indigo-200 bg-white p-4">
-            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-black text-white">
+                    📝
+                </div>
+
                 <div className="min-w-0 flex-1 break-words">
-                    <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-black text-white">
-                            📝
-                        </div>
+                    <p className="break-words text-sm font-black text-indigo-900">
+                        Jadwal Test MMPI: {tanggal}
+                    </p>
 
-                        <div className="min-w-0 flex-1 break-words">
-                            <p className="break-words text-sm font-black text-indigo-900">
-                                Jadwal Test MMPI: {tanggal}
-                            </p>
+                    <p className="mt-1 text-sm font-semibold text-indigo-700">
+                        {jam && jam !== "-" && jam !== "00.00" && jam !== "00:00"
+                            ? `Pukul ${jam} WIB`
+                            : "Silakan hadir sesuai informasi dari tim rekrutmen."}
+                    </p>
 
-                            <p className="mt-1 text-sm font-semibold text-indigo-700">
-                                {jam && jam !== "-" && jam !== "00.00" && jam !== "00:00"
-                                    ? `Pukul ${jam} WIB`
-                                    : "Silakan hadir sesuai informasi dari tim rekrutmen."}
-                            </p>
+                    {normalized?.keterangan && (
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                            {normalized.keterangan}
+                        </p>
+                    )}
 
-                            {normalized?.keterangan && (
-                                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                                    {normalized.keterangan}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {sudahMengisiKehadiran && (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                                 Status Kehadiran Test MMPI
                             </p>
@@ -1150,62 +1060,48 @@ function JadwalMmpiDalamTahapan({ jadwalMmpi, token, onUpdated }) {
                                 className={`mt-1 text-lg font-black ${
                                     kehadiran === "hadir"
                                         ? "text-emerald-700"
-                                        : "text-red-700"
+                                        : kehadiran === "tidak_hadir"
+                                        ? "text-red-700"
+                                        : "text-slate-600"
                                 }`}
                             >
-                                {kehadiran === "hadir" ? "Hadir" : "Tidak Hadir"}
+                                {kehadiran === "hadir"
+                                    ? "Hadir"
+                                    : kehadiran === "tidak_hadir"
+                                    ? "Tidak Hadir"
+                                    : "Menunggu Konfirmasi Admin"}
                             </p>
                         </div>
-                    )}
 
-                    
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Hasil Test MMPI
+                            </p>
 
-                    {!bolehIsiKehadiran && !sudahMengisiKehadiran && (
-                        <p className="mt-4 text-sm font-semibold text-indigo-700">
-                            Tombol kehadiran Test MMPI hanya muncul pada tanggal jadwal test.
-                        </p>
-                    )}
+                            <p
+                                className={`mt-1 text-lg font-black ${
+                                    hasilTestMmpi === "lolos"
+                                        ? "text-emerald-700"
+                                        : hasilTestMmpi === "gagal"
+                                        ? "text-red-700"
+                                        : "text-slate-600"
+                                }`}
+                            >
+                                {hasilTestMmpi === "lolos"
+                                    ? "Lolos"
+                                    : hasilTestMmpi === "gagal"
+                                    ? "Gagal"
+                                    : "Belum Ada"}
+                            </p>
+                        </div>
+                    </div>
 
-                    {bolehIsiKehadiran && !sudahMengisiKehadiran && (
-                        <p className="mt-4 text-sm font-semibold text-indigo-700">
-                            Silakan pilih status kehadiran Test MMPI Anda.
-                        </p>
-                    )}
-
-                    {sudahMengisiKehadiran && (
-                        <p className="mt-3 text-sm font-semibold text-indigo-700">
-                            Status kehadiran sudah tersimpan dan tidak dapat diubah.
-                        </p>
-                    )}
-
-                    {message && (
-                        <p className="mt-3 text-sm font-bold text-indigo-900">
-                            {message}
+                    {!sudahMengisiKehadiran && (
+                        <p className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-800">
+                            Kehadiran Test MMPI akan dikonfirmasi oleh admin atau tim rekrutmen. Kandidat tidak perlu memilih tombol Hadir/Tidak Hadir pada halaman cek tahapan.
                         </p>
                     )}
                 </div>
-
-                {(bolehIsiKehadiran || sudahMengisiKehadiran) && (
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-                        <button
-                            type="button"
-                            disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
-                            onClick={() => submitKehadiran("hadir")}
-                            className="w-full rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                        >
-                            {saving ? "Menyimpan..." : "Hadir"}
-                        </button>
-
-                        <button
-                            type="button"
-                            disabled={saving || sudahMengisiKehadiran || !bolehIsiKehadiran}
-                            onClick={() => submitKehadiran("tidak_hadir")}
-                            className="w-full rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                        >
-                            {saving ? "Menyimpan..." : "Tidak Hadir"}
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );
