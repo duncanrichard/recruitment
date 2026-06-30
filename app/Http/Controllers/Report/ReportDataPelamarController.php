@@ -7,6 +7,7 @@ use App\Models\DataRiwayatDiri;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportDataPelamarController extends Controller
@@ -23,19 +24,28 @@ class ReportDataPelamarController extends Controller
             'tanggal_akhir.after_or_equal' => 'Tanggal akhir tidak boleh lebih kecil dari tanggal awal.',
         ]);
 
-        $data = $this->queryPelamar($validated)
+        $rows = $this->queryPelamar($validated)
             ->orderByDesc('tanggal_skrining')
             ->orderByDesc('created_at')
             ->paginate(25);
 
-        $data->getCollection()->transform(function ($item) {
+        $rows->getCollection()->transform(function ($item) {
             return $this->formatPelamar($item);
         });
+
+        $dashboardRows = $this->queryPelamar($validated)
+            ->orderByDesc('tanggal_skrining')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($item) => $this->formatPelamar($item));
 
         return response()->json([
             'success' => true,
             'message' => 'Data report pelamar berhasil ditampilkan.',
-            'data' => $data,
+            'data' => [
+                'rows' => $rows,
+                'dashboard' => $this->buildDashboard($dashboardRows),
+            ],
         ]);
     }
 
@@ -229,6 +239,175 @@ class ReportDataPelamarController extends Controller
         }
 
         return $query;
+    }
+
+    private function buildDashboard(Collection $rows): array
+    {
+        $totalPelamar = $rows->count();
+
+        $lolos = $rows->filter(function ($item) {
+            return $this->isLolos($item['hasil_administrasi'] ?? null);
+        })->count();
+
+        $tidakLolos = $rows->filter(function ($item) {
+            return $this->isTidakLolos($item['hasil_administrasi'] ?? null);
+        })->count();
+
+        $belumDiproses = $rows->filter(function ($item) {
+            return empty($item['hasil_administrasi']);
+        })->count();
+
+        return [
+            'summary' => [
+                'total_pelamar' => $totalPelamar,
+                'lolos_administrasi' => $lolos,
+                'tidak_lolos_administrasi' => $tidakLolos,
+                'belum_diproses' => $belumDiproses,
+                'persentase_lolos' => $totalPelamar > 0 ? round(($lolos / $totalPelamar) * 100, 1) : 0,
+            ],
+            'demografi' => [
+                'jenis_kelamin' => $this->groupByValue($rows, 'jenis_kelamin'),
+                'pendidikan' => $this->groupByValue($rows, 'pendidikan'),
+                'agama' => $this->groupByValue($rows, 'agama'),
+                'usia' => $this->groupByAge($rows),
+                'status_pernikahan' => $this->groupByValue($rows, 'status_pernikahan'),
+                'hasil_administrasi' => $this->groupByValue($rows, 'hasil_administrasi', 'Belum Diproses'),
+            ],
+            'top' => [
+                'perusahaan' => $this->groupByValue($rows, 'perusahaan_dilamar', 'Tidak Diisi', 7),
+                'posisi' => $this->groupByValue($rows, 'posisi_yang_dilamar', 'Tidak Diisi', 7),
+                'sumber_informasi' => $this->groupByValue($rows, 'sumber_informasi', 'Tidak Diisi', 7),
+            ],
+            'trend' => $this->groupByDate($rows),
+        ];
+    }
+
+    private function groupByValue(
+        Collection $rows,
+        string $key,
+        string $emptyLabel = 'Tidak Diisi',
+        int $limit = 10
+    ): array {
+        return $rows
+            ->map(function ($item) use ($key, $emptyLabel) {
+                $value = trim((string) ($item[$key] ?? ''));
+
+                return $value !== '' ? $value : $emptyLabel;
+            })
+            ->countBy()
+            ->sortDesc()
+            ->take($limit)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByDate(Collection $rows): array
+    {
+        return $rows
+            ->map(function ($item) {
+                $tanggal = $item['tanggal_skrining'] ?? null;
+
+                if (!$tanggal) {
+                    return 'Tidak Diisi';
+                }
+
+                try {
+                    return Carbon::parse($tanggal)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                    return (string) $tanggal;
+                }
+            })
+            ->countBy()
+            ->sortKeys()
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByAge(Collection $rows): array
+    {
+        $groups = [
+            '< 20 Tahun' => 0,
+            '20 - 25 Tahun' => 0,
+            '26 - 30 Tahun' => 0,
+            '31 - 35 Tahun' => 0,
+            '36 - 40 Tahun' => 0,
+            '> 40 Tahun' => 0,
+            'Tidak Diisi' => 0,
+        ];
+
+        foreach ($rows as $item) {
+            $tanggalLahir = $item['tanggal_lahir'] ?? null;
+
+            if (!$tanggalLahir) {
+                $groups['Tidak Diisi']++;
+                continue;
+            }
+
+            try {
+                $age = Carbon::parse($tanggalLahir)->age;
+            } catch (\Throwable $e) {
+                $groups['Tidak Diisi']++;
+                continue;
+            }
+
+            if ($age < 20) {
+                $groups['< 20 Tahun']++;
+            } elseif ($age <= 25) {
+                $groups['20 - 25 Tahun']++;
+            } elseif ($age <= 30) {
+                $groups['26 - 30 Tahun']++;
+            } elseif ($age <= 35) {
+                $groups['31 - 35 Tahun']++;
+            } elseif ($age <= 40) {
+                $groups['36 - 40 Tahun']++;
+            } else {
+                $groups['> 40 Tahun']++;
+            }
+        }
+
+        return collect($groups)
+            ->filter(fn ($total) => $total > 0)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function isLolos(?string $value): bool
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        return str_contains($normalized, 'lolos')
+            || str_contains($normalized, 'diterima')
+            || str_contains($normalized, 'passed')
+            || str_contains($normalized, 'pass');
+    }
+
+    private function isTidakLolos(?string $value): bool
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        return str_contains($normalized, 'tidak')
+            || str_contains($normalized, 'gagal')
+            || str_contains($normalized, 'ditolak')
+            || str_contains($normalized, 'failed')
+            || str_contains($normalized, 'fail');
     }
 
     private function formatPelamar(DataRiwayatDiri $item): array

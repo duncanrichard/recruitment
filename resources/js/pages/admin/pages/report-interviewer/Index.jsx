@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-export default function ReportDataPelamarPage() {
+export default function ReportInterviewerPage() {
     const [tanggalAwal, setTanggalAwal] = useState("");
     const [tanggalAkhir, setTanggalAkhir] = useState("");
-    const [perusahaan, setPerusahaan] = useState("");
+    const [interviewer, setInterviewer] = useState("");
+
     const [rows, setRows] = useState([]);
-    const [dashboard, setDashboard] = useState(null);
     const [meta, setMeta] = useState(null);
+    const [dashboard, setDashboard] = useState(null);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
@@ -17,19 +18,19 @@ export default function ReportDataPelamarPage() {
 
         if (tanggalAwal) params.set("tanggal_awal", tanggalAwal);
         if (tanggalAkhir) params.set("tanggal_akhir", tanggalAkhir);
-        if (perusahaan) params.set("perusahaan", perusahaan);
+        if (interviewer) params.set("interviewer", interviewer);
 
         params.set("page", page);
 
         return params.toString();
-    }, [tanggalAwal, tanggalAkhir, perusahaan, page]);
+    }, [tanggalAwal, tanggalAkhir, interviewer, page]);
 
     async function fetchData() {
         setLoading(true);
         setMessage("");
 
         try {
-            const response = await fetch(`/report-data-pelamar?${queryString}`, {
+            const response = await fetch(`/report-interviewer?${queryString}`, {
                 method: "GET",
                 headers: {
                     Accept: "application/json",
@@ -43,7 +44,7 @@ export default function ReportDataPelamarPage() {
                 setRows([]);
                 setMeta(null);
                 setDashboard(null);
-                setMessage(json?.message || "Gagal mengambil data report pelamar.");
+                setMessage(json?.message || "Gagal mengambil report interviewer.");
                 return;
             }
 
@@ -54,7 +55,7 @@ export default function ReportDataPelamarPage() {
             setRows([]);
             setMeta(null);
             setDashboard(null);
-            setMessage("Terjadi kesalahan saat mengambil data report pelamar.");
+            setMessage("Terjadi kesalahan saat mengambil report interviewer.");
         } finally {
             setLoading(false);
         }
@@ -72,7 +73,7 @@ export default function ReportDataPelamarPage() {
     function handleReset() {
         setTanggalAwal("");
         setTanggalAkhir("");
-        setPerusahaan("");
+        setInterviewer("");
         setPage(1);
     }
 
@@ -81,33 +82,31 @@ export default function ReportDataPelamarPage() {
 
         if (tanggalAwal) params.set("tanggal_awal", tanggalAwal);
         if (tanggalAkhir) params.set("tanggal_akhir", tanggalAkhir);
-        if (perusahaan) params.set("perusahaan", perusahaan);
+        if (interviewer) params.set("interviewer", interviewer);
 
-        window.location.href = `/report-data-pelamar/export?${params.toString()}`;
+        window.location.href = `/report-interviewer/export?${params.toString()}`;
     }
 
     const summary = dashboard?.summary || {};
     const demografi = dashboard?.demografi || {};
-    const top = dashboard?.top || {};
-    const trend = dashboard?.trend || [];
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
             <div className="mx-auto max-w-7xl space-y-6">
-                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-teal-900 p-6 text-white shadow-xl">
+                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-900 p-6 text-white shadow-xl">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-teal-100 ring-1 ring-white/10">
-                                Recruitment Analytics
+                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-blue-100 ring-1 ring-white/10">
+                                Interviewer Analytics
                             </div>
 
                             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
-                                Report Data Pelamar
+                                Dashboard Report Interviewer
                             </h1>
 
                             <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-200">
-                                Monitoring data pelamar berdasarkan tanggal skrining, perusahaan,
-                                hasil administrasi, dan demografi kandidat.
+                                Monitoring jumlah interview yang dilakukan setiap interviewer,
+                                total jadwal, total kandidat, kehadiran kandidat, dan hasil interview.
                             </p>
                         </div>
 
@@ -132,75 +131,81 @@ export default function ReportDataPelamarPage() {
 
                     <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <SummaryCard
-                            title="Total Pelamar"
-                            value={summary.total_pelamar}
-                            description="Semua kandidat sesuai filter"
+                            title="Total Interviewer"
+                            value={summary.total_interviewer}
+                            description="Interviewer yang memiliki data"
                         />
+
                         <SummaryCard
-                            title="Lolos Administrasi"
-                            value={summary.lolos_administrasi}
-                            description={`${summary.persentase_lolos || 0}% dari total`}
+                            title="Total Jadwal"
+                            value={summary.total_jadwal}
+                            description="Jumlah jadwal interview"
                         />
+
                         <SummaryCard
-                            title="Tidak Lolos"
-                            value={summary.tidak_lolos_administrasi}
-                            description="Kandidat tidak memenuhi administrasi"
+                            title="Total Kandidat"
+                            value={summary.total_kandidat}
+                            description="Total kandidat yang diinterview"
                         />
+
                         <SummaryCard
-                            title="Belum Diproses"
-                            value={summary.belum_diproses}
-                            description="Data belum memiliki hasil administrasi"
+                            title="Rata-rata Kandidat"
+                            value={summary.rata_rata_kandidat_per_interviewer}
+                            description="Per interviewer"
                         />
                     </div>
                 </div>
 
                 {showFilter && (
-                    <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
                         <form
                             onSubmit={handleSubmit}
-                            className="grid grid-cols-1 gap-4 lg:grid-cols-12"
+                            className="grid grid-cols-1 items-end gap-4 md:grid-cols-2 xl:grid-cols-12"
                         >
-                            <div className="lg:col-span-3">
+                            <div className="xl:col-span-3">
                                 <label className="mb-2 block text-sm font-black text-slate-700">
                                     Tanggal Awal
                                 </label>
+
                                 <input
                                     type="date"
                                     value={tanggalAwal}
                                     onChange={(event) => setTanggalAwal(event.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                 />
                             </div>
 
-                            <div className="lg:col-span-3">
+                            <div className="xl:col-span-3">
                                 <label className="mb-2 block text-sm font-black text-slate-700">
                                     Tanggal Akhir
                                 </label>
+
                                 <input
                                     type="date"
                                     value={tanggalAkhir}
                                     onChange={(event) => setTanggalAkhir(event.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                 />
                             </div>
 
-                            <div className="lg:col-span-4">
+                            <div className="xl:col-span-4">
                                 <label className="mb-2 block text-sm font-black text-slate-700">
-                                    Perusahaan
+                                    Interviewer
                                 </label>
+
                                 <input
                                     type="text"
-                                    value={perusahaan}
-                                    onChange={(event) => setPerusahaan(event.target.value)}
-                                    placeholder="Cari nama perusahaan"
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    value={interviewer}
+                                    onChange={(event) => setInterviewer(event.target.value)}
+                                    placeholder="Cari nama interviewer / no WA"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                 />
                             </div>
 
-                            <div className="flex items-end gap-2 lg:col-span-2">
+                            <div className="flex gap-3 md:col-span-2 xl:col-span-2">
                                 <button
                                     type="submit"
-                                    className="w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                                    className="h-12 flex-1 rounded-2xl bg-slate-950 px-5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
                                 >
                                     Tampilkan
                                 </button>
@@ -208,7 +213,7 @@ export default function ReportDataPelamarPage() {
                                 <button
                                     type="button"
                                     onClick={handleReset}
-                                    className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-200"
+                                    className="h-12 rounded-2xl bg-slate-100 px-5 text-sm font-black text-slate-700 transition hover:bg-slate-200"
                                 >
                                     Reset
                                 </button>
@@ -223,53 +228,35 @@ export default function ReportDataPelamarPage() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                    <div className="xl:col-span-2">
-                        <ChartCard
-                            title="Trend Pelamar"
-                            description="Jumlah pelamar berdasarkan tanggal skrining"
-                        >
-                            <TrendChart items={trend} />
-                        </ChartCard>
-                    </div>
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    <ChartCard
+                        title="Top Interviewer Berdasarkan Kandidat"
+                        description="Jumlah kandidat yang sudah diinterview oleh masing-masing interviewer"
+                    >
+                        <ProgressList items={demografi.top_interviewer || []} colorClass="bg-blue-500" />
+                    </ChartCard>
 
                     <ChartCard
-                        title="Status Administrasi"
-                        description="Komposisi hasil administrasi"
+                        title="Top Interviewer Berdasarkan Jadwal"
+                        description="Jumlah jadwal interview per interviewer"
                     >
-                        <ProgressList items={demografi.hasil_administrasi || []} />
+                        <ProgressList items={demografi.jadwal_interviewer || []} colorClass="bg-cyan-500" />
                     </ChartCard>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-4">
-                    <ChartCard title="Jenis Kelamin" description="Demografi kandidat">
-                        <ProgressList items={demografi.jenis_kelamin || []} />
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    <ChartCard
+                        title="Demografi Hasil Interview"
+                        description="Akumulasi hasil interview dari semua interviewer"
+                    >
+                        <ProgressList items={demografi.hasil_interview || []} colorClass="bg-emerald-500" />
                     </ChartCard>
 
-                    <ChartCard title="Pendidikan" description="Pendidikan terakhir">
-                        <ProgressList items={demografi.pendidikan || []} />
-                    </ChartCard>
-
-                    <ChartCard title="Kelompok Usia" description="Usia berdasarkan tanggal lahir">
-                        <ProgressList items={demografi.usia || []} />
-                    </ChartCard>
-
-                    <ChartCard title="Status Pernikahan" description="Status kandidat">
-                        <ProgressList items={demografi.status_pernikahan || []} />
-                    </ChartCard>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <ChartCard title="Top Perusahaan" description="Perusahaan dengan pelamar terbanyak">
-                        <ProgressList items={top.perusahaan || []} />
-                    </ChartCard>
-
-                    <ChartCard title="Top Posisi" description="Posisi yang paling banyak dilamar">
-                        <ProgressList items={top.posisi || []} />
-                    </ChartCard>
-
-                    <ChartCard title="Sumber Informasi" description="Channel sumber kandidat">
-                        <ProgressList items={top.sumber_informasi || []} />
+                    <ChartCard
+                        title="Demografi Kehadiran Kandidat"
+                        description="Akumulasi status kehadiran kandidat interview"
+                    >
+                        <ProgressList items={demografi.status_kehadiran || []} colorClass="bg-violet-500" />
                     </ChartCard>
                 </div>
 
@@ -277,8 +264,9 @@ export default function ReportDataPelamarPage() {
                     <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 className="text-lg font-black text-slate-950">
-                                Detail Data Pelamar
+                                Detail Performa Interviewer
                             </h2>
+
                             <p className="mt-1 text-sm font-semibold text-slate-500">
                                 Total data: {meta?.total ?? rows.length}
                             </p>
@@ -286,7 +274,7 @@ export default function ReportDataPelamarPage() {
 
                         <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-600">
                             Filter: {tanggalAwal || "Semua"} s/d {tanggalAkhir || "Semua"} |{" "}
-                            Perusahaan: {perusahaan || "Semua"}
+                            Interviewer: {interviewer || "Semua"}
                         </div>
                     </div>
 
@@ -295,18 +283,19 @@ export default function ReportDataPelamarPage() {
                             <thead className="bg-slate-50">
                                 <tr>
                                     <Th>No</Th>
-                                    <Th>Tanggal Skrining</Th>
-                                    <Th>Token</Th>
-                                    <Th>Nama Lengkap</Th>
-                                    <Th>Email</Th>
+                                    <Th>Interviewer</Th>
                                     <Th>No WA</Th>
-                                    <Th>Posisi</Th>
-                                    <Th>Perusahaan</Th>
-                                    <Th>Gender</Th>
-                                    <Th>Pendidikan</Th>
-                                    <Th>Sumber</Th>
-                                    <Th>Hasil Administrasi</Th>
-                                    <Th>Created At</Th>
+                                    <Th>Total Jadwal</Th>
+                                    <Th>Total Kandidat</Th>
+                                    <Th>Hadir</Th>
+                                    <Th>Tidak Hadir</Th>
+                                    <Th>Tidak Respon</Th>
+                                    <Th>Reschedule</Th>
+                                    <Th>Lolos</Th>
+                                    <Th>Tidak Lolos</Th>
+                                    <Th>Dipertimbangkan</Th>
+                                    <Th>Belum Hasil</Th>
+                                    <Th>Interview Terakhir</Th>
                                 </tr>
                             </thead>
 
@@ -314,7 +303,7 @@ export default function ReportDataPelamarPage() {
                                 {loading && (
                                     <tr>
                                         <td
-                                            colSpan="13"
+                                            colSpan="14"
                                             className="px-6 py-10 text-center text-sm font-bold text-slate-500"
                                         >
                                             Memuat data...
@@ -325,7 +314,7 @@ export default function ReportDataPelamarPage() {
                                 {!loading && rows.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan="13"
+                                            colSpan="14"
                                             className="px-6 py-10 text-center text-sm font-bold text-slate-500"
                                         >
                                             Data tidak ditemukan.
@@ -340,31 +329,32 @@ export default function ReportDataPelamarPage() {
                                             className="transition hover:bg-slate-50"
                                         >
                                             <Td>{meta?.from ? meta.from + index : index + 1}</Td>
-                                            <Td>{formatDate(item.tanggal_skrining)}</Td>
-                                            <Td>
-                                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">
-                                                    {item.token || "-"}
-                                                </span>
-                                            </Td>
+
                                             <Td>
                                                 <div className="font-black text-slate-900">
-                                                    {item.nama_lengkap || "-"}
-                                                </div>
-                                                <div className="text-xs font-semibold text-slate-400">
-                                                    {item.nama_panggil || "-"}
+                                                    {item.nama || "-"}
                                                 </div>
                                             </Td>
-                                            <Td>{item.email || "-"}</Td>
+
                                             <Td>{item.no_wa || "-"}</Td>
-                                            <Td>{item.posisi_yang_dilamar || "-"}</Td>
-                                            <Td>{item.perusahaan_dilamar || "-"}</Td>
-                                            <Td>{item.jenis_kelamin || "-"}</Td>
-                                            <Td>{item.pendidikan || "-"}</Td>
-                                            <Td>{item.sumber_informasi || "-"}</Td>
+
                                             <Td>
-                                                <StatusBadge value={item.hasil_administrasi} />
+                                                <CountBadge value={item.total_jadwal} color="blue" />
                                             </Td>
-                                            <Td>{formatDateTime(item.created_at)}</Td>
+
+                                            <Td>
+                                                <CountBadge value={item.total_kandidat} color="slate" />
+                                            </Td>
+
+                                            <Td>{numberFormat(item.hadir)}</Td>
+                                            <Td>{numberFormat(item.tidak_hadir)}</Td>
+                                            <Td>{numberFormat(item.tidak_respon)}</Td>
+                                            <Td>{numberFormat(item.reschedule)}</Td>
+                                            <Td>{numberFormat(item.lolos_interview)}</Td>
+                                            <Td>{numberFormat(item.tidak_lolos_interview)}</Td>
+                                            <Td>{numberFormat(item.dipertimbangkan)}</Td>
+                                            <Td>{numberFormat(item.belum_hasil)}</Td>
+                                            <Td>{formatDateTime(item.interview_terakhir)}</Td>
                                         </tr>
                                     ))}
                             </tbody>
@@ -429,11 +419,12 @@ function ChartCard({ title, description, children }) {
     );
 }
 
-function ProgressList({ items }) {
+function ProgressList({ items, colorClass = "bg-blue-500" }) {
     const safeItems = Array.isArray(items) ? items : [];
-    const total = safeItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
+    const filteredItems = safeItems.filter((item) => Number(item.total || 0) > 0);
+    const total = filteredItems.reduce((sum, item) => sum + Number(item.total || 0), 0);
 
-    if (safeItems.length === 0) {
+    if (filteredItems.length === 0) {
         return (
             <div className="rounded-3xl bg-slate-50 p-6 text-center text-sm font-bold text-slate-400">
                 Belum ada data.
@@ -443,7 +434,7 @@ function ProgressList({ items }) {
 
     return (
         <div className="space-y-4">
-            {safeItems.map((item, index) => {
+            {filteredItems.map((item, index) => {
                 const value = Number(item.total || 0);
                 const percent = total > 0 ? Math.round((value / total) * 100) : 0;
 
@@ -453,6 +444,7 @@ function ProgressList({ items }) {
                             <p className="truncate text-sm font-black text-slate-700">
                                 {item.label || "Tidak Diisi"}
                             </p>
+
                             <p className="shrink-0 text-sm font-black text-slate-950">
                                 {numberFormat(value)}
                             </p>
@@ -460,8 +452,10 @@ function ProgressList({ items }) {
 
                         <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                             <div
-                                className="h-full rounded-full bg-teal-500"
-                                style={{ width: `${Math.max(percent, value > 0 ? 4 : 0)}%` }}
+                                className={`h-full rounded-full ${colorClass}`}
+                                style={{
+                                    width: `${Math.max(percent, value > 0 ? 4 : 0)}%`,
+                                }}
                             />
                         </div>
 
@@ -473,41 +467,16 @@ function ProgressList({ items }) {
     );
 }
 
-function TrendChart({ items }) {
-    const safeItems = Array.isArray(items) ? items : [];
-    const maxValue = Math.max(...safeItems.map((item) => Number(item.total || 0)), 0);
-
-    if (safeItems.length === 0) {
-        return (
-            <div className="rounded-3xl bg-slate-50 p-6 text-center text-sm font-bold text-slate-400">
-                Belum ada data trend.
-            </div>
-        );
-    }
+function CountBadge({ value, color = "slate" }) {
+    const colorClass =
+        color === "blue"
+            ? "bg-blue-100 text-blue-700"
+            : "bg-slate-100 text-slate-700";
 
     return (
-        <div className="flex min-h-[260px] items-end gap-3 overflow-x-auto rounded-3xl bg-slate-50 p-5">
-            {safeItems.map((item, index) => {
-                const value = Number(item.total || 0);
-                const height = maxValue > 0 ? Math.round((value / maxValue) * 180) : 0;
-
-                return (
-                    <div
-                        key={`${item.label}-${index}`}
-                        className="flex min-w-[58px] flex-col items-center justify-end gap-2"
-                    >
-                        <p className="text-xs font-black text-slate-700">{value}</p>
-                        <div
-                            className="w-10 rounded-t-2xl bg-teal-500 shadow-sm transition"
-                            style={{ height: `${Math.max(height, value > 0 ? 16 : 0)}px` }}
-                        />
-                        <p className="w-16 truncate text-center text-[11px] font-bold text-slate-500">
-                            {formatShortDate(item.label)}
-                        </p>
-                    </div>
-                );
-            })}
-        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-black ${colorClass}`}>
+            {numberFormat(value)}
+        </span>
     );
 }
 
@@ -525,62 +494,6 @@ function Td({ children }) {
             {children}
         </td>
     );
-}
-
-function StatusBadge({ value }) {
-    const normalized = String(value || "").toLowerCase();
-
-    if (!value) {
-        return (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-400">
-                Belum Diproses
-            </span>
-        );
-    }
-
-    const colorClass =
-        normalized.includes("lolos") || normalized.includes("diterima")
-            ? "bg-emerald-100 text-emerald-700"
-            : normalized.includes("gagal") || normalized.includes("tidak")
-            ? "bg-red-100 text-red-700"
-            : "bg-amber-100 text-amber-700";
-
-    return (
-        <span className={`rounded-full px-3 py-1 text-xs font-black ${colorClass}`}>
-            {value}
-        </span>
-    );
-}
-
-function formatDate(value) {
-    if (!value) return "-";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-    });
-}
-
-function formatShortDate(value) {
-    if (!value) return "-";
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return date.toLocaleDateString("id-ID", {
-        day: "2-digit",
-        month: "short",
-    });
 }
 
 function formatDateTime(value) {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -24,32 +25,26 @@ class ReportHasilTestMmpiController extends Controller
             'tanggal_akhir.after_or_equal' => 'Tanggal akhir tidak boleh lebih kecil dari tanggal awal.',
         ]);
 
-        $query = $this->baseQuery($validated);
-
-        $summaryItems = (clone $query)->get();
-
-        $summary = [
-            'total' => $summaryItems->count(),
-            'hadir' => $summaryItems->filter(fn ($item) => $this->normalizeKehadiran($item->status_kehadiran) === 'hadir')->count(),
-            'tidak_hadir' => $summaryItems->filter(fn ($item) => $this->normalizeKehadiran($item->status_kehadiran) === 'tidak_hadir')->count(),
-            'belum_ada_kehadiran' => $summaryItems->filter(fn ($item) => $this->normalizeKehadiran($item->status_kehadiran) === null)->count(),
-            'lolos' => $summaryItems->filter(fn ($item) => $this->normalizeHasilTest($item->hasil_test) === 'lolos')->count(),
-            'gagal' => $summaryItems->filter(fn ($item) => $this->normalizeHasilTest($item->hasil_test) === 'gagal')->count(),
-            'belum_ada_hasil' => $summaryItems->filter(fn ($item) => $this->normalizeHasilTest($item->hasil_test) === null)->count(),
-        ];
-
-        $data = $query
+        $rows = $this->baseQuery($validated)
             ->orderByDesc('dh.tanggal_kehadiran')
             ->orderByDesc('jtm.tanggal')
             ->paginate(25);
 
-        $data->getCollection()->transform(fn ($item) => $this->formatRow($item));
+        $rows->getCollection()->transform(fn ($item) => $this->formatRow($item));
+
+        $dashboardRows = $this->baseQuery($validated)
+            ->orderByDesc('dh.tanggal_kehadiran')
+            ->orderByDesc('jtm.tanggal')
+            ->get()
+            ->map(fn ($item) => $this->formatRow($item));
 
         return response()->json([
             'success' => true,
             'message' => 'Report hasil test MMPI berhasil ditampilkan.',
-            'summary' => $summary,
-            'data' => $data,
+            'data' => [
+                'rows' => $rows,
+                'dashboard' => $this->buildDashboard($dashboardRows),
+            ],
         ]);
     }
 
@@ -117,6 +112,7 @@ class ReportHasilTestMmpiController extends Controller
             echo '<th>No</th>';
             echo '<th>Tanggal Kehadiran</th>';
             echo '<th>Tanggal Jadwal MMPI</th>';
+            echo '<th>Token</th>';
             echo '<th>Nama Pelamar</th>';
             echo '<th>Email</th>';
             echo '<th>No HP / WA</th>';
@@ -131,7 +127,7 @@ class ReportHasilTestMmpiController extends Controller
 
             if ($rows->count() === 0) {
                 echo '<tr>';
-                echo '<td colspan="11" style="text-align:center;">Data tidak ditemukan</td>';
+                echo '<td colspan="12" style="text-align:center;">Data tidak ditemukan</td>';
                 echo '</tr>';
             }
 
@@ -140,6 +136,7 @@ class ReportHasilTestMmpiController extends Controller
                 echo '<td>' . ($index + 1) . '</td>';
                 echo '<td>' . e($row['tanggal_kehadiran']) . '</td>';
                 echo '<td>' . e($row['tanggal_mmpi']) . '</td>';
+                echo '<td>' . e($row['token']) . '</td>';
                 echo '<td>' . e($row['nama']) . '</td>';
                 echo '<td>' . e($row['email']) . '</td>';
                 echo '<td>' . e($row['no_hp']) . '</td>';
@@ -241,6 +238,213 @@ class ReportHasilTestMmpiController extends Controller
         }
 
         return $query;
+    }
+
+    private function buildDashboard(Collection $rows): array
+    {
+        $total = $rows->count();
+
+        $hadir = $rows->where('status_kehadiran', 'hadir')->count();
+        $tidakHadir = $rows->where('status_kehadiran', 'tidak_hadir')->count();
+        $belumKehadiran = $rows->filter(fn ($item) => empty($item['status_kehadiran']))->count();
+
+        $lolos = $rows->where('hasil_test', 'lolos')->count();
+        $gagal = $rows->where('hasil_test', 'gagal')->count();
+        $belumHasil = $rows->filter(fn ($item) => empty($item['hasil_test']))->count();
+
+        return [
+            'summary' => [
+                'total' => $total,
+                'hadir' => $hadir,
+                'tidak_hadir' => $tidakHadir,
+                'belum_ada_kehadiran' => $belumKehadiran,
+                'lolos' => $lolos,
+                'gagal' => $gagal,
+                'belum_ada_hasil' => $belumHasil,
+                'persentase_hadir' => $total > 0 ? round(($hadir / $total) * 100, 1) : 0,
+                'persentase_lolos' => $total > 0 ? round(($lolos / $total) * 100, 1) : 0,
+            ],
+            'demografi' => [
+                'status_kehadiran' => $this->groupByValue($rows, 'status_kehadiran_label', 'Belum Ada'),
+                'hasil_test' => $this->groupByValue($rows, 'hasil_test_label', 'Belum Ada'),
+                'kehadiran_hasil' => $this->groupByKehadiranHasil($rows),
+                'domain_email' => $this->groupByEmailDomain($rows),
+                'kelengkapan_kontak' => $this->groupByContactCompleteness($rows),
+            ],
+            'top' => [
+                'tanggal_mmpi' => $this->groupByMmpiDate($rows),
+                'peserta' => $this->groupByValue($rows, 'nama', 'Tidak Diisi', 7),
+            ],
+            'trend' => $this->groupByDate($rows),
+        ];
+    }
+
+    private function groupByValue(
+        Collection $rows,
+        string $key,
+        string $emptyLabel = 'Tidak Diisi',
+        int $limit = 10
+    ): array {
+        return $rows
+            ->map(function ($item) use ($key, $emptyLabel) {
+                $value = trim((string) ($item[$key] ?? ''));
+
+                return $value !== '' && $value !== '-' ? $value : $emptyLabel;
+            })
+            ->countBy()
+            ->sortDesc()
+            ->take($limit)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByDate(Collection $rows): array
+    {
+        return $rows
+            ->map(function ($item) {
+                $tanggal = $item['tanggal_kehadiran'] ?? null;
+
+                if (!$tanggal) {
+                    return 'Tidak Diisi';
+                }
+
+                try {
+                    return Carbon::parse($tanggal)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                    return (string) $tanggal;
+                }
+            })
+            ->countBy()
+            ->sortKeys()
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByMmpiDate(Collection $rows): array
+    {
+        return $rows
+            ->map(function ($item) {
+                $tanggal = $item['tanggal_mmpi'] ?? null;
+
+                if (!$tanggal) {
+                    return 'Tidak Diisi';
+                }
+
+                try {
+                    return Carbon::parse($tanggal)->format('d M Y');
+                } catch (\Throwable $e) {
+                    return (string) $tanggal;
+                }
+            })
+            ->countBy()
+            ->sortDesc()
+            ->take(7)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByKehadiranHasil(Collection $rows): array
+    {
+        return $rows
+            ->map(function ($item) {
+                $kehadiran = $item['status_kehadiran_label'] ?: 'Belum Ada Kehadiran';
+                $hasil = $item['hasil_test_label'] ?: 'Belum Ada Hasil';
+
+                return $kehadiran . ' - ' . $hasil;
+            })
+            ->countBy()
+            ->sortDesc()
+            ->take(10)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByEmailDomain(Collection $rows): array
+    {
+        return $rows
+            ->map(function ($item) {
+                $email = trim((string) ($item['email'] ?? ''));
+
+                if ($email === '' || $email === '-' || !str_contains($email, '@')) {
+                    return 'Tidak Diisi';
+                }
+
+                return strtolower(substr(strrchr($email, '@'), 1));
+            })
+            ->countBy()
+            ->sortDesc()
+            ->take(10)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function groupByContactCompleteness(Collection $rows): array
+    {
+        $groups = [
+            'Email & No HP Lengkap' => 0,
+            'Email Saja' => 0,
+            'No HP Saja' => 0,
+            'Tidak Lengkap' => 0,
+        ];
+
+        foreach ($rows as $item) {
+            $email = trim((string) ($item['email'] ?? ''));
+            $phone = trim((string) ($item['no_hp'] ?? ''));
+
+            $hasEmail = $email !== '' && $email !== '-';
+            $hasPhone = $phone !== '' && $phone !== '-';
+
+            if ($hasEmail && $hasPhone) {
+                $groups['Email & No HP Lengkap']++;
+            } elseif ($hasEmail) {
+                $groups['Email Saja']++;
+            } elseif ($hasPhone) {
+                $groups['No HP Saja']++;
+            } else {
+                $groups['Tidak Lengkap']++;
+            }
+        }
+
+        return collect($groups)
+            ->filter(fn ($total) => $total > 0)
+            ->map(function ($total, $label) {
+                return [
+                    'label' => (string) $label,
+                    'total' => (int) $total,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function formatRow($item): array
