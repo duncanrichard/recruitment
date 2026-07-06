@@ -42,49 +42,45 @@ class DataPerusahaanController extends Controller
     }
 
     public function store(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'nama_perusahaan' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at'),
-            ],
-            'no_wa' => ['required', 'string', 'max:30'],
-            'token_api_wa' => ['required', 'string'],
-        ], [
-            'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
-            'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
-            'no_wa.required' => 'Nomor perusahaan wajib diisi.',
-            'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
-            'token_api_wa.required' => 'Token API WA wajib diisi.',
-            'token_api_wa.string' => 'Token API WA harus berupa teks.',
-        ]);
+{
+    $validated = $request->validate([
+        'nama_perusahaan' => [
+            'required',
+            'string',
+            'max:255',
+            Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at'),
+        ],
+        'no_wa' => ['required', 'string', 'max:30'],
+        'token_api_wa' => ['nullable', 'string'],
+    ], [
+        'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
+        'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
+        'no_wa.required' => 'Nomor perusahaan wajib diisi.',
+        'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
+        'token_api_wa.string' => 'Token API WA harus berupa teks.',
+    ]);
 
-        $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
-        $tokenApiWa = $this->normalizeToken($validated['token_api_wa']);
+    $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
+    $tokenApiWa = $this->normalizeToken($validated['token_api_wa'] ?? null);
 
-        /*
-         * Validasi token tetap jalan.
-         * Tetapi kalau nomor sesuai token dan device belum connect,
-         * data tetap boleh tersimpan.
-         */
+    if ($tokenApiWa) {
         $this->validateFonnteDeviceOrFail($nomorPerusahaan, $tokenApiWa);
-
-        $perusahaan = DataPerusahaan::create([
-            'kode' => $this->generateKodePerusahaan(),
-            'nama_perusahaan' => trim($validated['nama_perusahaan']),
-            'no_wa' => $nomorPerusahaan,
-            'token_api_wa' => $tokenApiWa,
-            'created_by' => Auth::id(),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data perusahaan berhasil ditambahkan.',
-            'data' => $perusahaan,
-        ], 201);
     }
+
+    $perusahaan = DataPerusahaan::create([
+        'kode' => $this->generateKodePerusahaan(),
+        'nama_perusahaan' => trim($validated['nama_perusahaan']),
+        'no_wa' => $nomorPerusahaan,
+        'token_api_wa' => $tokenApiWa,
+        'created_by' => Auth::id(),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Data perusahaan berhasil ditambahkan.',
+        'data' => $perusahaan,
+    ], 201);
+}
 
     public function update(Request $request, string $id): JsonResponse
     {
