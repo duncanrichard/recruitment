@@ -8,6 +8,7 @@ use App\Models\JadwalTestMmpi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,8 @@ class MmpiController extends Controller
         ]);
 
         $query = DB::table('jadwal_test_mmpi as jmm')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jmm.data_riwayat_diri_id')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
             ->leftJoin('daftar_hadir_test_mmpi as dhm', function ($join) {
                 $join->on('dhm.jadwal_test_mmpi_id', '=', 'jmm.id');
 
@@ -38,6 +41,12 @@ class MmpiController extends Controller
             $query->whereNull('jmm.deleted_at');
         }
 
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        $this->applyCompanyScopeToPelamarJoin($query, 'drd');
+
         if (!empty($validated['tanggal_mulai'])) {
             $query->whereDate('jmm.tanggal', '>=', $validated['tanggal_mulai']);
         }
@@ -48,7 +57,12 @@ class MmpiController extends Controller
 
         if (!empty($validated['search'])) {
             $keyword = trim($validated['search']);
-            $query->whereRaw('CAST(DATE(jmm.tanggal) AS TEXT) ILIKE ?', ["%{$keyword}%"]);
+
+            $query->where(function ($q) use ($keyword) {
+                $q->whereRaw('CAST(DATE(jmm.tanggal) AS TEXT) ILIKE ?', ["%{$keyword}%"])
+                    ->orWhereRaw("COALESCE(dp.nama_perusahaan, '') ILIKE ?", ["%{$keyword}%"])
+                    ->orWhereRaw("COALESCE(dp.kode, '') ILIKE ?", ["%{$keyword}%"]);
+            });
         }
 
         $data = $query
@@ -59,6 +73,8 @@ class MmpiController extends Controller
             ->selectRaw("COUNT(DISTINCT CASE WHEN dhm.id IS NULL OR TRIM(COALESCE(dhm.status_kehadiran, '')) = '' THEN jmm.id END) as total_belum_ada")
             ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(COALESCE(dhm.hasil_test, '')) = 'lolos' THEN jmm.id END) as total_lolos")
             ->selectRaw("COUNT(DISTINCT CASE WHEN LOWER(REPLACE(REPLACE(COALESCE(dhm.hasil_test, ''), ' ', '_'), '-', '_')) IN ('gagal', 'tidak_lolos', 'tidaklolos') THEN jmm.id END) as total_gagal")
+            ->selectRaw('COUNT(DISTINCT drd.perusahaan_dilamar) as total_perusahaan')
+            ->selectRaw("STRING_AGG(DISTINCT COALESCE(dp.nama_perusahaan, '-'), ', ') as perusahaan_label")
             ->groupBy(DB::raw('DATE(jmm.tanggal)'))
             ->orderByDesc(DB::raw('DATE(jmm.tanggal)'))
             ->get()
@@ -66,6 +82,8 @@ class MmpiController extends Controller
                 return [
                     'tanggal_test' => $row->tanggal_test,
                     'tanggal_label' => $this->formatTanggalIndonesia($row->tanggal_test),
+                    'perusahaan_label' => $row->perusahaan_label ?: '-',
+                    'total_perusahaan' => (int) $row->total_perusahaan,
                     'total_peserta' => (int) $row->total_peserta,
                     'total_hadir' => (int) $row->total_hadir,
                     'total_tidak_hadir' => (int) $row->total_tidak_hadir,
@@ -113,6 +131,7 @@ class MmpiController extends Controller
 
         $query = DB::table('jadwal_test_mmpi as jmm')
             ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jmm.data_riwayat_diri_id')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
             ->leftJoin('daftar_hadir_test_mmpi as dhm', function ($join) {
                 $join->on('dhm.jadwal_test_mmpi_id', '=', 'jmm.id');
 
@@ -129,6 +148,8 @@ class MmpiController extends Controller
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
             $query->whereNull('drd.deleted_at');
         }
+
+        $this->applyCompanyScopeToPelamarJoin($query, 'drd');
 
         if ($status === 'hadir') {
             $query->whereRaw("LOWER(COALESCE(dhm.status_kehadiran, '')) = 'hadir'");
@@ -148,10 +169,13 @@ class MmpiController extends Controller
 
         if (!empty($validated['search'])) {
             $keyword = trim($validated['search']);
+
             $query->where(function ($q) use ($keyword, $pelamarColumns) {
                 $q->whereRaw($pelamarColumns['nama'] . ' ILIKE ?', ["%{$keyword}%"])
                     ->orWhereRaw($pelamarColumns['email'] . ' ILIKE ?', ["%{$keyword}%"])
-                    ->orWhereRaw($pelamarColumns['no_hp'] . ' ILIKE ?', ["%{$keyword}%"]);
+                    ->orWhereRaw($pelamarColumns['no_hp'] . ' ILIKE ?', ["%{$keyword}%"])
+                    ->orWhereRaw("COALESCE(dp.nama_perusahaan, '') ILIKE ?", ["%{$keyword}%"])
+                    ->orWhereRaw("COALESCE(dp.kode, '') ILIKE ?", ["%{$keyword}%"]);
             });
         }
 
@@ -163,6 +187,9 @@ class MmpiController extends Controller
             'dhm.tanggal_kehadiran',
             'dhm.status_kehadiran',
             'dhm.hasil_test',
+            'drd.perusahaan_dilamar as perusahaan_id',
+            'dp.kode as perusahaan_kode',
+            'dp.nama_perusahaan as perusahaan_nama',
             DB::raw($pelamarColumns['nama'] . ' as nama'),
             DB::raw($pelamarColumns['email'] . ' as email'),
             DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
@@ -197,6 +224,10 @@ class MmpiController extends Controller
                     'hasil_test_label' => $this->labelHasilTest($hasilTest),
                     'file_hasil_test_mmpi' => $fileUrl,
                     'file_hasil_test_mmpi_url' => $fileUrl,
+                    'perusahaan_id' => $item->perusahaan_id,
+                    'perusahaan_kode' => $item->perusahaan_kode,
+                    'perusahaan_nama' => $item->perusahaan_nama ?: '-',
+                    'perusahaan_label' => trim(($item->perusahaan_kode ? $item->perusahaan_kode . ' - ' : '') . ($item->perusahaan_nama ?: '-')),
                     'nama' => $item->nama ?: '-',
                     'email' => $item->email ?: '-',
                     'no_hp' => $item->no_hp ?: '-',
@@ -247,7 +278,7 @@ class MmpiController extends Controller
             ], 500);
         }
 
-        $jadwal = JadwalTestMmpi::query()->findOrFail($jadwalTestMmpi);
+        $jadwal = $this->findScopedJadwalMmpiOrFail($jadwalTestMmpi);
 
         $daftarHadir = DaftarHadirTestMmpi::query()
             ->where('jadwal_test_mmpi_id', $jadwal->id)
@@ -326,7 +357,7 @@ class MmpiController extends Controller
             'status_kehadiran.in' => 'Status kehadiran harus Hadir atau Tidak Hadir.',
         ]);
 
-        $jadwal = JadwalTestMmpi::query()->findOrFail($jadwalTestMmpi);
+        $jadwal = $this->findScopedJadwalMmpiOrFail($jadwalTestMmpi);
 
         $daftarHadir = DaftarHadirTestMmpi::withTrashed()
             ->where('jadwal_test_mmpi_id', $jadwal->id)
@@ -395,7 +426,8 @@ class MmpiController extends Controller
 
     private function itemsByTanggal(string $tanggal)
     {
-        return DB::table('jadwal_test_mmpi as jmm')
+        $query = DB::table('jadwal_test_mmpi as jmm')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jmm.data_riwayat_diri_id')
             ->leftJoin('daftar_hadir_test_mmpi as dhm', function ($join) {
                 $join->on('dhm.jadwal_test_mmpi_id', '=', 'jmm.id');
 
@@ -407,6 +439,13 @@ class MmpiController extends Controller
             ->when(Schema::hasColumn('jadwal_test_mmpi', 'deleted_at'), function ($query) {
                 $query->whereNull('jmm.deleted_at');
             })
+            ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
+                $query->whereNull('drd.deleted_at');
+            });
+
+        $this->applyCompanyScopeToPelamarJoin($query, 'drd');
+
+        return $query
             ->select(['jmm.id', 'dhm.status_kehadiran', 'dhm.hasil_test'])
             ->get()
             ->map(function ($item) {
@@ -416,6 +455,107 @@ class MmpiController extends Controller
                     'hasil_test' => $this->normalizeHasilTestValue($item->hasil_test ?? null),
                 ];
             });
+    }
+
+
+    private function findScopedJadwalMmpiOrFail(string $id): JadwalTestMmpi
+    {
+        $query = JadwalTestMmpi::query();
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereExists(function ($q) use ($allowedPerusahaanIds) {
+                $q->select(DB::raw(1))
+                    ->from('data_riwayat_diri as drd')
+                    ->whereColumn('drd.id', 'jadwal_test_mmpi.data_riwayat_diri_id')
+                    ->whereIn('drd.perusahaan_dilamar', $allowedPerusahaanIds);
+
+                if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+                    $q->whereNull('drd.deleted_at');
+                }
+            });
+        }
+
+        return $query->findOrFail($id);
+    }
+
+    private function applyCompanyScopeToPelamarJoin($query, string $pelamarAlias = 'drd'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn("{$pelamarAlias}.perusahaan_dilamar", $allowedPerusahaanIds);
+        }
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(fn ($id) => (string) $id)
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole') && $user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                return true;
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(fn ($name) => strtolower(trim((string) $name)))
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(fn ($name) => in_array($name, ['superadmin', 'super admin'], true));
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
     }
 
     private function getPelamarColumns(): array

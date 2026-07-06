@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Account;
 
 use App\Http\Controllers\Controller;
 use App\Models\Role;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -16,7 +17,7 @@ class RoleController extends Controller
         return view('pages.admin.index');
     }
 
-    public function list()
+    public function list(): JsonResponse
     {
         try {
             $roles = Role::query()
@@ -41,17 +42,19 @@ class RoleController extends Controller
         }
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        $guardName = $request->input('guard_name', 'web');
+        $guardName = $request->input('guard_name') ?: 'web';
 
         $validated = $request->validate([
-            'nama_role' => [
+            'name' => [
                 'required',
                 'string',
                 'max:100',
                 Rule::unique('roles', 'name')
-                    ->where('guard_name', $guardName),
+                    ->where(function ($query) use ($guardName) {
+                        return $query->where('guard_name', $guardName);
+                    }),
             ],
             'guard_name' => [
                 'nullable',
@@ -59,16 +62,19 @@ class RoleController extends Controller
                 'max:100',
             ],
         ], [
-            'nama_role.required' => 'Nama role wajib diisi.',
-            'nama_role.unique' => 'Nama role sudah digunakan.',
+            'name.required' => 'Nama role wajib diisi.',
+            'name.string' => 'Nama role harus berupa teks.',
+            'name.max' => 'Nama role maksimal 100 karakter.',
+            'name.unique' => 'Nama role sudah digunakan.',
             'guard_name.string' => 'Guard name harus berupa teks.',
+            'guard_name.max' => 'Guard name maksimal 100 karakter.',
         ]);
 
         try {
-            $role = DB::transaction(function () use ($validated) {
+            $role = DB::transaction(function () use ($validated, $guardName) {
                 $role = Role::create([
-                    'name' => trim($validated['nama_role']),
-                    'guard_name' => $validated['guard_name'] ?? 'web',
+                    'name' => trim($validated['name']),
+                    'guard_name' => $validated['guard_name'] ?? $guardName,
                 ]);
 
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -79,7 +85,7 @@ class RoleController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data role berhasil ditambahkan.',
-                'data' => $this->formatRole($role),
+                'data' => $this->formatRole($role->loadCount('permissions')),
             ], 201);
         } catch (\Throwable $th) {
             return response()->json([
@@ -90,7 +96,7 @@ class RoleController extends Controller
         }
     }
 
-    public function update(Request $request, Role $role)
+    public function update(Request $request, Role $role): JsonResponse
     {
         if ($this->isSuperadminRole($role)) {
             return response()->json([
@@ -99,15 +105,17 @@ class RoleController extends Controller
             ], 422);
         }
 
-        $guardName = $request->input('guard_name', $role->guard_name ?? 'web');
+        $guardName = $request->input('guard_name') ?: ($role->guard_name ?? 'web');
 
         $validated = $request->validate([
-            'nama_role' => [
+            'name' => [
                 'required',
                 'string',
                 'max:100',
                 Rule::unique('roles', 'name')
-                    ->where('guard_name', $guardName)
+                    ->where(function ($query) use ($guardName) {
+                        return $query->where('guard_name', $guardName);
+                    })
                     ->ignore($role->id, 'id'),
             ],
             'guard_name' => [
@@ -116,16 +124,19 @@ class RoleController extends Controller
                 'max:100',
             ],
         ], [
-            'nama_role.required' => 'Nama role wajib diisi.',
-            'nama_role.unique' => 'Nama role sudah digunakan.',
+            'name.required' => 'Nama role wajib diisi.',
+            'name.string' => 'Nama role harus berupa teks.',
+            'name.max' => 'Nama role maksimal 100 karakter.',
+            'name.unique' => 'Nama role sudah digunakan.',
             'guard_name.string' => 'Guard name harus berupa teks.',
+            'guard_name.max' => 'Guard name maksimal 100 karakter.',
         ]);
 
         try {
-            DB::transaction(function () use ($validated, $role) {
+            DB::transaction(function () use ($validated, $guardName, $role) {
                 $role->update([
-                    'name' => trim($validated['nama_role']),
-                    'guard_name' => $validated['guard_name'] ?? $role->guard_name ?? 'web',
+                    'name' => trim($validated['name']),
+                    'guard_name' => $validated['guard_name'] ?? $guardName,
                 ]);
 
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -145,7 +156,7 @@ class RoleController extends Controller
         }
     }
 
-    public function destroy(Role $role)
+    public function destroy(Role $role): JsonResponse
     {
         if ($this->isSuperadminRole($role)) {
             return response()->json([

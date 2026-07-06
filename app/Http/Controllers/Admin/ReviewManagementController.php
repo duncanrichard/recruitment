@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -336,6 +337,9 @@ class ReviewManagementController extends Controller
             ->whereHas('hasilInterview', function ($query) {
                 $query->whereIn('hasil_interview', $this->hasilInterviewReviewOptions);
             })
+            ->whereHas('hasilInterview.kandidat', function ($query) {
+                $this->applyPerusahaanScopeToEloquent($query, 'perusahaan_dilamar');
+            })
             ->whereHas('hasilInterview.jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
                 $query
                     ->whereDate('jadwal_interview', '>=', $tanggalMulai)
@@ -379,6 +383,9 @@ class ReviewManagementController extends Controller
                     'email_kandidat' => $kandidat?->email,
                     'no_wa_kandidat' => $kandidat?->no_wa,
                     'posisi_label' => $kandidat?->posisi_label,
+                    'perusahaan_id' => $kandidat?->perusahaan_dilamar,
+                    'perusahaan_kode' => $kandidat?->perusahaan?->kode ?? null,
+                    'perusahaan_nama' => $kandidat?->perusahaan?->nama_perusahaan ?? null,
                     'perusahaan_label' => $kandidat?->perusahaan_label,
 
                     'status_kehadiran' => $item?->status_kehadiran,
@@ -432,6 +439,8 @@ class ReviewManagementController extends Controller
             $query->whereNull('drd.deleted_at');
         }
 
+        $this->applyPerusahaanScopeToQuery($query, 'drd.perusahaan_dilamar');
+
         $selects = [
             'dhz.id as hasil_test_zoom_id',
             'dhz.jadwal_test_zoom_id',
@@ -450,6 +459,8 @@ class ReviewManagementController extends Controller
             'drd.email',
             'drd.no_wa',
             'p.nama_posisi',
+            'dp.id as perusahaan_id',
+            'dp.kode as perusahaan_kode',
             'dp.nama_perusahaan',
             'hrm.id as review_management_id',
             'hrm.review_management',
@@ -513,6 +524,9 @@ class ReviewManagementController extends Controller
                     'email_kandidat' => $kandidat?->email ?? $row->email,
                     'no_wa_kandidat' => $kandidat?->no_wa ?? $row->no_wa,
                     'posisi_label' => $kandidat?->posisi_label ?? $row->nama_posisi,
+                    'perusahaan_id' => $row->perusahaan_id ?? ($kandidat?->perusahaan_dilamar ?? null),
+                    'perusahaan_kode' => $row->perusahaan_kode ?? ($kandidat?->perusahaan?->kode ?? null),
+                    'perusahaan_nama' => $row->nama_perusahaan ?? ($kandidat?->perusahaan?->nama_perusahaan ?? null),
                     'perusahaan_label' => $kandidat?->perusahaan_label ?? $row->nama_perusahaan,
 
                     'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran),
@@ -569,6 +583,8 @@ class ReviewManagementController extends Controller
             $query->whereNull('drd.deleted_at');
         }
 
+        $this->applyPerusahaanScopeToQuery($query, 'drd.perusahaan_dilamar');
+
         return $query
             ->select([
                 'dhm.id as hasil_test_mmpi_id',
@@ -588,6 +604,8 @@ class ReviewManagementController extends Controller
                 'drd.email',
                 'drd.no_wa',
                 'p.nama_posisi',
+                'dp.id as perusahaan_id',
+                'dp.kode as perusahaan_kode',
                 'dp.nama_perusahaan',
                 'hrm.id as review_management_id',
                 'hrm.review_management',
@@ -633,6 +651,9 @@ class ReviewManagementController extends Controller
                     'email_kandidat' => $kandidat?->email ?? $row->email,
                     'no_wa_kandidat' => $kandidat?->no_wa ?? $row->no_wa,
                     'posisi_label' => $kandidat?->posisi_label ?? $row->nama_posisi,
+                    'perusahaan_id' => $row->perusahaan_id ?? ($kandidat?->perusahaan_dilamar ?? null),
+                    'perusahaan_kode' => $row->perusahaan_kode ?? ($kandidat?->perusahaan?->kode ?? null),
+                    'perusahaan_nama' => $row->nama_perusahaan ?? ($kandidat?->perusahaan?->nama_perusahaan ?? null),
                     'perusahaan_label' => $kandidat?->perusahaan_label ?? $row->nama_perusahaan,
 
                     'status_kehadiran' => $this->labelKehadiran($row->status_kehadiran),
@@ -890,6 +911,9 @@ class ReviewManagementController extends Controller
         $jadwalKandidat = JadwalInterviewKandidat::query()
             ->where('id', $validated['hasil_interview_id'])
             ->whereIn('hasil_interview', $this->hasilInterviewReviewOptions)
+            ->whereHas('kandidat', function ($query) {
+                $this->applyPerusahaanScopeToEloquent($query, 'perusahaan_dilamar');
+            })
             ->first();
 
         if (!$jadwalKandidat) {
@@ -948,8 +972,22 @@ class ReviewManagementController extends Controller
             ], 422);
         }
 
-        $hasilTest = DB::table('daftar_hadir_test_zoom')
-            ->where('id', $validated['hasil_test_zoom_id'])
+        $hasilTestQuery = DB::table('daftar_hadir_test_zoom as dhz')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhz.data_riwayat_diri_id')
+            ->where('dhz.id', $validated['hasil_test_zoom_id']);
+
+        if (Schema::hasColumn('daftar_hadir_test_zoom', 'deleted_at')) {
+            $hasilTestQuery->whereNull('dhz.deleted_at');
+        }
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $hasilTestQuery->whereNull('drd.deleted_at');
+        }
+
+        $this->applyPerusahaanScopeToQuery($hasilTestQuery, 'drd.perusahaan_dilamar');
+
+        $hasilTest = $hasilTestQuery
+            ->select('dhz.*')
             ->first();
 
         if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
@@ -1019,8 +1057,22 @@ class ReviewManagementController extends Controller
             ], 422);
         }
 
-        $hasilTest = DB::table('daftar_hadir_test_mmpi')
-            ->where('id', $validated['hasil_test_mmpi_id'])
+        $hasilTestQuery = DB::table('daftar_hadir_test_mmpi as dhm')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhm.data_riwayat_diri_id')
+            ->where('dhm.id', $validated['hasil_test_mmpi_id']);
+
+        if (Schema::hasColumn('daftar_hadir_test_mmpi', 'deleted_at')) {
+            $hasilTestQuery->whereNull('dhm.deleted_at');
+        }
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $hasilTestQuery->whereNull('drd.deleted_at');
+        }
+
+        $this->applyPerusahaanScopeToQuery($hasilTestQuery, 'drd.perusahaan_dilamar');
+
+        $hasilTest = $hasilTestQuery
+            ->select('dhm.*')
             ->first();
 
         if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
@@ -1076,6 +1128,13 @@ class ReviewManagementController extends Controller
 
     public function show(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
+        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
+            ], 404);
+        }
+
         $hasilReviewManagement->load([
             'hasilInterview.jadwalInterview:id,judul_interview,jadwal_interview',
             'hasilInterview.kandidat' => function ($query) {
@@ -1097,6 +1156,13 @@ class ReviewManagementController extends Controller
 
     public function update(Request $request, HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
+        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
+            ], 404);
+        }
+
         $validated = $request->validate([
             'review_management' => [
                 'nullable',
@@ -1123,6 +1189,13 @@ class ReviewManagementController extends Controller
 
     public function destroy(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
+        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
+            ], 404);
+        }
+
         $hasilReviewManagement->update([
             'review_management' => null,
             'status' => null,
@@ -1474,6 +1547,165 @@ class ReviewManagementController extends Controller
         }
 
         return null;
+    }
+
+
+    private function applyPerusahaanScopeToEloquent($query, string $column = 'perusahaan_dilamar'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn($column, $allowedPerusahaanIds);
+        }
+    }
+
+    private function applyPerusahaanScopeToQuery($query, string $column = 'perusahaan_dilamar'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn($column, $allowedPerusahaanIds);
+        }
+    }
+
+    private function reviewManagementIsAccessible(HasilReviewManagement $review): bool
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if ($allowedPerusahaanIds === null) {
+            return true;
+        }
+
+        if (empty($allowedPerusahaanIds)) {
+            return false;
+        }
+
+        if (!empty($review->hasil_interview_id)) {
+            return DB::table('jadwal_interview_kandidat as jik')
+                ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jik.data_riwayat_diri_id')
+                ->where('jik.id', $review->hasil_interview_id)
+                ->whereIn('drd.perusahaan_dilamar', $allowedPerusahaanIds)
+                ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
+                    $query->whereNull('drd.deleted_at');
+                })
+                ->exists();
+        }
+
+        if (
+            Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id') &&
+            !empty($review->daftar_hadir_test_zoom_id)
+        ) {
+            return DB::table('daftar_hadir_test_zoom as dhz')
+                ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhz.data_riwayat_diri_id')
+                ->where('dhz.id', $review->daftar_hadir_test_zoom_id)
+                ->whereIn('drd.perusahaan_dilamar', $allowedPerusahaanIds)
+                ->when(Schema::hasColumn('daftar_hadir_test_zoom', 'deleted_at'), function ($query) {
+                    $query->whereNull('dhz.deleted_at');
+                })
+                ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
+                    $query->whereNull('drd.deleted_at');
+                })
+                ->exists();
+        }
+
+        if (
+            Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id') &&
+            !empty($review->daftar_hadir_test_mmpi_id)
+        ) {
+            return DB::table('daftar_hadir_test_mmpi as dhm')
+                ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhm.data_riwayat_diri_id')
+                ->where('dhm.id', $review->daftar_hadir_test_mmpi_id)
+                ->whereIn('drd.perusahaan_dilamar', $allowedPerusahaanIds)
+                ->when(Schema::hasColumn('daftar_hadir_test_mmpi', 'deleted_at'), function ($query) {
+                    $query->whereNull('dhm.deleted_at');
+                })
+                ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
+                    $query->whereNull('drd.deleted_at');
+                })
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(function ($id) {
+                        return (string) $id;
+                    })
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $e) {
+            $ids = [];
+        }
+
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(function ($name) {
+                        return strtolower(trim((string) $name));
+                    })
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(function ($name) {
+                    return in_array($name, [
+                        'superadmin',
+                        'super admin',
+                    ], true);
+                });
+            }
+        } catch (\Throwable $e) {
+            //
+        }
+
+        return false;
     }
 
     private function safePelamarRelations(): array

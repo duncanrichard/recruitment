@@ -7,6 +7,7 @@ use App\Models\JadwalTestMmpi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -59,6 +60,8 @@ class MmpiController extends Controller
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
             $query->whereNull('drd.deleted_at');
         }
+
+        $this->applyCompanyScopeToDrdJoin($query, 'drd');
 
         if (!empty($validated['tanggal_mulai'])) {
             $query->whereDate('jtm.tanggal', '>=', $validated['tanggal_mulai']);
@@ -153,6 +156,8 @@ class MmpiController extends Controller
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
             $query->whereNull('drd.deleted_at');
         }
+
+        $this->applyCompanyScopeToDrdJoin($query, 'drd');
 
         $items = $query
             ->select([
@@ -256,19 +261,29 @@ class MmpiController extends Controller
 
         DB::transaction(function () use ($items, $tanggal, &$created, &$skipped) {
             foreach ($items as $item) {
-                $daftarHadir = DB::table('daftar_hadir_test_zoom as dh')
+                $daftarHadirQuery = DB::table('daftar_hadir_test_zoom as dh')
                     ->join('jadwal_test_zoom as jtz', function ($join) {
                         $join->on('jtz.id', '=', 'dh.jadwal_test_zoom_id')
                             ->whereNull('jtz.deleted_at');
                     })
+                    ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dh.data_riwayat_diri_id')
                     ->where('dh.id', $item['daftar_hadir_test_zoom_id'])
-                    ->whereNull('dh.deleted_at')
+                    ->whereNull('dh.deleted_at');
+
+                if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+                    $daftarHadirQuery->whereNull('drd.deleted_at');
+                }
+
+                $this->applyCompanyScopeToDrdJoin($daftarHadirQuery, 'drd');
+
+                $daftarHadir = $daftarHadirQuery
                     ->select([
                         'dh.id',
                         'dh.data_riwayat_diri_id',
                         'dh.status_kehadiran',
                         'dh.hasil_test',
                         'dh.jadwal_test_zoom_id',
+                        'drd.perusahaan_dilamar',
                     ])
                     ->first();
 
@@ -334,7 +349,7 @@ class MmpiController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $jadwal = JadwalTestMmpi::query()->findOrFail($id);
+        $jadwal = $this->findScopedJadwalMmpiOrFail($id);
 
         DB::transaction(function () use ($jadwal) {
             if (Schema::hasTable('daftar_hadir_test_mmpi')) {
@@ -354,6 +369,133 @@ class MmpiController extends Controller
             'success' => true,
             'message' => 'Jadwal test MMPI berhasil dihapus.',
         ]);
+    }
+
+
+    private function applyCompanyScopeToDrdJoin($query, string $pelamarAlias = 'drd'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            if (empty($allowedPerusahaanIds)) {
+                $query->whereRaw('1 = 0');
+                return;
+            }
+
+            $query->whereIn($pelamarAlias . '.perusahaan_dilamar', $allowedPerusahaanIds);
+        }
+    }
+
+    private function findScopedJadwalMmpiOrFail(string $id): JadwalTestMmpi
+    {
+        $query = JadwalTestMmpi::query()
+            ->where('id', $id);
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            if (empty($allowedPerusahaanIds)) {
+                abort(404);
+            }
+
+            $query->whereExists(function ($subQuery) use ($allowedPerusahaanIds) {
+                $subQuery
+                    ->select(DB::raw(1))
+                    ->from('data_riwayat_diri as drd')
+                    ->whereColumn('drd.id', 'jadwal_test_mmpi.data_riwayat_diri_id')
+                    ->whereIn('drd.perusahaan_dilamar', $allowedPerusahaanIds);
+
+                if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+                    $subQuery->whereNull('drd.deleted_at');
+                }
+            });
+        }
+
+        return $query->firstOrFail();
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(function ($id) {
+                        return (string) $id;
+                    })
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        /**
+         * Fallback kalau masih ada sistem lama:
+         * users.perusahaan_id
+         */
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(function ($name) {
+                        return strtolower(trim((string) $name));
+                    })
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(function ($name) {
+                    return in_array($name, [
+                        'superadmin',
+                        'super admin',
+                    ], true);
+                });
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
     }
 
     private function getPelamarColumns(): array

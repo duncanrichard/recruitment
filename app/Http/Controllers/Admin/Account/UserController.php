@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin\Account;
 
 use App\Http\Controllers\Controller;
+use App\Models\DataPerusahaan;
 use App\Models\Divisi;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -26,6 +29,7 @@ class UserController extends Controller
                 ->with([
                     'roles:id,name,guard_name',
                     'divisi:id,nama',
+                    'perusahaans:id,kode,nama_perusahaan',
                 ])
                 ->orderBy('name', 'asc')
                 ->get()
@@ -59,8 +63,6 @@ class UserController extends Controller
                         'id' => $role->id,
                         'name' => $role->name,
                         'guard_name' => $role->guard_name,
-
-                        // fallback supaya frontend lama tetap aman
                         'nama_role' => $role->name,
                         'kode_role' => $role->guard_name,
                     ];
@@ -71,12 +73,26 @@ class UserController extends Controller
                 ->orderBy('nama', 'asc')
                 ->get();
 
+            $perusahaan = DataPerusahaan::query()
+                ->select('id', 'kode', 'nama_perusahaan')
+                ->orderBy('nama_perusahaan', 'asc')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'kode' => $item->kode,
+                        'nama_perusahaan' => $item->nama_perusahaan,
+                        'label' => trim(($item->kode ? $item->kode . ' - ' : '') . $item->nama_perusahaan),
+                    ];
+                });
+
             return response()->json([
                 'success' => true,
                 'message' => 'Data option berhasil diambil.',
                 'data' => [
                     'roles' => $roles,
                     'divisi' => $divisi,
+                    'perusahaan' => $perusahaan,
                 ],
             ]);
         } catch (\Throwable $th) {
@@ -118,6 +134,14 @@ class UserController extends Controller
                 'uuid',
                 'exists:divisi,id',
             ],
+            'perusahaan_ids' => [
+                'nullable',
+                'array',
+            ],
+            'perusahaan_ids.*' => [
+                'uuid',
+                'exists:data_perusahaan,id',
+            ],
             'email_verified_at' => [
                 'nullable',
                 'date',
@@ -133,6 +157,8 @@ class UserController extends Controller
             'role_id.required' => 'Role wajib dipilih.',
             'role_id.exists' => 'Role tidak valid.',
             'divisi_id.exists' => 'Divisi tidak valid.',
+            'perusahaan_ids.array' => 'Format perusahaan tidak valid.',
+            'perusahaan_ids.*.exists' => 'Perusahaan tidak valid.',
         ]);
 
         try {
@@ -141,19 +167,33 @@ class UserController extends Controller
                     ->where('id', $validated['role_id'])
                     ->firstOrFail();
 
-                $user = User::create([
+                $perusahaanIds = $this->normalizePerusahaanIds($validated['perusahaan_ids'] ?? []);
+
+                $createPayload = [
                     'name' => trim($validated['name']),
                     'email' => strtolower(trim($validated['email'])),
                     'password' => Hash::make($validated['password']),
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
-                ]);
+                ];
+
+                if (Schema::hasColumn('users', 'perusahaan_id')) {
+                    $createPayload['perusahaan_id'] = $perusahaanIds[0] ?? null;
+                }
+
+                $user = User::query()->create($createPayload);
 
                 $user->assignRole($role);
 
+                $this->syncUserPerusahaans($user, $perusahaanIds);
+
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-                return $user->load(['roles:id,name,guard_name', 'divisi:id,nama']);
+                return $user->fresh()->load([
+                    'roles:id,name,guard_name',
+                    'divisi:id,nama',
+                    'perusahaans:id,kode,nama_perusahaan',
+                ]);
             });
 
             return response()->json([
@@ -200,6 +240,14 @@ class UserController extends Controller
                 'uuid',
                 'exists:divisi,id',
             ],
+            'perusahaan_ids' => [
+                'nullable',
+                'array',
+            ],
+            'perusahaan_ids.*' => [
+                'uuid',
+                'exists:data_perusahaan,id',
+            ],
             'email_verified_at' => [
                 'nullable',
                 'date',
@@ -214,6 +262,8 @@ class UserController extends Controller
             'role_id.required' => 'Role wajib dipilih.',
             'role_id.exists' => 'Role tidak valid.',
             'divisi_id.exists' => 'Divisi tidak valid.',
+            'perusahaan_ids.array' => 'Format perusahaan tidak valid.',
+            'perusahaan_ids.*.exists' => 'Perusahaan tidak valid.',
         ]);
 
         try {
@@ -222,12 +272,18 @@ class UserController extends Controller
                     ->where('id', $validated['role_id'])
                     ->firstOrFail();
 
+                $perusahaanIds = $this->normalizePerusahaanIds($validated['perusahaan_ids'] ?? []);
+
                 $payload = [
                     'name' => trim($validated['name']),
                     'email' => strtolower(trim($validated['email'])),
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ];
+
+                if (Schema::hasColumn('users', 'perusahaan_id')) {
+                    $payload['perusahaan_id'] = $perusahaanIds[0] ?? null;
+                }
 
                 if (!empty($validated['password'])) {
                     $payload['password'] = Hash::make($validated['password']);
@@ -236,9 +292,15 @@ class UserController extends Controller
                 $user->update($payload);
                 $user->syncRoles([$role]);
 
+                $this->syncUserPerusahaans($user, $perusahaanIds);
+
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-                return $user->fresh()->load(['roles:id,name,guard_name', 'divisi:id,nama']);
+                return $user->fresh()->load([
+                    'roles:id,name,guard_name',
+                    'divisi:id,nama',
+                    'perusahaans:id,kode,nama_perusahaan',
+                ]);
             });
 
             return response()->json([
@@ -257,6 +319,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        $user->loadMissing('roles:id,name,guard_name');
+
         if ($this->userHasSuperadminRole($user)) {
             return response()->json([
                 'success' => false,
@@ -266,6 +330,7 @@ class UserController extends Controller
 
         try {
             DB::transaction(function () use ($user) {
+                $this->syncUserPerusahaans($user, []);
                 $user->syncRoles([]);
                 $user->delete();
 
@@ -285,9 +350,62 @@ class UserController extends Controller
         }
     }
 
+    private function syncUserPerusahaans(User $user, array $perusahaanIds): void
+    {
+        $perusahaanIds = $this->normalizePerusahaanIds($perusahaanIds);
+
+        if (!Schema::hasTable('data_perusahaan_user')) {
+            return;
+        }
+
+        DB::table('data_perusahaan_user')
+            ->where('user_id', $user->id)
+            ->delete();
+
+        if (empty($perusahaanIds)) {
+            return;
+        }
+
+        $now = now();
+
+        $rows = collect($perusahaanIds)
+            ->map(function ($perusahaanId) use ($user, $now) {
+                $row = [
+                    'user_id' => $user->id,
+                    'perusahaan_id' => $perusahaanId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+
+                if (Schema::hasColumn('data_perusahaan_user', 'id')) {
+                    $row['id'] = (string) Str::uuid();
+                }
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        DB::table('data_perusahaan_user')->insert($rows);
+    }
+
+    private function normalizePerusahaanIds($perusahaanIds): array
+    {
+        return collect($perusahaanIds ?: [])
+            ->filter()
+            ->map(function ($id) {
+                return (string) $id;
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     private function formatUser(User $user): array
     {
         $role = $user->roles->first();
+
+        $perusahaans = $user->perusahaans ?? collect();
 
         return [
             'id' => $user->id,
@@ -304,6 +422,19 @@ class UserController extends Controller
             'divisi_id' => $user->divisi_id,
             'divisi_label' => $user->divisi?->nama,
 
+            'perusahaan_id' => $user->perusahaan_id ?? null,
+            'perusahaan_ids' => $perusahaans->pluck('id')->values(),
+            'perusahaan_kode' => $perusahaans->pluck('kode')->filter()->implode(', '),
+            'perusahaan_label' => $perusahaans->pluck('nama_perusahaan')->filter()->implode(', '),
+            'perusahaans' => $perusahaans->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'kode' => $item->kode,
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'label' => trim(($item->kode ? $item->kode . ' - ' : '') . $item->nama_perusahaan),
+                ];
+            })->values(),
+
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
         ];
@@ -311,6 +442,8 @@ class UserController extends Controller
 
     private function userHasSuperadminRole(User $user): bool
     {
+        $user->loadMissing('roles:id,name,guard_name');
+
         return $user->roles->contains(function ($role) {
             return $this->isSuperadminRole($role);
         });

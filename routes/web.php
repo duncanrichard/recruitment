@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Auth\LoginController;
 
 Route::middleware('guest')->group(function () {
@@ -26,6 +27,42 @@ require __DIR__ . '/pendaftaran.php';
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
+
+    Route::get('/admin/auth-user', function () {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User belum login.',
+                'data' => null,
+            ], 401);
+        }
+
+        $relations = [];
+
+        if (method_exists($user, 'roles')) {
+            $relations[] = 'roles';
+        }
+
+        if (method_exists($user, 'perusahaans')) {
+            $relations[] = 'perusahaans';
+        }
+
+        if (method_exists($user, 'perusahaan')) {
+            $relations[] = 'perusahaan';
+        }
+
+        if (!empty($relations)) {
+            $user->load($relations);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+        ]);
+    })->name('admin.auth-user');
+
     require __DIR__ . '/admin.php';
     require __DIR__ . '/dashboard.php';
     require __DIR__ . '/data_pelamar.php';

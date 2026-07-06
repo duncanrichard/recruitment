@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -32,7 +33,7 @@ class JadwalTestZoomController extends Controller
             'tanggal_test_selesai.after_or_equal' => 'Tanggal test selesai harus sama atau setelah tanggal test mulai.',
         ]);
 
-        $query = JadwalTestZoom::query()
+        $query = $this->scopedJadwalTestZoomQuery()
             ->with([
                 'dataRiwayatDiri:id,nama_lengkap,nama_panggil,email,no_wa,token,tanggal_skrining,posisi_yang_dilamar,perusahaan_dilamar',
                 'dataRiwayatDiri.posisi:id,nama_posisi',
@@ -150,11 +151,14 @@ class JadwalTestZoomController extends Controller
         }
 
         $rows = $this->jadwalDetailQuery()
-            ->whereDate('jadwal_mulai', $tanggalCarbon->toDateString())
-            ->orWhere(function ($query) use ($tanggalCarbon) {
+            ->where(function ($query) use ($tanggalCarbon) {
                 $query
-                    ->whereNull('jadwal_mulai')
-                    ->whereDate('jadwal', $tanggalCarbon->toDateString());
+                    ->whereDate('jadwal_mulai', $tanggalCarbon->toDateString())
+                    ->orWhere(function ($legacyQuery) use ($tanggalCarbon) {
+                        $legacyQuery
+                            ->whereNull('jadwal_mulai')
+                            ->whereDate('jadwal', $tanggalCarbon->toDateString());
+                    });
             })
             ->latest('jadwal_mulai')
             ->latest('jadwal')
@@ -195,7 +199,7 @@ class JadwalTestZoomController extends Controller
             ->values()
             ->toArray();
 
-        $data = DataRiwayatDiri::query()
+        $data = $this->scopedPelamarQuery()
             ->with([
                 'posisi:id,nama_posisi',
                 'perusahaan:id,nama_perusahaan',
@@ -268,7 +272,7 @@ class JadwalTestZoomController extends Controller
             ->values()
             ->toArray();
 
-        $pelamarIdsSesuaiTanggal = DataRiwayatDiri::query()
+        $pelamarIdsSesuaiTanggal = $this->scopedPelamarQuery()
             ->whereDate('tanggal_skrining', $tanggalSkrining)
             ->whereIn('id', $pelamarIdsRequest)
             ->pluck('id')
@@ -368,7 +372,7 @@ class JadwalTestZoomController extends Controller
     {
         $this->mergeScheduleInputs($request);
 
-        $data = JadwalTestZoom::query()->findOrFail($id);
+        $data = $this->findScopedJadwalOrFail($id);
 
         $validated = $request->validate([
             'data_riwayat_diri_id' => [
@@ -383,6 +387,13 @@ class JadwalTestZoomController extends Controller
 
             'link_zoom' => ['nullable', 'url', 'max:2048'],
         ], $this->validationMessages());
+
+        if (!$this->scopedPelamarQuery()->where('id', $validated['data_riwayat_diri_id'])->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pelamar tidak sesuai dengan perusahaan account yang login.',
+            ], 422);
+        }
 
         $jadwalMulai = Carbon::parse($validated['jadwal_mulai']);
         $jadwalSelesai = Carbon::parse($validated['jadwal_selesai']);
@@ -429,7 +440,7 @@ class JadwalTestZoomController extends Controller
                 'link_zoom' => $newLinkZoom,
             ])->save();
 
-            JadwalTestZoom::query()
+            $this->scopedJadwalTestZoomQuery()
                 ->where('id', '!=', $data->id)
                 ->where('group_key', $oldGroupKey)
                 ->update([
@@ -488,8 +499,10 @@ class JadwalTestZoomController extends Controller
         $newGroupKey = $this->makeGroupKey($validated['sesi'], $jadwalMulai, $jadwalSelesai);
         $newLinkZoom = $validated['link_zoom'] ?? null;
 
+        $rowIds = $rows->pluck('id')->filter()->values()->all();
+
         DB::transaction(function () use (
-            $groupKey,
+            $rowIds,
             $validated,
             $jadwalMulai,
             $jadwalSelesai,
@@ -497,7 +510,7 @@ class JadwalTestZoomController extends Controller
             $newLinkZoom
         ) {
             JadwalTestZoom::query()
-                ->where('group_key', $groupKey)
+                ->whereIn('id', $rowIds)
                 ->update([
                     'sesi' => $validated['sesi'],
                     'group_key' => $newGroupKey,
@@ -553,7 +566,7 @@ class JadwalTestZoomController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $data = JadwalTestZoom::query()->findOrFail($id);
+        $data = $this->findScopedJadwalOrFail($id);
 
         try {
             $data->delete();
@@ -582,9 +595,11 @@ class JadwalTestZoomController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($groupKey) {
+            $rowIds = $rows->pluck('id')->filter()->values()->all();
+
+            DB::transaction(function () use ($rowIds) {
                 JadwalTestZoom::query()
-                    ->where('group_key', $groupKey)
+                    ->whereIn('id', $rowIds)
                     ->delete();
             });
 
@@ -1044,6 +1059,128 @@ class JadwalTestZoomController extends Controller
         return $number;
     }
 
+
+    private function scopedPelamarQuery()
+    {
+        $query = DataRiwayatDiri::query();
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            if (empty($allowedPerusahaanIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('perusahaan_dilamar', $allowedPerusahaanIds);
+            }
+        }
+
+        return $query;
+    }
+
+    private function scopedJadwalTestZoomQuery()
+    {
+        $query = JadwalTestZoom::query();
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            if (empty($allowedPerusahaanIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas('dataRiwayatDiri', function ($pelamarQuery) use ($allowedPerusahaanIds) {
+                    $pelamarQuery->whereIn('perusahaan_dilamar', $allowedPerusahaanIds);
+                });
+            }
+        }
+
+        return $query;
+    }
+
+    private function findScopedJadwalOrFail(string $id): JadwalTestZoom
+    {
+        return $this->scopedJadwalTestZoomQuery()->findOrFail($id);
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan yang terhubung ke account login.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(function ($id) {
+                        return (string) $id;
+                    })
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(function ($name) {
+                        return strtolower(trim((string) $name));
+                    })
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(function ($name) {
+                    return in_array($name, [
+                        'superadmin',
+                        'super admin',
+                    ], true);
+                });
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
+    }
+
     private function applyTanggalTestFilter($query, Request $request): void
     {
         $tanggalTest = $request->input('tanggal_test')
@@ -1112,7 +1249,7 @@ class JadwalTestZoomController extends Controller
 
     private function jadwalDetailQuery()
     {
-        return JadwalTestZoom::query()
+        return $this->scopedJadwalTestZoomQuery()
             ->with([
                 'dataRiwayatDiri:id,nama_lengkap,nama_panggil,email,no_wa,token,tanggal_skrining,posisi_yang_dilamar,perusahaan_dilamar',
                 'dataRiwayatDiri.posisi:id,nama_posisi',

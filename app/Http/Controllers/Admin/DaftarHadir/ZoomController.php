@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\DaftarHadir;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +22,8 @@ class ZoomController extends Controller
         ]);
 
         $query = DB::table('jadwal_test_zoom as jtz')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
             ->leftJoin('daftar_hadir_test_zoom as dh', function ($join) {
                 $join->on('dh.jadwal_test_zoom_id', '=', 'jtz.id')
                     ->whereNull('dh.deleted_at');
@@ -28,6 +31,7 @@ class ZoomController extends Controller
             ->whereNotNull('jtz.jadwal')
             ->whereNull('jtz.deleted_at')
             ->selectRaw('DATE(jtz.jadwal) as tanggal_test')
+            ->selectRaw("STRING_AGG(DISTINCT CONCAT(CASE WHEN dp.kode IS NOT NULL AND dp.kode <> '' THEN CONCAT(dp.kode, ' - ') ELSE '' END, COALESCE(dp.nama_perusahaan, '-')), ', ') as perusahaan_label")
             ->selectRaw('COUNT(DISTINCT jtz.id) as total_peserta')
             ->selectRaw("
                 COUNT(DISTINCT CASE
@@ -62,6 +66,12 @@ class ZoomController extends Controller
                 END) as total_gagal
             ");
 
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        $this->applyCompanyScope($query, 'drd.perusahaan_dilamar');
+
         if (!empty($validated['tanggal_mulai'])) {
             $query->whereDate('jtz.jadwal', '>=', $validated['tanggal_mulai']);
         }
@@ -73,7 +83,19 @@ class ZoomController extends Controller
         $data = $query
             ->groupBy(DB::raw('DATE(jtz.jadwal)'))
             ->orderByDesc(DB::raw('DATE(jtz.jadwal)'))
-            ->get();
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'tanggal_test' => $row->tanggal_test,
+                    'perusahaan_label' => $row->perusahaan_label ?: '-',
+                    'total_peserta' => (int) $row->total_peserta,
+                    'total_hadir' => (int) $row->total_hadir,
+                    'total_tidak_hadir' => (int) $row->total_tidak_hadir,
+                    'total_belum_ada' => (int) $row->total_belum_ada,
+                    'total_lolos' => (int) $row->total_lolos,
+                    'total_gagal' => (int) $row->total_gagal,
+                ];
+            });
 
         return response()->json([
             'success' => true,
@@ -118,6 +140,9 @@ class ZoomController extends Controller
             'dh.status_kehadiran',
             'dh.hasil_test',
             'drd.email',
+            'drd.perusahaan_dilamar as perusahaan_id',
+            'dp.kode as perusahaan_kode',
+            'dp.nama_perusahaan as perusahaan_nama',
         ];
 
         if (Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
@@ -161,11 +186,18 @@ class ZoomController extends Controller
                 $join->on('dh.jadwal_test_zoom_id', '=', 'jtz.id')
                     ->whereNull('dh.deleted_at');
             })
-            ->leftJoin('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
             ->whereDate('jtz.jadwal', $tanggal)
             ->whereNull('jtz.deleted_at')
             ->select($selects)
             ->orderBy('jtz.jadwal', 'asc');
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('drd.deleted_at');
+        }
+
+        $this->applyCompanyScope($query, 'drd.perusahaan_dilamar');
 
         if ($status === 'hadir') {
             $query->whereRaw("LOWER(COALESCE(dh.status_kehadiran, '')) = 'hadir'");
@@ -208,10 +240,19 @@ class ZoomController extends Controller
                 'nama' => $item->nama ?: '-',
                 'email' => $item->email ?: '-',
                 'no_hp' => $item->no_hp ?: '-',
+
+                'perusahaan_id' => $item->perusahaan_id,
+                'perusahaan_kode' => $item->perusahaan_kode,
+                'perusahaan_nama' => $item->perusahaan_nama,
+                'perusahaan_label' => $this->formatPerusahaanLabel(
+                    $item->perusahaan_kode ?? null,
+                    $item->perusahaan_nama ?? null
+                ),
             ];
         });
 
-        $allItems = DB::table('jadwal_test_zoom as jtz')
+        $summaryQuery = DB::table('jadwal_test_zoom as jtz')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
             ->leftJoin('daftar_hadir_test_zoom as dh', function ($join) {
                 $join->on('dh.jadwal_test_zoom_id', '=', 'jtz.id')
                     ->whereNull('dh.deleted_at');
@@ -222,8 +263,15 @@ class ZoomController extends Controller
                 'jtz.id',
                 'dh.status_kehadiran',
                 'dh.hasil_test',
-            ])
-            ->get();
+            ]);
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $summaryQuery->whereNull('drd.deleted_at');
+        }
+
+        $this->applyCompanyScope($summaryQuery, 'drd.perusahaan_dilamar');
+
+        $allItems = $summaryQuery->get();
 
         $summary = [
             'total' => $allItems->count(),
@@ -331,12 +379,19 @@ class ZoomController extends Controller
             $selects[] = DB::raw("'-' as nama_kandidat");
         }
 
-        $jadwal = DB::table('jadwal_test_zoom as jtz')
-            ->leftJoin('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
+        $jadwalQuery = DB::table('jadwal_test_zoom as jtz')
+            ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jtz.data_riwayat_diri_id')
             ->where('jtz.id', $id)
             ->whereNull('jtz.deleted_at')
-            ->select($selects)
-            ->first();
+            ->select($selects);
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $jadwalQuery->whereNull('drd.deleted_at');
+        }
+
+        $this->applyCompanyScope($jadwalQuery, 'drd.perusahaan_dilamar');
+
+        $jadwal = $jadwalQuery->first();
 
         if (!$jadwal) {
             return response()->json([
@@ -448,6 +503,128 @@ class ZoomController extends Controller
                 'file_hasil_test_zoom_url' => $fileUrl,
             ],
         ]);
+    }
+
+
+    private function applyCompanyScope($query, string $companyColumn = 'drd.perusahaan_dilamar'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if ($allowedPerusahaanIds === null) {
+            return;
+        }
+
+        if (empty($allowedPerusahaanIds)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->whereIn($companyColumn, $allowedPerusahaanIds);
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(fn ($id) => (string) $id)
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        if (empty($ids) && Schema::hasTable('data_perusahaan_user')) {
+            try {
+                $ids = DB::table('data_perusahaan_user')
+                    ->where('user_id', $user->id)
+                    ->pluck('perusahaan_id')
+                    ->map(fn ($id) => (string) $id)
+                    ->values()
+                    ->all();
+            } catch (\Throwable $th) {
+                $ids = [];
+            }
+        }
+
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole') && $user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                return true;
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(fn ($name) => strtolower(trim((string) $name)))
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(fn ($name) => in_array($name, [
+                    'superadmin',
+                    'super admin',
+                ], true));
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
+    }
+
+    private function formatPerusahaanLabel(?string $kode, ?string $nama): string
+    {
+        $kode = trim((string) $kode);
+        $nama = trim((string) $nama);
+
+        if ($kode !== '' && $nama !== '') {
+            return $kode . ' - ' . $nama;
+        }
+
+        if ($nama !== '') {
+            return $nama;
+        }
+
+        if ($kode !== '') {
+            return $kode;
+        }
+
+        return '-';
     }
 
     private function firstExistingColumn(string $table, array $columns): ?string

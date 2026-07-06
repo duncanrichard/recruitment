@@ -17,6 +17,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -292,13 +293,34 @@ class DataPelamarController extends Controller
 
     public function list(Request $request): JsonResponse
     {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        $perusahaanRules = [
+            'nullable',
+            'uuid',
+            Rule::exists('data_perusahaan', 'id'),
+        ];
+
+        if (is_array($allowedPerusahaanIds)) {
+            $perusahaanRules[] = Rule::in($allowedPerusahaanIds);
+        }
+
         $validated = $request->validate([
             'tanggal_skrining_mulai' => ['nullable', 'date'],
             'tanggal_skrining_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_skrining_mulai'],
+            'perusahaan_dilamar' => $perusahaanRules,
+        ], [
+            'perusahaan_dilamar.uuid' => 'Perusahaan tidak valid.',
+            'perusahaan_dilamar.exists' => 'Perusahaan tidak ditemukan.',
+            'perusahaan_dilamar.in' => 'Perusahaan tidak sesuai dengan perusahaan akun login.',
         ]);
 
-        $query = DataRiwayatDiri::query()
+        $query = $this->scopedPelamarQuery()
             ->with($this->safeRelations());
+
+        if (!empty($validated['perusahaan_dilamar'])) {
+            $query->where('perusahaan_dilamar', $validated['perusahaan_dilamar']);
+        }
 
         if (!empty($validated['tanggal_skrining_mulai'])) {
             $query->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai']);
@@ -319,12 +341,14 @@ class DataPelamarController extends Controller
             'success' => true,
             'message' => 'Data pelamar berhasil diambil.',
             'filter' => [
+                'perusahaan_dilamar' => $validated['perusahaan_dilamar'] ?? null,
                 'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'] ?? null,
                 'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'] ?? null,
             ],
             'data' => $data,
         ]);
     }
+
 
     public function kirimPesanSkrining(Request $request): JsonResponse
     {
@@ -338,7 +362,7 @@ class DataPelamarController extends Controller
             'tanggal_skrining_selesai.after_or_equal' => 'Tanggal skrining selesai tidak boleh lebih kecil dari tanggal mulai.',
         ]);
 
-        $pelamars = DataRiwayatDiri::query()
+        $pelamars = $this->scopedPelamarQuery()
             ->with($this->safeRelations())
             ->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai'])
             ->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai'])
@@ -638,21 +662,29 @@ class DataPelamarController extends Controller
 
     public function perusahaanList(): JsonResponse
     {
-        $data = DataPerusahaan::query()
-            ->orderBy('nama_perusahaan')
-            ->get([
-                'id',
-                'kode',
-                'nama_perusahaan',
-                'no_wa',
-                'token_api_wa',
-            ]);
+        $query = DataPerusahaan::query()
+            ->orderBy('nama_perusahaan');
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn('id', $allowedPerusahaanIds);
+        }
+
+        $data = $query->get([
+            'id',
+            'kode',
+            'nama_perusahaan',
+            'no_wa',
+            'token_api_wa',
+        ]);
 
         return response()->json([
             'success' => true,
             'data' => $data,
         ]);
     }
+
 
     public function sumberInformasiList(): JsonResponse
     {
@@ -737,9 +769,7 @@ class DataPelamarController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $data = DataRiwayatDiri::query()
-            ->with($this->safeRelations())
-            ->findOrFail($id);
+        $data = $this->findScopedPelamarOrFail($id, true);
 
         $data = $this->appendExtraData($data);
 
@@ -748,6 +778,7 @@ class DataPelamarController extends Controller
             'data' => $data,
         ]);
     }
+
 
     public function detail(string $id)
     {
@@ -759,9 +790,7 @@ class DataPelamarController extends Controller
 
     public function detailData(string $id): JsonResponse
     {
-        $data = DataRiwayatDiri::query()
-            ->with($this->safeRelations())
-            ->findOrFail($id);
+        $data = $this->findScopedPelamarOrFail($id, true);
 
         $data = $this->appendExtraData($data);
 
@@ -770,6 +799,7 @@ class DataPelamarController extends Controller
             'data' => $data,
         ]);
     }
+
 
     public function showByToken(string $token)
     {
@@ -813,7 +843,7 @@ class DataPelamarController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $data = DataRiwayatDiri::query()->findOrFail($id);
+        $data = $this->findScopedPelamarOrFail($id);
 
         $validated = $this->validatePelamar($request, true);
 
@@ -833,9 +863,10 @@ class DataPelamarController extends Controller
         ]);
     }
 
+
     public function destroy(string $id): JsonResponse
     {
-        $data = DataRiwayatDiri::query()->findOrFail($id);
+        $data = $this->findScopedPelamarOrFail($id);
 
         try {
             $data->delete();
@@ -852,19 +883,28 @@ class DataPelamarController extends Controller
         }
     }
 
+
     private function validatePelamar(Request $request, bool $isUpdate = false): array
     {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        $perusahaanRules = [
+            'required',
+            'uuid',
+            Rule::exists('data_perusahaan', 'id'),
+        ];
+
+        if (is_array($allowedPerusahaanIds)) {
+            $perusahaanRules[] = Rule::in($allowedPerusahaanIds);
+        }
+
         return $request->validate([
             'posisi_yang_dilamar' => [
                 'required',
                 'uuid',
                 Rule::exists('posisi', 'id'),
             ],
-            'perusahaan_dilamar' => [
-                'required',
-                'uuid',
-                Rule::exists('data_perusahaan', 'id'),
-            ],
+            'perusahaan_dilamar' => $perusahaanRules,
             'sumber_informasi_id' => [
                 'required',
                 'uuid',
@@ -957,16 +997,21 @@ class DataPelamarController extends Controller
             'posisi_yang_dilamar.required' => 'Posisi yang dilamar wajib diisi.',
             'posisi_yang_dilamar.uuid' => 'Posisi yang dilamar tidak valid.',
             'posisi_yang_dilamar.exists' => 'Posisi yang dilamar tidak ditemukan.',
+
             'perusahaan_dilamar.required' => 'Perusahaan dilamar wajib diisi.',
             'perusahaan_dilamar.uuid' => 'Perusahaan dilamar tidak valid.',
             'perusahaan_dilamar.exists' => 'Perusahaan dilamar tidak ditemukan.',
+            'perusahaan_dilamar.in' => 'Perusahaan dilamar tidak sesuai dengan perusahaan akun login.',
+
             'sumber_informasi_id.required' => 'Sumber informasi wajib diisi.',
             'sumber_informasi_id.uuid' => 'Sumber informasi tidak valid.',
             'sumber_informasi_id.exists' => 'Sumber informasi tidak ditemukan.',
+
             'nama_lengkap.required' => 'Nama lengkap wajib diisi.',
             'email.email' => 'Format email tidak valid.',
         ]);
     }
+
 
     private function makePendaftaranUrl(?string $token): ?string
     {
@@ -1552,6 +1597,114 @@ class DataPelamarController extends Controller
         }
 
         return $number;
+    }
+
+
+    private function scopedPelamarQuery()
+    {
+        $query = DataRiwayatDiri::query();
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn('perusahaan_dilamar', $allowedPerusahaanIds);
+        }
+
+        return $query;
+    }
+
+    private function findScopedPelamarOrFail(string $id, bool $withRelations = false): DataRiwayatDiri
+    {
+        $query = $this->scopedPelamarQuery();
+
+        if ($withRelations) {
+            $query->with($this->safeRelations());
+        }
+
+        return $query->findOrFail($id);
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(function ($id) {
+                        return (string) $id;
+                    })
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        /**
+         * Fallback jika sistem lama masih punya users.perusahaan_id.
+         */
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(function ($name) {
+                        return strtolower(trim((string) $name));
+                    })
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(function ($name) {
+                    return in_array($name, [
+                        'superadmin',
+                        'super admin',
+                    ], true);
+                });
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
     }
 
     private function safeRelations(): array

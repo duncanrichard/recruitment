@@ -9,6 +9,7 @@ use App\Models\JadwalInterviewKandidat;
 use App\Models\JadwalInterviewPanelis;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -129,12 +130,13 @@ class InterviewKandidatController extends Controller
         $tanggalMulai = $validated['tanggal_mulai'] ?? now($this->timezone)->toDateString();
         $tanggalSelesai = $validated['tanggal_selesai'] ?? now($this->timezone)->toDateString();
 
-        $rows = JadwalInterviewKandidat::query()
+        $query = JadwalInterviewKandidat::query()
             ->with([
                 'jadwalInterview' => function ($query) {
                     $query->select($this->jadwalInterviewSelectColumns());
                 },
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
+                'kandidat.perusahaan:id,kode,nama_perusahaan',
             ])
             ->whereHas('jadwalInterview', function ($query) use ($tanggalMulai, $tanggalSelesai) {
                 $query
@@ -142,8 +144,11 @@ class InterviewKandidatController extends Controller
                     ->whereDate('jadwal_interview', '>=', $tanggalMulai)
                     ->whereDate('jadwal_interview', '<=', $tanggalSelesai);
             })
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderBy('created_at', 'desc');
+
+        $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+        $rows = $query->get();
 
         $data = $rows
             ->groupBy('jadwal_interview_id')
@@ -165,24 +170,28 @@ class InterviewKandidatController extends Controller
 
     public function detail(string $jadwalInterviewId)
     {
-        $items = JadwalInterviewKandidat::query()
+        $query = JadwalInterviewKandidat::query()
             ->with([
                 'jadwalInterview' => function ($query) {
                     $query->select($this->jadwalInterviewSelectColumns());
                 },
                 'kandidat:id,nama_lengkap,nama_panggil,email,no_wa,posisi_yang_dilamar,perusahaan_dilamar',
+                'kandidat.perusahaan:id,kode,nama_perusahaan',
             ])
             ->where('jadwal_interview_id', $jadwalInterviewId)
             ->whereHas('jadwalInterview', function ($query) {
                 $query->whereNull('deleted_at');
             })
-            ->orderBy('created_at', 'asc')
-            ->get();
+            ->orderBy('created_at', 'asc');
+
+        $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+        $items = $query->get();
 
         if ($items->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Data kandidat pada jadwal ini tidak ditemukan.',
+                'message' => 'Data kandidat pada jadwal ini tidak ditemukan atau tidak sesuai perusahaan akun login.',
             ], 404);
         }
 
@@ -230,6 +239,7 @@ class InterviewKandidatController extends Controller
         $includeJadwalInterviewId = $request->query('include_jadwal_interview_id');
 
         $query = DB::table('data_riwayat_diri')
+            ->leftJoin('data_perusahaan', 'data_perusahaan.id', '=', 'data_riwayat_diri.perusahaan_dilamar')
             ->join(
                 'daftar_hadir_test_mmpi',
                 'daftar_hadir_test_mmpi.data_riwayat_diri_id',
@@ -262,6 +272,8 @@ class InterviewKandidatController extends Controller
             $query->whereNull('data_riwayat_diri.deleted_at');
         }
 
+        $this->applyCompanyScopeToDataRiwayatDiriQuery($query, 'data_riwayat_diri');
+
         $data = $query
             ->select([
                 'data_riwayat_diri.id',
@@ -272,12 +284,16 @@ class InterviewKandidatController extends Controller
                 'data_riwayat_diri.posisi_yang_dilamar',
                 'data_riwayat_diri.perusahaan_dilamar',
                 'daftar_hadir_test_mmpi.hasil_test',
+                'data_perusahaan.id as perusahaan_id',
+                'data_perusahaan.kode as perusahaan_kode',
+                'data_perusahaan.nama_perusahaan as perusahaan_nama',
             ])
             ->distinct()
             ->orderBy('data_riwayat_diri.nama_lengkap', 'asc')
             ->get()
             ->map(function ($item) {
                 $item->posisi_dilamar = $this->getNamaPosisi($item->posisi_yang_dilamar ?? null);
+                $item->perusahaan_label = $item->perusahaan_nama ?: '-';
 
                 return $item;
             });
@@ -307,6 +323,7 @@ class InterviewKandidatController extends Controller
 
         $kandidatIds = collect($validated['kandidat_ids'])->unique()->values();
 
+        $this->validateKandidatSesuaiPerusahaanLogin($kandidatIds->all());
         $this->validateKandidatLolosMmpi($kandidatIds->all());
         $this->validateKandidatBelumPunyaJadwalAktif($kandidatIds->all());
 
@@ -387,6 +404,7 @@ class InterviewKandidatController extends Controller
 
         $kandidatIds = collect($validated['kandidat_ids'])->unique()->values();
 
+        $this->validateKandidatSesuaiPerusahaanLogin($kandidatIds->all());
         $this->validateKandidatLolosMmpi($kandidatIds->all());
         $this->validateKandidatBelumPunyaJadwalAktif($kandidatIds->all(), $jadwalInterviewId);
 
@@ -468,11 +486,7 @@ class InterviewKandidatController extends Controller
             'jadwal_interview' => $this->normalizeDateTime($validated['jadwal_interview']),
         ]);
 
-        $kandidatIds = JadwalInterviewKandidat::query()
-            ->where('jadwal_interview_id', $jadwalInterviewId)
-            ->pluck('data_riwayat_diri_id')
-            ->values()
-            ->all();
+        $kandidatIds = $this->scopedKandidatIdsByJadwalInterview($jadwalInterviewId);
 
         $waPanelisResult = [];
         $waKandidatResult = [];
@@ -518,12 +532,7 @@ class InterviewKandidatController extends Controller
             ], 404);
         }
 
-        $kandidatIds = JadwalInterviewKandidat::query()
-            ->where('jadwal_interview_id', $jadwalInterviewId)
-            ->pluck('data_riwayat_diri_id')
-            ->filter()
-            ->values()
-            ->all();
+        $kandidatIds = $this->scopedKandidatIdsByJadwalInterview($jadwalInterviewId);
 
         if (empty($kandidatIds)) {
             return response()->json([
@@ -563,13 +572,16 @@ class InterviewKandidatController extends Controller
             'catatan' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $row = JadwalInterviewKandidat::query()
+        $query = JadwalInterviewKandidat::query()
             ->where('jadwal_interview_id', $jadwalInterviewId)
             ->where('id', $pivotId)
             ->whereHas('jadwalInterview', function ($query) {
                 $query->whereNull('deleted_at');
-            })
-            ->firstOrFail();
+            });
+
+        $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+        $row = $query->firstOrFail();
 
         DB::transaction(function () use ($request, $validated, $row) {
             $payload = [];
@@ -621,9 +633,12 @@ class InterviewKandidatController extends Controller
             ];
 
         DB::transaction(function () use ($jadwalInterviewId) {
-            $pivotIds = JadwalInterviewKandidat::query()
-                ->where('jadwal_interview_id', $jadwalInterviewId)
-                ->pluck('id');
+            $query = JadwalInterviewKandidat::query()
+                ->where('jadwal_interview_id', $jadwalInterviewId);
+
+            $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+            $pivotIds = $query->pluck('id');
 
             if ($pivotIds->isNotEmpty()) {
                 HasilReviewManagement::query()
@@ -646,10 +661,13 @@ class InterviewKandidatController extends Controller
     public function destroyKandidat(string $jadwalInterviewId, string $pivotId)
     {
         DB::transaction(function () use ($jadwalInterviewId, $pivotId) {
-            $row = JadwalInterviewKandidat::query()
+            $query = JadwalInterviewKandidat::query()
                 ->where('jadwal_interview_id', $jadwalInterviewId)
-                ->where('id', $pivotId)
-                ->firstOrFail();
+                ->where('id', $pivotId);
+
+            $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+            $row = $query->firstOrFail();
 
             HasilReviewManagement::query()
                 ->where('hasil_interview_id', $row->id)
@@ -658,11 +676,7 @@ class InterviewKandidatController extends Controller
             $row->delete();
         });
 
-        $remainingKandidatIds = JadwalInterviewKandidat::query()
-            ->where('jadwal_interview_id', $jadwalInterviewId)
-            ->pluck('data_riwayat_diri_id')
-            ->values()
-            ->all();
+        $remainingKandidatIds = $this->scopedKandidatIdsByJadwalInterview($jadwalInterviewId);
 
         if (!empty($remainingKandidatIds)) {
             $calendarResult = $this->syncGoogleCalendarInterview(
@@ -1747,6 +1761,159 @@ class InterviewKandidatController extends Controller
             ->delete();
     }
 
+
+    private function applyCompanyScopeToInterviewKandidatQuery($query): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereHas('kandidat', function ($kandidatQuery) use ($allowedPerusahaanIds) {
+                $kandidatQuery->whereIn('perusahaan_dilamar', $allowedPerusahaanIds);
+            });
+        }
+    }
+
+    private function applyCompanyScopeToDataRiwayatDiriQuery($query, string $tableAlias = 'data_riwayat_diri'): void
+    {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if (is_array($allowedPerusahaanIds)) {
+            $query->whereIn($tableAlias . '.perusahaan_dilamar', $allowedPerusahaanIds);
+        }
+    }
+
+    private function scopedKandidatIdsByJadwalInterview(string $jadwalInterviewId): array
+    {
+        $query = JadwalInterviewKandidat::query()
+            ->where('jadwal_interview_id', $jadwalInterviewId);
+
+        $this->applyCompanyScopeToInterviewKandidatQuery($query);
+
+        return $query
+            ->pluck('data_riwayat_diri_id')
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function validateKandidatSesuaiPerusahaanLogin(array $kandidatIds): void
+    {
+        $kandidatIds = collect($kandidatIds)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($kandidatIds)) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'Kandidat wajib dipilih.',
+            ], 422));
+        }
+
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        if ($allowedPerusahaanIds === null) {
+            return;
+        }
+
+        $totalValid = DB::table('data_riwayat_diri')
+            ->whereIn('id', $kandidatIds)
+            ->whereIn('perusahaan_dilamar', $allowedPerusahaanIds)
+            ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), function ($query) {
+                $query->whereNull('deleted_at');
+            })
+            ->distinct()
+            ->count('id');
+
+        if ($totalValid !== count($kandidatIds)) {
+            abort(response()->json([
+                'success' => false,
+                'message' => 'Ada kandidat yang tidak sesuai dengan perusahaan account login.',
+            ], 403));
+        }
+    }
+
+    /**
+     * Return:
+     * - null  => user boleh akses semua perusahaan, contoh Superadmin.
+     * - array => user hanya boleh akses perusahaan tertentu.
+     */
+    private function currentUserPerusahaanIds(): ?array
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return [];
+        }
+
+        if ($this->currentUserCanAccessAllPerusahaan($user)) {
+            return null;
+        }
+
+        $ids = [];
+
+        try {
+            if (method_exists($user, 'perusahaans')) {
+                $ids = $user->perusahaans()
+                    ->pluck('data_perusahaan.id')
+                    ->map(function ($id) {
+                        return (string) $id;
+                    })
+                    ->values()
+                    ->all();
+            }
+        } catch (\Throwable $th) {
+            $ids = [];
+        }
+
+        if (empty($ids) && !empty($user->perusahaan_id)) {
+            $ids[] = (string) $user->perusahaan_id;
+        }
+
+        return collect($ids)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentUserCanAccessAllPerusahaan($user): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole')) {
+                if ($user->hasRole(['superadmin', 'Superadmin', 'super admin', 'Super Admin'])) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        try {
+            if (method_exists($user, 'roles')) {
+                $roleNames = $user->roles()
+                    ->pluck('name')
+                    ->map(function ($name) {
+                        return strtolower(trim((string) $name));
+                    })
+                    ->values()
+                    ->all();
+
+                return collect($roleNames)->contains(function ($name) {
+                    return in_array($name, [
+                        'superadmin',
+                        'super admin',
+                    ], true);
+                });
+            }
+        } catch (\Throwable $th) {
+            //
+        }
+
+        return false;
+    }
+
     private function validateJadwalInterviewBelumLewat(string $jadwalInterviewId): void
     {
         $jadwal = JadwalInterview::query()
@@ -1833,6 +2000,8 @@ class InterviewKandidatController extends Controller
     {
         $kandidat = $item->kandidat;
         $posisiRaw = $kandidat?->posisi_yang_dilamar;
+        $perusahaanRaw = $kandidat?->perusahaan_dilamar;
+        $perusahaanMeta = $this->getPerusahaanMeta($perusahaanRaw, $kandidat?->perusahaan ?? null);
 
         return [
             'pivot_id' => $item->id,
@@ -1843,9 +2012,69 @@ class InterviewKandidatController extends Controller
             'no_wa' => $kandidat?->no_wa,
             'posisi_yang_dilamar' => $posisiRaw,
             'posisi_dilamar' => $this->getNamaPosisi($posisiRaw),
+            'perusahaan_dilamar' => $perusahaanRaw,
+            'perusahaan_id' => $perusahaanMeta['id'],
+            'perusahaan_kode' => $perusahaanMeta['kode'],
+            'perusahaan_nama' => $perusahaanMeta['nama'],
+            'perusahaan_label' => $perusahaanMeta['label'],
             'status_kehadiran' => $item->status_kehadiran,
             'hasil_interview' => $item->hasil_interview,
             'catatan' => $item->catatan,
+        ];
+    }
+
+
+    private function getPerusahaanMeta($perusahaanId, $relation = null): array
+    {
+        $empty = [
+            'id' => $perusahaanId ? (string) $perusahaanId : null,
+            'kode' => null,
+            'nama' => '-',
+            'label' => '-',
+        ];
+
+        if (empty($perusahaanId) && !$relation) {
+            return $empty;
+        }
+
+        if ($relation) {
+            $kode = $relation->kode ?? null;
+            $nama = $relation->nama_perusahaan
+                ?? $relation->perusahaan
+                ?? $relation->nama
+                ?? null;
+
+            return [
+                'id' => (string) ($relation->id ?? $perusahaanId),
+                'kode' => $kode,
+                'nama' => $nama ?: '-',
+                'label' => trim(($kode ? "{$kode} - " : '') . ($nama ?: '-')),
+            ];
+        }
+
+        if (!Schema::hasTable('data_perusahaan')) {
+            return $empty;
+        }
+
+        $perusahaan = DB::table('data_perusahaan')
+            ->where('id', $perusahaanId)
+            ->first();
+
+        if (!$perusahaan) {
+            return $empty;
+        }
+
+        $kode = $perusahaan->kode ?? null;
+        $nama = $perusahaan->nama_perusahaan
+            ?? $perusahaan->perusahaan
+            ?? $perusahaan->nama
+            ?? null;
+
+        return [
+            'id' => (string) ($perusahaan->id ?? $perusahaanId),
+            'kode' => $kode,
+            'nama' => $nama ?: '-',
+            'label' => trim(($kode ? "{$kode} - " : '') . ($nama ?: '-')),
         ];
     }
 

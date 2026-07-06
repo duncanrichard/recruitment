@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\DataPerusahaan;
 use App\Models\Divisi;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -60,6 +61,16 @@ class User extends Authenticatable
     public function divisi()
     {
         return $this->belongsTo(Divisi::class, 'divisi_id', 'id');
+    }
+
+    public function perusahaans()
+    {
+        return $this->belongsToMany(
+            DataPerusahaan::class,
+            'data_perusahaan_user',
+            'user_id',
+            'perusahaan_id'
+        )->withTimestamps();
     }
 
     public function setPasswordAttribute($value): void

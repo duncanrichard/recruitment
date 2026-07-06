@@ -1,12 +1,113 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export default function AdminHeader({
     activeMenuData,
     showActionButton,
     onOpenSidebar,
     onHeaderAction,
+    currentUser = null,
 }) {
     const [logoutLoading, setLogoutLoading] = useState(false);
+    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [profileModalOpen, setProfileModalOpen] = useState(false);
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [authUser, setAuthUser] = useState(currentUser || null);
+
+    const profileMenuRef = useRef(null);
+
+    const userName =
+        authUser?.name ||
+        authUser?.nama ||
+        authUser?.username ||
+        authUser?.email ||
+        (profileLoading ? "Memuat..." : "User");
+
+    const userEmail = authUser?.email || "-";
+
+    const userRole = useMemo(() => {
+        if (authUser?.role?.name) return authUser.role.name;
+        if (authUser?.role?.nama) return authUser.role.nama;
+        if (authUser?.role_name) return authUser.role_name;
+        if (authUser?.nama_role) return authUser.nama_role;
+
+        if (Array.isArray(authUser?.roles) && authUser.roles.length > 0) {
+            return authUser.roles
+                .map((role) => {
+                    if (typeof role === "string") return role;
+
+                    return role?.name || role?.nama || role?.label || null;
+                })
+                .filter(Boolean)
+                .join(", ");
+        }
+
+        return "-";
+    }, [authUser]);
+
+    const userPerusahaan = useMemo(() => {
+        if (Array.isArray(authUser?.perusahaans)) {
+            return authUser.perusahaans;
+        }
+
+        if (Array.isArray(authUser?.perusahaan)) {
+            return authUser.perusahaan;
+        }
+
+        if (Array.isArray(authUser?.data_perusahaan)) {
+            return authUser.data_perusahaan;
+        }
+
+        if (authUser?.perusahaan) {
+            return [authUser.perusahaan];
+        }
+
+        if (authUser?.data_perusahaan) {
+            return [authUser.data_perusahaan];
+        }
+
+        if (authUser?.perusahaan_id || authUser?.nama_perusahaan) {
+            return [
+                {
+                    id: authUser?.perusahaan_id,
+                    kode: authUser?.kode_perusahaan,
+                    nama_perusahaan: authUser?.nama_perusahaan,
+                },
+            ];
+        }
+
+        return [];
+    }, [authUser]);
+
+    const getInitials = (value) => {
+        const text = String(value || "U").trim();
+
+        if (!text) return "U";
+
+        const parts = text.split(" ").filter(Boolean);
+
+        if (parts.length === 1) {
+            return parts[0].charAt(0).toUpperCase();
+        }
+
+        return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    };
+
+    const getPerusahaanLabel = (item) => {
+        if (!item) return "-";
+
+        const kode = item.kode || item.kode_perusahaan || null;
+        const nama =
+            item.nama_perusahaan ||
+            item.perusahaan ||
+            item.nama ||
+            item.name ||
+            item.label ||
+            null;
+
+        if (kode && nama) return `${kode} - ${nama}`;
+
+        return nama || kode || "-";
+    };
 
     const getCsrfToken = () => {
         return document
@@ -14,11 +115,95 @@ export default function AdminHeader({
             ?.getAttribute("content");
     };
 
+    const parseJsonResponse = async (response) => {
+        const text = await response.text();
+
+        if (!text) return {};
+
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            console.error("Response bukan JSON:", text);
+
+            return {
+                success: false,
+                message: "Response server tidak valid.",
+                raw: text,
+            };
+        }
+    };
+
+    const fetchAuthUser = async () => {
+        setProfileLoading(true);
+
+        try {
+            const response = await fetch("/admin/auth-user", {
+                method: "GET",
+                credentials: "same-origin",
+                headers: {
+                    Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+
+            const result = await parseJsonResponse(response);
+
+            if (response.ok && result.success) {
+                setAuthUser(result.data || null);
+                return;
+            }
+
+            console.error("Gagal mengambil data user login:", result);
+        } catch (error) {
+            console.error("Gagal mengambil data user login:", error);
+        } finally {
+            setProfileLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchAuthUser();
+    }, []);
+
+    useEffect(() => {
+        if (currentUser) {
+            setAuthUser(currentUser);
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                profileMenuRef.current &&
+                !profileMenuRef.current.contains(event.target)
+            ) {
+                setProfileMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    const openProfileModal = async () => {
+        setProfileMenuOpen(false);
+        setProfileModalOpen(true);
+        await fetchAuthUser();
+    };
+
+    const closeProfileModal = () => {
+        setProfileModalOpen(false);
+    };
+
     const handleLogout = async () => {
         const confirmLogout = confirm("Yakin ingin logout?");
 
         if (!confirmLogout) return;
 
+        setProfileMenuOpen(false);
         setLogoutLoading(true);
 
         try {
@@ -32,13 +217,7 @@ export default function AdminHeader({
                 },
             });
 
-            let result = {};
-
-            try {
-                result = await response.json();
-            } catch (error) {
-                result = {};
-            }
+            const result = await parseJsonResponse(response);
 
             if (response.ok) {
                 window.location.href = result.redirect || "/login";
@@ -55,107 +234,284 @@ export default function AdminHeader({
     };
 
     return (
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
-            <div className="flex min-h-[78px] items-center justify-between gap-4 px-5 sm:px-8">
-                <div className="flex min-w-0 items-center gap-4">
-                    <button
-                        type="button"
-                        onClick={onOpenSidebar}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-700 transition hover:bg-slate-200 lg:hidden"
-                        aria-label="Buka menu"
-                    >
-                        ☰
-                    </button>
-
-                    <div className="min-w-0">
-                        {activeMenuData?.parentLabel && (
-                            <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
-                                {activeMenuData.parentLabel}
-                            </div>
-                        )}
-
-                        {!activeMenuData?.parentLabel && (
-                            <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
-                                {activeMenuData?.key === "dashboard"
-                                    ? "Sistem Rekrutmen"
-                                    : "Sistem Rekrutmen"}
-                            </div>
-                        )}
-
-                        <h1 className="mt-1 truncate text-xl font-black text-slate-950 sm:text-2xl">
-                            {activeMenuData?.label || "Dashboard"}
-                        </h1>
-
-                        {activeMenuData?.description && (
-                            <p className="mt-1 hidden truncate text-sm font-semibold text-slate-500 sm:block">
-                                {activeMenuData.description}
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-3">
-                    {showActionButton && activeMenuData?.action && (
+        <>
+            <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+                <div className="flex min-h-[78px] items-center justify-between gap-4 px-5 sm:px-8">
+                    <div className="flex min-w-0 items-center gap-4">
                         <button
                             type="button"
-                            onClick={onHeaderAction}
-                            className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:-translate-y-0.5 hover:bg-teal-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
+                            onClick={onOpenSidebar}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-700 transition hover:bg-slate-200 lg:hidden"
+                            aria-label="Buka menu"
                         >
-                            <span className="hidden sm:inline">
-                                {activeMenuData.action.label}
-                            </span>
-
-                            <span className="sm:hidden">Tambah</span>
+                            ☰
                         </button>
-                    )}
 
-                    <button
-                        type="button"
-                        onClick={handleLogout}
-                        disabled={logoutLoading}
-                        title="Logout"
-                        aria-label="Logout"
-                        className="group flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-100 bg-white text-rose-600 shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-600 hover:text-white hover:shadow-lg hover:shadow-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {logoutLoading ? (
-                            <svg
-                                className="h-5 w-5 animate-spin"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                aria-hidden="true"
+                        <div className="min-w-0">
+                            {activeMenuData?.parentLabel ? (
+                                <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
+                                    {activeMenuData.parentLabel}
+                                </div>
+                            ) : (
+                                <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
+                                    Sistem Rekrutmen
+                                </div>
+                            )}
+
+                            <h1 className="mt-1 truncate text-xl font-black text-slate-950 sm:text-2xl">
+                                {activeMenuData?.label || "Dashboard"}
+                            </h1>
+
+                            {activeMenuData?.description && (
+                                <p className="mt-1 hidden truncate text-sm font-semibold text-slate-500 sm:block">
+                                    {activeMenuData.description}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-3">
+                        {showActionButton && activeMenuData?.action && (
+                            <button
+                                type="button"
+                                onClick={onHeaderAction}
+                                className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:-translate-y-0.5 hover:bg-teal-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
                             >
-                                <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                />
-                                <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                />
-                            </svg>
-                        ) : (
-                            <svg
-                                className="h-5 w-5"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.4"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                            >
-                                <path d="M12 2v10" />
-                                <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
-                            </svg>
+                                <span className="hidden sm:inline">
+                                    {activeMenuData.action.label}
+                                </span>
+
+                                <span className="sm:hidden">Tambah</span>
+                            </button>
                         )}
-                    </button>
+
+                        <div ref={profileMenuRef} className="relative">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setProfileMenuOpen((prev) => !prev)
+                                }
+                                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-teal-50 hover:shadow-lg hover:shadow-teal-100"
+                            >
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-sm font-black text-white shadow-md shadow-teal-100">
+                                    {getInitials(userName)}
+                                </div>
+
+                                <div className="hidden min-w-0 text-left md:block">
+                                    <div className="max-w-[160px] truncate text-sm font-black text-slate-900">
+                                        {userName}
+                                    </div>
+                                    <div className="max-w-[160px] truncate text-xs font-bold text-slate-500">
+                                        {userEmail}
+                                    </div>
+                                </div>
+
+                                <svg
+                                    className={`h-4 w-4 text-slate-500 transition ${
+                                        profileMenuOpen ? "rotate-180" : ""
+                                    }`}
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <path d="m6 9 6 6 6-6" />
+                                </svg>
+                            </button>
+
+                            {profileMenuOpen && (
+                                <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+                                    <div className="border-b border-slate-100 bg-gradient-to-br from-teal-50 to-cyan-50 p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-base font-black text-white shadow-lg shadow-teal-100">
+                                                {getInitials(userName)}
+                                            </div>
+
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-black text-slate-950">
+                                                    {userName}
+                                                </div>
+                                                <div className="truncate text-xs font-bold text-slate-500">
+                                                    {userEmail}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-2">
+                                        <button
+                                            type="button"
+                                            onClick={openProfileModal}
+                                            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
+                                        >
+                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                                                👤
+                                            </span>
+                                            <span>Lihat Profil</span>
+                                        </button>
+
+                                        <button
+    type="button"
+    onClick={handleLogout}
+    disabled={logoutLoading}
+    className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+>
+    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+        {logoutLoading ? (
+            <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+            >
+                <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                />
+                <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+            </svg>
+        ) : (
+            <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+            >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+            </svg>
+        )}
+    </span>
+
+    <span>{logoutLoading ? "Logout..." : "Logout"}</span>
+</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
+            </header>
+
+            {profileModalOpen && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+                        <div className="bg-gradient-to-br from-teal-600 to-cyan-600 px-6 py-6 text-white">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 text-xl font-black shadow-lg backdrop-blur">
+                                        {getInitials(userName)}
+                                    </div>
+
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-[0.18em] text-white/70">
+                                            Profil Login
+                                        </div>
+                                        <h2 className="mt-1 text-2xl font-black">
+                                            {userName}
+                                        </h2>
+                                        <p className="mt-1 text-sm font-bold text-white/80">
+                                            {userEmail}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={closeProfileModal}
+                                    className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 text-xl font-black text-white transition hover:bg-white/25"
+                                    aria-label="Tutup modal"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 p-6">
+                            {profileLoading && (
+                                <div className="rounded-3xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-black text-cyan-700">
+                                    Memuat data profil...
+                                </div>
+                            )}
+
+                            <ProfileInfoRow label="Nama" value={userName} />
+                            <ProfileInfoRow label="Email" value={userEmail} />
+                            <ProfileInfoRow label="Role" value={userRole} />
+
+                            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                    Perusahaan
+                                </div>
+
+                                {userPerusahaan.length > 0 ? (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {userPerusahaan.map((item, index) => (
+                                            <span
+                                                key={item?.id || index}
+                                                className="inline-flex rounded-2xl bg-teal-50 px-3 py-2 text-xs font-black text-teal-700"
+                                            >
+                                                {getPerusahaanLabel(item)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-500">
+                                        Data perusahaan belum tersedia.
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={closeProfileModal}
+                                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-50"
+                                >
+                                    Tutup
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleLogout}
+                                    disabled={logoutLoading}
+                                    className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-rose-100 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {logoutLoading ? "Logout..." : "Logout"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
+function ProfileInfoRow({ label, value }) {
+    return (
+        <div className="rounded-3xl border border-slate-200 bg-white p-4">
+            <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                {label}
             </div>
-        </header>
+            <div className="mt-1 break-words text-sm font-black text-slate-800">
+                {value || "-"}
+            </div>
+        </div>
     );
 }

@@ -30,7 +30,9 @@ export default function DataPelamarPage({
 
     const [tanggalSkriningMulai, setTanggalSkriningMulai] = useState("");
     const [tanggalSkriningSelesai, setTanggalSkriningSelesai] = useState("");
+    const [filterPerusahaan, setFilterPerusahaan] = useState("");
     const [appliedTanggalSkrining, setAppliedTanggalSkrining] = useState({
+        perusahaan_dilamar: "",
         tanggal_skrining_mulai: "",
         tanggal_skrining_selesai: "",
     });
@@ -70,9 +72,12 @@ export default function DataPelamarPage({
     const resetForm = () => {
         setAlamatSama(false);
 
+        const defaultPerusahaanId =
+            dataPerusahaan.length === 1 ? String(dataPerusahaan[0].id) : "";
+
         setForm({
             posisi_yang_dilamar: "",
-            perusahaan_dilamar: "",
+            perusahaan_dilamar: defaultPerusahaanId,
             sumber_informasi_id: "",
             nama_lengkap: "",
             nama_panggil: "",
@@ -141,6 +146,10 @@ export default function DataPelamarPage({
     const fetchData = async (filters = appliedTanggalSkrining) => {
         try {
             const params = new URLSearchParams();
+
+            if (filters?.perusahaan_dilamar) {
+                params.append("perusahaan_dilamar", filters.perusahaan_dilamar);
+            }
 
             if (filters?.tanggal_skrining_mulai) {
                 params.append("tanggal_skrining_mulai", filters.tanggal_skrining_mulai);
@@ -271,6 +280,17 @@ export default function DataPelamarPage({
         fetchKewarganegaraan();
         fetchStatusPernikahan();
     }, []);
+
+    useEffect(() => {
+        if (!modalOpen) return;
+
+        if (dataPerusahaan.length === 1 && !form.perusahaan_dilamar) {
+            setForm((prev) => ({
+                ...prev,
+                perusahaan_dilamar: String(dataPerusahaan[0].id),
+            }));
+        }
+    }, [modalOpen, dataPerusahaan, form.perusahaan_dilamar]);
 
     useEffect(() => {
         if (isFirstActionSignalRender.current) {
@@ -484,6 +504,7 @@ export default function DataPelamarPage({
         }
 
         const nextFilter = {
+            perusahaan_dilamar: filterPerusahaan,
             tanggal_skrining_mulai: tanggalSkriningMulai,
             tanggal_skrining_selesai: tanggalSkriningSelesai,
         };
@@ -494,10 +515,12 @@ export default function DataPelamarPage({
 
     const handleResetTanggalSkrining = () => {
         const nextFilter = {
+            perusahaan_dilamar: "",
             tanggal_skrining_mulai: "",
             tanggal_skrining_selesai: "",
         };
 
+        setFilterPerusahaan("");
         setTanggalSkriningMulai("");
         setTanggalSkriningSelesai("");
         setAppliedTanggalSkrining(nextFilter);
@@ -506,6 +529,7 @@ export default function DataPelamarPage({
 
     const handleSetTanggalSkriningHariIni = () => {
         const nextFilter = {
+            perusahaan_dilamar: filterPerusahaan,
             tanggal_skrining_mulai: today,
             tanggal_skrining_selesai: today,
         };
@@ -909,8 +933,22 @@ Dilewati: ${result.total_dilewati || 0}`
 
                     <form
                         onSubmit={handleFilterTanggalSkrining}
-                        className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] lg:items-end"
+                        className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] lg:items-end"
                     >
+                        <SelectFilterInput
+                            label="Filter Perusahaan"
+                            value={filterPerusahaan}
+                            onChange={setFilterPerusahaan}
+                            options={dataPerusahaan.map((item) => ({
+                                value: String(item.id),
+                                label:
+                                    item.kode && item.nama_perusahaan
+                                        ? `${item.kode} - ${item.nama_perusahaan}`
+                                        : item.nama_perusahaan || item.kode || "-",
+                            }))}
+                            placeholder="Semua perusahaan account"
+                        />
+
                         <DateFilterInput
                             label="Tanggal Skrining Mulai"
                             value={tanggalSkriningMulai}
@@ -948,10 +986,11 @@ Dilewati: ${result.total_dilewati || 0}`
                         </button>
                     </form>
 
-                    {(appliedTanggalSkrining.tanggal_skrining_mulai ||
+                    {(appliedTanggalSkrining.perusahaan_dilamar ||
+                        appliedTanggalSkrining.tanggal_skrining_mulai ||
                         appliedTanggalSkrining.tanggal_skrining_selesai) && (
                         <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-700">
-                            Filter aktif tanggal skrining: {appliedTanggalSkrining.tanggal_skrining_mulai || "-"} sampai {appliedTanggalSkrining.tanggal_skrining_selesai || "-"}
+                            Filter aktif: Perusahaan {getNamaPerusahaan(appliedTanggalSkrining.perusahaan_dilamar) || "-"} | Tanggal skrining {appliedTanggalSkrining.tanggal_skrining_mulai || "-"} sampai {appliedTanggalSkrining.tanggal_skrining_selesai || "-"}
                         </div>
                     )}
                 </div>
@@ -1276,6 +1315,37 @@ Dilewati: ${result.total_dilewati || 0}`
                 </div>
             )}
         </div>
+    );
+}
+
+
+function SelectFilterInput({
+    label,
+    value,
+    onChange,
+    options = [],
+    placeholder = "Pilih data",
+}) {
+    return (
+        <label className="block">
+            <span className="mb-2 block text-sm font-black text-slate-700">
+                {label}
+            </span>
+
+            <select
+                value={value}
+                onChange={(event) => onChange(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+            >
+                <option value="">{placeholder}</option>
+
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+        </label>
     );
 }
 
