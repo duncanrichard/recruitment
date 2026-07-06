@@ -22,8 +22,10 @@ class DashboardController extends Controller
 
         $jadwalZoomIds = $this->getIdsFromTable('jadwal_test_zoom');
         $hasilZoom = $this->getHasilByPelamar('daftar_hadir_test_zoom');
+
         $jadwalMmpiIds = $this->getIdsFromTable('jadwal_test_mmpi');
         $hasilMmpi = $this->getHasilByPelamar('daftar_hadir_test_mmpi');
+
         $interview = $this->getInterviewByPelamar();
 
         $stageCounts = [
@@ -152,19 +154,24 @@ class DashboardController extends Controller
 
     private function getPelamarIds(): Collection
     {
-        if (!Schema::hasTable('data_riwayat_diri')) {
+        if (! Schema::hasTable('data_riwayat_diri')) {
+            return collect();
+        }
+
+        if (! Schema::hasColumn('data_riwayat_diri', 'uuid')) {
             return collect();
         }
 
         return DB::table('data_riwayat_diri')
-            ->pluck('id')
+            ->whereNotNull('uuid')
+            ->pluck('uuid')
             ->unique()
             ->values();
     }
 
     private function getIdsFromTable(string $table, string $column = 'data_riwayat_diri_id'): Collection
     {
-        if (!Schema::hasTable($table) || !Schema::hasColumn($table, $column)) {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $column)) {
             return collect();
         }
 
@@ -183,7 +190,7 @@ class DashboardController extends Controller
 
     private function getHasilByPelamar(string $table): Collection
     {
-        if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'data_riwayat_diri_id')) {
+        if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'data_riwayat_diri_id')) {
             return collect();
         }
 
@@ -194,7 +201,7 @@ class DashboardController extends Controller
             'status',
         ]);
 
-        if (!$hasilColumn) {
+        if (! $hasilColumn) {
             return collect();
         }
 
@@ -223,11 +230,11 @@ class DashboardController extends Controller
 
     private function getInterviewByPelamar(): Collection
     {
-        if (!Schema::hasTable('jadwal_interview_kandidat')) {
+        if (! Schema::hasTable('jadwal_interview_kandidat')) {
             return collect();
         }
 
-        if (!Schema::hasColumn('jadwal_interview_kandidat', 'data_riwayat_diri_id')) {
+        if (! Schema::hasColumn('jadwal_interview_kandidat', 'data_riwayat_diri_id')) {
             return collect();
         }
 
@@ -263,13 +270,17 @@ class DashboardController extends Controller
 
     private function getMonthlyApplicants(int $months = 12): array
     {
-        if (!Schema::hasTable('data_riwayat_diri') || !Schema::hasColumn('data_riwayat_diri', 'created_at')) {
+        if (
+            ! Schema::hasTable('data_riwayat_diri') ||
+            ! Schema::hasColumn('data_riwayat_diri', 'created_at')
+        ) {
             return [];
         }
 
         $startDate = now()->startOfMonth()->subMonths($months - 1);
 
         $driver = DB::connection()->getDriverName();
+
         $monthExpression = $driver === 'pgsql'
             ? "TO_CHAR(created_at, 'YYYY-MM')"
             : "DATE_FORMAT(created_at, '%Y-%m')";
@@ -301,19 +312,38 @@ class DashboardController extends Controller
 
     private function getRecentPelamar(): array
     {
-        if (!Schema::hasTable('data_riwayat_diri')) {
+        if (! Schema::hasTable('data_riwayat_diri')) {
             return [];
         }
 
-        $select = ['id'];
+        if (! Schema::hasColumn('data_riwayat_diri', 'uuid')) {
+            return [];
+        }
 
-        foreach (['nama_lengkap', 'nama_panggil', 'email', 'no_wa', 'posisi_yang_dilamar', 'perusahaan_dilamar', 'created_at'] as $column) {
+        $select = [
+            DB::raw('uuid as id'),
+            'uuid',
+        ];
+
+        foreach ([
+            'nama_lengkap',
+            'nama_panggil',
+            'email',
+            'no_wa',
+            'posisi_yang_dilamar',
+            'perusahaan_dilamar',
+            'created_at',
+        ] as $column) {
             if (Schema::hasColumn('data_riwayat_diri', $column)) {
                 $select[] = $column;
             }
         }
 
         $query = DB::table('data_riwayat_diri')->select($select);
+
+        if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
 
         if (Schema::hasColumn('data_riwayat_diri', 'created_at')) {
             $query->orderByDesc('created_at');
@@ -324,7 +354,8 @@ class DashboardController extends Controller
             ->get()
             ->map(function ($item) {
                 return [
-                    'id' => $item->id ?? null,
+                    'id' => $item->id ?? $item->uuid ?? null,
+                    'uuid' => $item->uuid ?? $item->id ?? null,
                     'nama_lengkap' => $item->nama_lengkap ?? $item->nama_panggil ?? '-',
                     'nama_panggil' => $item->nama_panggil ?? null,
                     'email' => $item->email ?? null,
@@ -416,22 +447,24 @@ class DashboardController extends Controller
             return '-';
         }
 
-        if (!Schema::hasTable('posisi')) {
+        if (! Schema::hasTable('posisi')) {
             return (string) $posisiId;
         }
 
-        if (!Schema::hasColumn('posisi', 'id')) {
+        if (! Schema::hasColumn('posisi', 'id')) {
             return (string) $posisiId;
         }
 
-        $posisi = DB::table('posisi')->where('id', $posisiId)->first();
+        $posisi = DB::table('posisi')
+            ->where('id', $posisiId)
+            ->first();
 
-        if (!$posisi) {
+        if (! $posisi) {
             return (string) $posisiId;
         }
 
         foreach (['nama_posisi', 'posisi', 'nama', 'nama_jabatan', 'jabatan'] as $column) {
-            if (isset($posisi->{$column}) && !empty($posisi->{$column})) {
+            if (isset($posisi->{$column}) && ! empty($posisi->{$column})) {
                 return $posisi->{$column};
             }
         }
@@ -445,22 +478,32 @@ class DashboardController extends Controller
             return '-';
         }
 
-        if (!Schema::hasTable('perusahaan')) {
+        $table = null;
+
+        if (Schema::hasTable('data_perusahaan')) {
+            $table = 'data_perusahaan';
+        } elseif (Schema::hasTable('perusahaan')) {
+            $table = 'perusahaan';
+        }
+
+        if (! $table) {
             return (string) $perusahaanId;
         }
 
-        if (!Schema::hasColumn('perusahaan', 'id')) {
+        if (! Schema::hasColumn($table, 'id')) {
             return (string) $perusahaanId;
         }
 
-        $perusahaan = DB::table('perusahaan')->where('id', $perusahaanId)->first();
+        $perusahaan = DB::table($table)
+            ->where('id', $perusahaanId)
+            ->first();
 
-        if (!$perusahaan) {
+        if (! $perusahaan) {
             return (string) $perusahaanId;
         }
 
         foreach (['nama_perusahaan', 'perusahaan', 'nama'] as $column) {
-            if (isset($perusahaan->{$column}) && !empty($perusahaan->{$column})) {
+            if (isset($perusahaan->{$column}) && ! empty($perusahaan->{$column})) {
                 return $perusahaan->{$column};
             }
         }

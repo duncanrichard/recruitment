@@ -44,6 +44,7 @@ class DataPelamarController extends Controller
         'statusPernikahan',
         'posisi',
         'perusahaan',
+        'creator:uuid,name,email',
         'sosialMedia',
         'sumberInformasi',
         'riwayatKeluarga',
@@ -399,7 +400,7 @@ class DataPelamarController extends Controller
 
             if (!$target) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'perusahaan' => $pelamar->perusahaan_label,
@@ -412,7 +413,7 @@ class DataPelamarController extends Controller
 
             if (!$urlPendaftaran) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
@@ -426,7 +427,7 @@ class DataPelamarController extends Controller
 
             if (!$perusahaan) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
@@ -443,7 +444,7 @@ class DataPelamarController extends Controller
 
             if (!$nomerPerusahaan) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
@@ -458,7 +459,7 @@ class DataPelamarController extends Controller
 
             if (!$tokenApiWa) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
@@ -485,7 +486,7 @@ class DataPelamarController extends Controller
 
             if (!$validasiWa['success']) {
                 $skipped[] = [
-                    'id' => $pelamar->id,
+                    'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
                     'no_wa' => $pelamar->no_wa,
                     'target' => $target,
@@ -752,6 +753,14 @@ class DataPelamarController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validatePelamar($request);
+
+        /**
+         * Simpan user pembuat data.
+         * Kolom created_by wajib sudah ada di tabel data_riwayat_diri.
+         */
+        if (Schema::hasColumn('data_riwayat_diri', 'created_by')) {
+            $validated['created_by'] = Auth::user()?->uuid;
+        }
 
         $data = DataRiwayatDiri::query()->create($validated);
 
@@ -1032,6 +1041,8 @@ class DataPelamarController extends Controller
     {
         $data->pendaftaran_url = $this->makePendaftaranUrl($data->token);
 
+        $data->id = $this->pelamarKey($data);
+
         $data->posisi_label = $this->relationValue($data->posisi, [
             'nama_posisi',
             'posisi',
@@ -1045,6 +1056,14 @@ class DataPelamarController extends Controller
             'perusahaan',
             'nama',
         ]);
+
+        $data->created_by_label = $this->relationValue($data->creator, [
+            'name',
+            'nama',
+            'email',
+        ]);
+
+        $data->dibuat_oleh_label = $data->created_by_label;
 
         $data->pendidikan_label = $this->relationValue($data->pendidikan, [
             'pendidikan',
@@ -1445,7 +1464,7 @@ class DataPelamarController extends Controller
         }
 
         $query = DB::table('jadwal_interview_kandidat as jik')
-            ->where('jik.data_riwayat_diri_id', $data->id);
+            ->where('jik.data_riwayat_diri_id', $this->pelamarKey($data));
 
         if (Schema::hasColumn('jadwal_interview_kandidat', 'deleted_at')) {
             $query->whereNull('jik.deleted_at');
@@ -1600,6 +1619,12 @@ class DataPelamarController extends Controller
     }
 
 
+
+    private function pelamarKey(DataRiwayatDiri $pelamar): ?string
+    {
+        return $pelamar->getKey() ? (string) $pelamar->getKey() : null;
+    }
+
     private function scopedPelamarQuery()
     {
         $query = DataRiwayatDiri::query();
@@ -1621,7 +1646,7 @@ class DataPelamarController extends Controller
             $query->with($this->safeRelations());
         }
 
-        return $query->findOrFail($id);
+        return $query->where('id', $id)->firstOrFail();
     }
 
     /**

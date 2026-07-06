@@ -819,6 +819,33 @@ Dilewati: ${result.total_dilewati || 0}`
                 ),
             },
             {
+                key: "created_by",
+                label: "Dibuat Oleh",
+                accessor: (item) =>
+                    item.created_by_label ||
+                    item.dibuat_oleh_label ||
+                    item.creator?.name ||
+                    item.created_by_user?.name ||
+                    "",
+                render: (item) => (
+                    <div className="min-w-[160px]">
+                        <div className="text-sm font-black text-slate-700">
+                            {item.created_by_label ||
+                                item.dibuat_oleh_label ||
+                                item.creator?.name ||
+                                item.created_by_user?.name ||
+                                "-"}
+                        </div>
+
+                        {item.created_by && (
+                            <div className="mt-0.5 text-xs font-semibold text-slate-400">
+                                {item.created_by}
+                            </div>
+                        )}
+                    </div>
+                ),
+            },
+            {
                 key: "sumber_informasi",
                 label: "Sumber Informasi",
                 accessor: (item) =>

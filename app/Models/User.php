@@ -18,7 +18,7 @@ class User extends Authenticatable
 
     protected $table = 'users';
 
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'uuid';
 
     public $incrementing = false;
 
@@ -27,12 +27,14 @@ class User extends Authenticatable
     protected $guard_name = 'web';
 
     protected $fillable = [
+        'uuid',
         'name',
         'email',
         'email_verified_at',
         'password',
         'remember_token',
         'divisi_id',
+        'perusahaan_id',
     ];
 
     protected $hidden = [
@@ -41,16 +43,22 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'id' => 'string',
+        'uuid' => 'string',
         'email_verified_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'divisi_id' => 'string',
+        'perusahaan_id' => 'string',
     ];
 
     public function uniqueIds(): array
     {
-        return ['id'];
+        return ['uuid'];
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
     }
 
     public function guardName(): string
@@ -69,7 +77,9 @@ class User extends Authenticatable
             DataPerusahaan::class,
             'data_perusahaan_user',
             'user_id',
-            'perusahaan_id'
+            'perusahaan_id',
+            'uuid',
+            'id'
         )->withTimestamps();
     }
 

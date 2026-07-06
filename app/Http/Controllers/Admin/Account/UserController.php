@@ -9,7 +9,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -170,9 +169,10 @@ class UserController extends Controller
                 $perusahaanIds = $this->normalizePerusahaanIds($validated['perusahaan_ids'] ?? []);
 
                 $createPayload = [
+                    'uuid' => (string) Str::uuid(),
                     'name' => trim($validated['name']),
                     'email' => strtolower(trim($validated['email'])),
-                    'password' => Hash::make($validated['password']),
+                    'password' => $validated['password'],
                     'divisi_id' => $validated['divisi_id'] ?? null,
                     'email_verified_at' => $validated['email_verified_at'] ?? null,
                 ];
@@ -222,7 +222,7 @@ class UserController extends Controller
                 'required',
                 'email',
                 'max:191',
-                Rule::unique('users', 'email')->ignore($user->id, 'id'),
+                Rule::unique('users', 'email')->ignore($user->uuid, 'uuid'),
             ],
             'password' => [
                 'nullable',
@@ -285,11 +285,12 @@ class UserController extends Controller
                     $payload['perusahaan_id'] = $perusahaanIds[0] ?? null;
                 }
 
-                if (!empty($validated['password'])) {
-                    $payload['password'] = Hash::make($validated['password']);
+                if (! empty($validated['password'])) {
+                    $payload['password'] = $validated['password'];
                 }
 
                 $user->update($payload);
+
                 $user->syncRoles([$role]);
 
                 $this->syncUserPerusahaans($user, $perusahaanIds);
@@ -331,7 +332,9 @@ class UserController extends Controller
         try {
             DB::transaction(function () use ($user) {
                 $this->syncUserPerusahaans($user, []);
+
                 $user->syncRoles([]);
+
                 $user->delete();
 
                 app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -354,12 +357,12 @@ class UserController extends Controller
     {
         $perusahaanIds = $this->normalizePerusahaanIds($perusahaanIds);
 
-        if (!Schema::hasTable('data_perusahaan_user')) {
+        if (! Schema::hasTable('data_perusahaan_user')) {
             return;
         }
 
         DB::table('data_perusahaan_user')
-            ->where('user_id', $user->id)
+            ->where('user_id', $user->uuid)
             ->delete();
 
         if (empty($perusahaanIds)) {
@@ -371,7 +374,7 @@ class UserController extends Controller
         $rows = collect($perusahaanIds)
             ->map(function ($perusahaanId) use ($user, $now) {
                 $row = [
-                    'user_id' => $user->id,
+                    'user_id' => $user->uuid,
                     'perusahaan_id' => $perusahaanId,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -408,7 +411,11 @@ class UserController extends Controller
         $perusahaans = $user->perusahaans ?? collect();
 
         return [
-            'id' => $user->id,
+            // ini sengaja tetap dikirim sebagai id
+            // supaya React yang masih pakai item.id tidak perlu diubah
+            'id' => $user->uuid,
+            'uuid' => $user->uuid,
+
             'name' => $user->name,
             'email' => $user->email,
             'email_verified_at' => $user->email_verified_at,

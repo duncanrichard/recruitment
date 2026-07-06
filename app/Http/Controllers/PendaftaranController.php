@@ -529,7 +529,7 @@ public function masterPendidikan(): JsonResponse
                 ->toArray();
 
             $pelamar->forceFill($data);
-            $pelamar->save();
+            $pelamar->saveQuietly();
 
             $this->syncSosialMedia($pelamar, $validated['sosial_media'] ?? []);
         });
@@ -907,7 +907,7 @@ public function masterPendidikan(): JsonResponse
 
             if (count($diriData) > 0) {
                 $pelamar->forceFill($diriData);
-                $pelamar->save();
+                $pelamar->saveQuietly();
             }
         });
 
