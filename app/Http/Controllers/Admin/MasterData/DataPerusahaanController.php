@@ -64,6 +64,11 @@ class DataPerusahaanController extends Controller
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
         $tokenApiWa = $this->normalizeToken($validated['token_api_wa']);
 
+        /*
+         * Validasi token tetap jalan.
+         * Tetapi kalau nomor sesuai token dan device belum connect,
+         * data tetap boleh tersimpan.
+         */
         $this->validateFonnteDeviceOrFail($nomorPerusahaan, $tokenApiWa);
 
         $perusahaan = DataPerusahaan::create([
@@ -76,7 +81,7 @@ class DataPerusahaanController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data perusahaan berhasil ditambahkan dan token WA valid.',
+            'message' => 'Data perusahaan berhasil ditambahkan.',
             'data' => $perusahaan,
         ], 201);
     }
@@ -108,6 +113,11 @@ class DataPerusahaanController extends Controller
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
         $tokenApiWa = $this->normalizeToken($validated['token_api_wa']);
 
+        /*
+         * Validasi token tetap jalan.
+         * Tetapi kalau nomor sesuai token dan device belum connect,
+         * data tetap boleh di-update.
+         */
         $this->validateFonnteDeviceOrFail($nomorPerusahaan, $tokenApiWa);
 
         $payload = [
@@ -124,7 +134,7 @@ class DataPerusahaanController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data perusahaan berhasil diperbarui dan token WA valid.',
+            'message' => 'Data perusahaan berhasil diperbarui.',
             'data' => $perusahaan->fresh(),
         ]);
     }
@@ -186,10 +196,21 @@ class DataPerusahaanController extends Controller
     {
         $result = $this->checkFonnteDevice($nomorPerusahaan, $tokenApiWa);
 
-        if ($result['success']) {
+        /*
+         * Status yang boleh simpan:
+         * connected     = token valid, nomor sesuai, device connect
+         * disconnected  = token valid, nomor sesuai, tetapi device belum connect
+         */
+        if (in_array($result['status'] ?? null, ['connected', 'disconnected'], true)) {
             return;
         }
 
+        /*
+         * Status yang tetap gagal:
+         * invalid   = nomor/token tidak valid
+         * mismatch  = nomor perusahaan berbeda dengan nomor pada token
+         * error     = gagal request / response Fonnte error
+         */
         $field = $result['field'] ?? 'token_api_wa';
 
         throw ValidationException::withMessages([
@@ -280,6 +301,12 @@ class DataPerusahaanController extends Controller
                 ];
             }
 
+            /*
+             * Nomor sudah sesuai token, tetapi device belum connect.
+             * Untuk validasi manual tetap ditampilkan sebagai belum connect.
+             * Untuk proses simpan/update, status ini tetap boleh lewat
+             * karena token dan nomor sudah benar.
+             */
             if ($deviceStatus !== 'connect') {
                 return [
                     'success' => false,
