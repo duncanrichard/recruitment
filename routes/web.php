@@ -31,35 +31,105 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/auth-user', function () {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'User belum login.',
                 'data' => null,
+                'user' => null,
             ], 401);
         }
 
-        $relations = [];
+        $user->loadMissing([
+            'roles',
+            'perusahaans',
+            'divisi',
+        ]);
 
-        if (method_exists($user, 'roles')) {
-            $relations[] = 'roles';
+        $roles = $user->roles->map(function ($role) {
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'nama' => $role->name,
+                'guard_name' => $role->guard_name,
+            ];
+        })->values();
+
+        $perusahaans = $user->perusahaans->map(function ($perusahaan) {
+            $kode = $perusahaan->kode ?? null;
+            $nama = $perusahaan->nama_perusahaan
+                ?? $perusahaan->perusahaan
+                ?? $perusahaan->nama
+                ?? null;
+
+            $label = trim(($kode ? $kode . ' - ' : '') . ($nama ?: ''));
+
+            return [
+                'id' => $perusahaan->id,
+                'uuid' => $perusahaan->id,
+                'kode' => $kode,
+                'kode_perusahaan' => $kode,
+                'nama_perusahaan' => $nama,
+                'perusahaan' => $nama,
+                'name' => $nama,
+                'nama' => $nama,
+                'label' => $label,
+            ];
+        })->values();
+
+        $divisi = null;
+
+        if ($user->divisi) {
+            $namaDivisi = $user->divisi->nama_divisi
+                ?? $user->divisi->divisi
+                ?? $user->divisi->nama
+                ?? null;
+
+            $divisi = [
+                'id' => $user->divisi->id,
+                'uuid' => $user->divisi->id,
+                'nama_divisi' => $namaDivisi,
+                'divisi' => $namaDivisi,
+                'name' => $namaDivisi,
+                'nama' => $namaDivisi,
+            ];
         }
 
-        if (method_exists($user, 'perusahaans')) {
-            $relations[] = 'perusahaans';
-        }
+        $data = [
+            'uuid' => $user->uuid,
+            'id' => $user->uuid,
+            'name' => $user->name,
+            'nama' => $user->name,
+            'username' => $user->name,
+            'email' => $user->email,
 
-        if (method_exists($user, 'perusahaan')) {
-            $relations[] = 'perusahaan';
-        }
+            'role' => $roles->first(),
+            'role_name' => $roles->pluck('name')->filter()->implode(', '),
+            'nama_role' => $roles->pluck('name')->filter()->implode(', '),
+            'roles' => $roles,
 
-        if (!empty($relations)) {
-            $user->load($relations);
-        }
+            'divisi' => $divisi,
+            'divisi_id' => $user->divisi_id,
+            'nama_divisi' => $divisi['nama_divisi'] ?? null,
+
+            'perusahaans' => $perusahaans,
+            'perusahaan' => $perusahaans,
+            'data_perusahaan' => $perusahaans,
+
+            'perusahaan_id' => $perusahaans->first()['id'] ?? $user->perusahaan_id ?? null,
+            'kode_perusahaan' => $perusahaans->first()['kode'] ?? null,
+            'nama_perusahaan' => $perusahaans->first()['nama_perusahaan'] ?? null,
+
+            'perusahaan_ids' => $perusahaans->pluck('id')->values(),
+            'perusahaan_kode' => $perusahaans->pluck('kode')->filter()->implode(', '),
+            'perusahaan_label' => $perusahaans->pluck('label')->filter()->implode(', '),
+        ];
 
         return response()->json([
             'success' => true,
-            'data' => $user,
+            'message' => 'Data user login berhasil diambil.',
+            'data' => $data,
+            'user' => $data,
         ]);
     })->name('admin.auth-user');
 
