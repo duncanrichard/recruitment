@@ -1158,7 +1158,6 @@ class InterviewKandidatController extends Controller
                 'data_perusahaan.id as perusahaan_id',
                 'data_perusahaan.nama_perusahaan',
                 'data_perusahaan.no_wa as no_wa_perusahaan',
-                'data_perusahaan.token_api_wa',
             ])
             ->get();
 
@@ -1175,6 +1174,9 @@ class InterviewKandidatController extends Controller
                 'responses' => [],
             ];
         }
+
+        $openWaSession = $this->checkOpenWaSessionForSending();
+        $openWaDeviceNumber = $this->normalizeWhatsappNumber($openWaSession['device_number'] ?? null);
 
         $groupedMessages = [];
         $skipped = [];
@@ -1204,7 +1206,6 @@ class InterviewKandidatController extends Controller
                 continue;
             }
 
-            $tokenApiWa = $this->normalizeTokenApiWa($kandidat->token_api_wa ?? null);
             $nomorPerusahaan = $this->normalizeWhatsappNumber($kandidat->no_wa_perusahaan ?? null);
 
             if (!$nomorPerusahaan) {
@@ -1220,7 +1221,7 @@ class InterviewKandidatController extends Controller
                 continue;
             }
 
-            if (!$tokenApiWa) {
+            if (empty($openWaSession['success'])) {
                 $skipped[] = [
                     'kandidat_id' => $kandidat->id,
                     'nama_lengkap' => $kandidat->nama_lengkap,
@@ -1228,7 +1229,22 @@ class InterviewKandidatController extends Controller
                     'perusahaan_id' => $kandidat->perusahaan_id,
                     'perusahaan' => $kandidat->nama_perusahaan,
                     'nomer_perusahaan' => $nomorPerusahaan,
-                    'reason' => 'Token API WA perusahaan kosong.',
+                    'reason' => $openWaSession['message'] ?? 'Session OpenWA belum siap.',
+                ];
+
+                continue;
+            }
+
+            if ($openWaDeviceNumber && $nomorPerusahaan && $openWaDeviceNumber !== $nomorPerusahaan) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'target' => $target,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'openwa_device_number' => $openWaDeviceNumber,
+                    'reason' => 'Nomor OpenWA aktif tidak sama dengan nomor WhatsApp perusahaan kandidat.',
                 ];
 
                 continue;
@@ -1241,22 +1257,23 @@ class InterviewKandidatController extends Controller
                     'perusahaan_id' => $kandidat->perusahaan_id,
                     'perusahaan' => $kandidat->nama_perusahaan,
                     'nomer_perusahaan' => $nomorPerusahaan,
-                    'token_api_wa' => $tokenApiWa,
+                    'openwa_session' => $openWaSession['session'] ?? null,
+                    'openwa_device_number' => $openWaDeviceNumber,
                     'messages' => [],
                 ];
             }
 
             $groupedMessages[$groupKey]['messages'][] = [
                 'target' => $target,
+                'chat_id' => $target . '@c.us',
                 'message' => $this->buildPesanReminderInterviewUntukKandidat($jadwal, $kandidat),
-                'delay' => '2',
             ];
         }
 
         if (empty($groupedMessages)) {
             return [
                 'success' => false,
-                'message' => 'Tidak ada kandidat valid untuk dikirim reminder interview. Pastikan nomor WhatsApp kandidat, nomor WhatsApp perusahaan, dan token_api_wa perusahaan tersedia.',
+                'message' => 'Tidak ada kandidat valid untuk dikirim reminder interview melalui OpenWA.',
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
                 'total_gagal_provider' => 0,
@@ -1264,6 +1281,7 @@ class InterviewKandidatController extends Controller
                 'skipped' => $skipped,
                 'targets' => [],
                 'responses' => [],
+                'openwa_session' => $openWaSession,
             ];
         }
 
@@ -1273,68 +1291,51 @@ class InterviewKandidatController extends Controller
         $targets = [];
 
         foreach ($groupedMessages as $group) {
-            try {
-                $response = Http::asForm()
-                    ->withoutVerifying()
-                    ->withHeaders([
-                        'Authorization' => $group['token_api_wa'],
-                    ])
-                    ->timeout(120)
-                    ->post('https://api.fonnte.com/send', [
-                        'data' => json_encode($group['messages']),
-                        'countryCode' => '62',
-                        'typing' => 'false',
-                        'preview' => 'true',
-                    ]);
+            $groupSuccess = 0;
+            $groupFailed = 0;
+            $providerResponses = [];
+            $targetGroup = [];
 
-                $json = $response->json();
-                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-                $isSuccess = $response->successful() && (bool) $fonnteStatus;
-                $countMessages = count($group['messages']);
+            foreach ($group['messages'] as $messageItem) {
+                $targetGroup[] = $messageItem['target'];
+                $targets[] = $messageItem['target'];
 
-                if ($isSuccess) {
-                    $totalDikirim += $countMessages;
+                $sendResult = $this->sendOpenWaText($messageItem['target'], $messageItem['message']);
+                $providerResponses[] = [
+                    'target' => $messageItem['target'],
+                    'chat_id' => $messageItem['chat_id'],
+                    'success' => (bool) ($sendResult['success'] ?? false),
+                    'message' => $sendResult['message'] ?? null,
+                    'response' => $sendResult['response'] ?? null,
+                ];
+
+                if (!empty($sendResult['success'])) {
+                    $groupSuccess++;
+                    $totalDikirim++;
                 } else {
-                    $totalGagalProvider += $countMessages;
+                    $groupFailed++;
+                    $totalGagalProvider++;
                 }
-
-                $targetGroup = collect($group['messages'])->pluck('target')->values()->all();
-                $targets = array_merge($targets, $targetGroup);
-
-                $responses[] = [
-                    'success' => $isSuccess,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'total_pesan' => $countMessages,
-                    'targets' => $targetGroup,
-                    'fonnte_http_code' => $response->status(),
-                    'fonnte_response' => $json ?: $response->body(),
-                    'message' => $isSuccess
-                        ? 'Reminder interview berhasil dikirim ke kandidat untuk perusahaan ini.'
-                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Reminder interview gagal dikirim melalui Fonnte.'),
-                ];
-            } catch (\Throwable $e) {
-                $countMessages = count($group['messages']);
-                $totalGagalProvider += $countMessages;
-
-                Log::error('Gagal mengirim reminder interview ke kandidat', [
-                    'message' => $e->getMessage(),
-                    'jadwal_interview_id' => $jadwal->id ?? null,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                ]);
-
-                $responses[] = [
-                    'success' => false,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'total_pesan' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
-                    'message' => 'Terjadi kesalahan saat mengirim reminder interview: ' . $e->getMessage(),
-                ];
             }
+
+            $responses[] = [
+                'success' => $groupSuccess > 0 && $groupFailed === 0,
+                'perusahaan_id' => $group['perusahaan_id'],
+                'perusahaan' => $group['perusahaan'],
+                'nomer_perusahaan' => $group['nomer_perusahaan'],
+                'openwa_session' => $group['openwa_session'],
+                'openwa_device_number' => $group['openwa_device_number'],
+                'total_pesan' => count($group['messages']),
+                'total_berhasil' => $groupSuccess,
+                'total_gagal' => $groupFailed,
+                'targets' => array_values(array_unique($targetGroup)),
+                'provider_responses' => $providerResponses,
+                'message' => $groupFailed === 0
+                    ? 'Reminder interview berhasil dikirim ke kandidat melalui OpenWA untuk perusahaan ini.'
+                    : ($groupSuccess > 0
+                        ? 'Sebagian reminder interview berhasil dikirim ke kandidat melalui OpenWA.'
+                        : 'Reminder interview gagal dikirim ke kandidat melalui OpenWA.'),
+            ];
         }
 
         $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
@@ -1343,10 +1344,10 @@ class InterviewKandidatController extends Controller
         return [
             'success' => $totalDikirim > 0,
             'message' => $isAllSuccess
-                ? 'Reminder interview berhasil dikirim ke kandidat sesuai perusahaan masing-masing.'
+                ? 'Reminder interview berhasil dikirim ke kandidat melalui OpenWA sesuai perusahaan masing-masing.'
                 : ($isPartialSuccess
-                    ? 'Sebagian reminder interview berhasil dikirim, sebagian gagal.'
-                    : 'Reminder interview gagal dikirim.'),
+                    ? 'Sebagian reminder interview berhasil dikirim melalui OpenWA, sebagian gagal.'
+                    : 'Reminder interview gagal dikirim melalui OpenWA.'),
             'total_dikirim' => $totalDikirim,
             'total_dilewati' => count($skipped),
             'total_gagal_provider' => $totalGagalProvider,
@@ -1354,8 +1355,10 @@ class InterviewKandidatController extends Controller
             'skipped' => $skipped,
             'targets' => array_values(array_unique($targets)),
             'responses' => $responses,
+            'openwa_session' => $openWaSession,
         ];
     }
+
 
     private function buildPesanReminderInterviewUntukKandidat(JadwalInterview $jadwal, $kandidat): string
     {
@@ -1443,7 +1446,6 @@ class InterviewKandidatController extends Controller
                 'data_perusahaan.id as perusahaan_id',
                 'data_perusahaan.nama_perusahaan',
                 'data_perusahaan.no_wa as no_wa_perusahaan',
-                'data_perusahaan.token_api_wa',
             ])
             ->get();
 
@@ -1459,6 +1461,9 @@ class InterviewKandidatController extends Controller
             ];
         }
 
+        $openWaSession = $this->checkOpenWaSessionForSending();
+        $openWaDeviceNumber = $this->normalizeWhatsappNumber($openWaSession['device_number'] ?? null);
+
         $groupedMessages = [];
         $skipped = [];
 
@@ -1473,7 +1478,6 @@ class InterviewKandidatController extends Controller
                 continue;
             }
 
-            $tokenApiWa = $this->normalizeTokenApiWa($kandidat->token_api_wa ?? null);
             $nomorPerusahaan = $this->normalizeWhatsappNumber($kandidat->no_wa_perusahaan ?? null);
 
             if (!$nomorPerusahaan) {
@@ -1488,14 +1492,28 @@ class InterviewKandidatController extends Controller
                 continue;
             }
 
-            if (!$tokenApiWa) {
+            if (empty($openWaSession['success'])) {
                 $skipped[] = [
                     'kandidat_id' => $kandidat->id,
                     'nama_lengkap' => $kandidat->nama_lengkap,
                     'perusahaan_id' => $kandidat->perusahaan_id,
                     'perusahaan' => $kandidat->nama_perusahaan,
                     'nomer_perusahaan' => $nomorPerusahaan,
-                    'reason' => 'Token API WA perusahaan kosong.',
+                    'reason' => $openWaSession['message'] ?? 'Session OpenWA belum siap.',
+                ];
+
+                continue;
+            }
+
+            if ($openWaDeviceNumber && $nomorPerusahaan && $openWaDeviceNumber !== $nomorPerusahaan) {
+                $skipped[] = [
+                    'kandidat_id' => $kandidat->id,
+                    'nama_lengkap' => $kandidat->nama_lengkap,
+                    'perusahaan_id' => $kandidat->perusahaan_id,
+                    'perusahaan' => $kandidat->nama_perusahaan,
+                    'nomer_perusahaan' => $nomorPerusahaan,
+                    'openwa_device_number' => $openWaDeviceNumber,
+                    'reason' => 'Nomor OpenWA aktif tidak sama dengan nomor WhatsApp perusahaan kandidat.',
                 ];
 
                 continue;
@@ -1508,7 +1526,8 @@ class InterviewKandidatController extends Controller
                     'perusahaan_id' => $kandidat->perusahaan_id,
                     'perusahaan' => $kandidat->nama_perusahaan,
                     'nomer_perusahaan' => $nomorPerusahaan,
-                    'token_api_wa' => $tokenApiWa,
+                    'openwa_session' => $openWaSession['session'] ?? null,
+                    'openwa_device_number' => $openWaDeviceNumber,
                     'kandidats' => [],
                     'messages' => [],
                 ];
@@ -1526,12 +1545,13 @@ class InterviewKandidatController extends Controller
         if (empty($groupedMessages)) {
             return [
                 'success' => false,
-                'message' => 'Tidak ada data valid untuk dikirim. Pastikan kandidat punya perusahaan, perusahaan punya no_wa, dan token_api_wa.',
+                'message' => 'Tidak ada data valid untuk dikirim ke interviewer melalui OpenWA.',
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
                 'total_gagal_provider' => 0,
                 'skipped' => $skipped,
                 'responses' => [],
+                'openwa_session' => $openWaSession,
             ];
         }
 
@@ -1554,8 +1574,8 @@ class InterviewKandidatController extends Controller
 
                 $groupedMessages[$groupKey]['messages'][] = [
                     'target' => $target,
+                    'chat_id' => $target . '@c.us',
                     'message' => $this->buildPesanJadwalInterviewUntukPanelis($jadwal, $group, $interviewer),
-                    'delay' => '2',
                 ];
             }
         }
@@ -1570,12 +1590,13 @@ class InterviewKandidatController extends Controller
         if (empty($groupedMessages)) {
             return [
                 'success' => false,
-                'message' => 'Tidak ada nomor interviewer valid untuk dikirim pesan.',
+                'message' => 'Tidak ada nomor interviewer valid untuk dikirim pesan melalui OpenWA.',
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
                 'total_gagal_provider' => 0,
                 'skipped' => $skipped,
                 'responses' => [],
+                'openwa_session' => $openWaSession,
             ];
         }
 
@@ -1585,71 +1606,52 @@ class InterviewKandidatController extends Controller
         $targets = [];
 
         foreach ($groupedMessages as $group) {
-            try {
-                $response = Http::asForm()
-                    ->withoutVerifying()
-                    ->withHeaders([
-                        'Authorization' => $group['token_api_wa'],
-                    ])
-                    ->timeout(120)
-                    ->post('https://api.fonnte.com/send', [
-                        'data' => json_encode($group['messages']),
-                        'countryCode' => '62',
-                        'typing' => 'false',
-                        'preview' => 'true',
-                    ]);
+            $groupSuccess = 0;
+            $groupFailed = 0;
+            $providerResponses = [];
+            $targetGroup = [];
 
-                $json = $response->json();
-                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-                $isSuccess = $response->successful() && (bool) $fonnteStatus;
+            foreach ($group['messages'] as $messageItem) {
+                $targetGroup[] = $messageItem['target'];
+                $targets[] = $messageItem['target'];
 
-                $countMessages = count($group['messages']);
+                $sendResult = $this->sendOpenWaText($messageItem['target'], $messageItem['message']);
+                $providerResponses[] = [
+                    'target' => $messageItem['target'],
+                    'chat_id' => $messageItem['chat_id'],
+                    'success' => (bool) ($sendResult['success'] ?? false),
+                    'message' => $sendResult['message'] ?? null,
+                    'response' => $sendResult['response'] ?? null,
+                ];
 
-                if ($isSuccess) {
-                    $totalDikirim += $countMessages;
+                if (!empty($sendResult['success'])) {
+                    $groupSuccess++;
+                    $totalDikirim++;
                 } else {
-                    $totalGagalProvider += $countMessages;
+                    $groupFailed++;
+                    $totalGagalProvider++;
                 }
-
-                $targetGroup = collect($group['messages'])->pluck('target')->values()->all();
-                $targets = array_merge($targets, $targetGroup);
-
-                $responses[] = [
-                    'success' => $isSuccess,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'total_kandidat' => count($group['kandidats']),
-                    'total_pesan' => $countMessages,
-                    'targets' => $targetGroup,
-                    'fonnte_http_code' => $response->status(),
-                    'fonnte_response' => $json ?: $response->body(),
-                    'message' => $isSuccess
-                        ? 'Pesan jadwal interview berhasil dikirim ke panelis untuk perusahaan ini.'
-                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan gagal dikirim melalui Fonnte.'),
-                ];
-            } catch (\Throwable $e) {
-                $countMessages = count($group['messages']);
-                $totalGagalProvider += $countMessages;
-
-                Log::error('Gagal mengirim WA jadwal interview ke panelis', [
-                    'message' => $e->getMessage(),
-                    'jadwal_interview_id' => $jadwal->id ?? null,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                ]);
-
-                $responses[] = [
-                    'success' => false,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'total_kandidat' => count($group['kandidats']),
-                    'total_pesan' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
-                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte: ' . $e->getMessage(),
-                ];
             }
+
+            $responses[] = [
+                'success' => $groupSuccess > 0 && $groupFailed === 0,
+                'perusahaan_id' => $group['perusahaan_id'],
+                'perusahaan' => $group['perusahaan'],
+                'nomer_perusahaan' => $group['nomer_perusahaan'],
+                'openwa_session' => $group['openwa_session'],
+                'openwa_device_number' => $group['openwa_device_number'],
+                'total_kandidat' => count($group['kandidats']),
+                'total_pesan' => count($group['messages']),
+                'total_berhasil' => $groupSuccess,
+                'total_gagal' => $groupFailed,
+                'targets' => array_values(array_unique($targetGroup)),
+                'provider_responses' => $providerResponses,
+                'message' => $groupFailed === 0
+                    ? 'Pesan jadwal interview berhasil dikirim ke interviewer melalui OpenWA untuk perusahaan ini.'
+                    : ($groupSuccess > 0
+                        ? 'Sebagian pesan jadwal interview berhasil dikirim ke interviewer melalui OpenWA.'
+                        : 'Pesan jadwal interview gagal dikirim ke interviewer melalui OpenWA.'),
+            ];
         }
 
         $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
@@ -1658,10 +1660,10 @@ class InterviewKandidatController extends Controller
         return [
             'success' => $totalDikirim > 0,
             'message' => $isAllSuccess
-                ? 'Pesan jadwal interview berhasil dikirim ke panelis sesuai perusahaan.'
+                ? 'Pesan jadwal interview berhasil dikirim ke interviewer melalui OpenWA sesuai perusahaan.'
                 : ($isPartialSuccess
-                    ? 'Sebagian pesan jadwal interview berhasil dikirim, sebagian gagal.'
-                    : 'Pesan jadwal interview gagal dikirim.'),
+                    ? 'Sebagian pesan jadwal interview berhasil dikirim ke interviewer melalui OpenWA, sebagian gagal.'
+                    : 'Pesan jadwal interview ke interviewer gagal dikirim melalui OpenWA.'),
             'total_dikirim' => $totalDikirim,
             'total_dilewati' => count($skipped),
             'total_gagal_provider' => $totalGagalProvider,
@@ -1669,8 +1671,10 @@ class InterviewKandidatController extends Controller
             'skipped' => $skipped,
             'targets' => array_values(array_unique($targets)),
             'responses' => $responses,
+            'openwa_session' => $openWaSession,
         ];
     }
+
 
     private function buildPesanJadwalInterviewUntukPanelis(JadwalInterview $jadwal, array $group, $interviewer): string
     {
@@ -1702,6 +1706,241 @@ class InterviewKandidatController extends Controller
             . "Terima kasih atas perhatian dan kerja samanya.\n\n"
             . "Hormat kami,\n"
             . "Tim Rekrutmen {$group['perusahaan']}";
+    }
+
+    private function openWaBaseUrl(): string
+    {
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+
+        if (!Str::endsWith($url, '/api')) {
+            $url .= '/api';
+        }
+
+        return $url;
+    }
+
+    private function openWaSessionId(): ?string
+    {
+        $session = config('services.waha.session', env('WAHA_SESSION'));
+        $session = trim((string) $session);
+
+        return $session !== '' ? $session : null;
+    }
+
+    private function openWaHeaders(): array
+    {
+        $apiKey = config('services.waha.api_key', env('WAHA_API_KEY')) ?: env('WAHA_API_KEY');
+
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if (!empty($apiKey)) {
+            $headers['X-API-Key'] = $apiKey;
+        }
+
+        return $headers;
+    }
+
+    private function checkOpenWaSessionForSending(): array
+    {
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionId = $this->openWaSessionId();
+
+        if (!$sessionId) {
+            return [
+                'success' => false,
+                'session' => null,
+                'status' => 'error',
+                'message' => 'WAHA_SESSION belum diisi di .env.',
+                'device_number' => null,
+                'device_status' => null,
+            ];
+        }
+
+        try {
+            $url = $baseUrl . '/sessions/' . urlencode($sessionId);
+
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->openWaHeaders())
+                ->timeout(30)
+                ->get($url);
+
+            $json = $response->json();
+
+            Log::info('OpenWA session check interview', [
+                'url' => $url,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $response->body(),
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'session' => $sessionId,
+                    'status' => 'error',
+                    'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status(),
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json ?: $response->body(),
+                ];
+            }
+
+            $sessionData = is_array($json) ? $json : [];
+            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
+
+            $isConnected = in_array($deviceStatus, [
+                'connected',
+                'connect',
+                'working',
+                'authenticated',
+                'ready',
+            ], true);
+
+            if (!$isConnected) {
+                return [
+                    'success' => false,
+                    'session' => $sessionId,
+                    'status' => 'disconnected',
+                    'message' => 'Session OpenWA belum ready. Status saat ini: ' . ($deviceStatus ?: '-'),
+                    'device_number' => $deviceNumber,
+                    'device_status' => $deviceStatus ?: null,
+                    'waha_response' => $json,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'session' => $sessionId,
+                'status' => 'connected',
+                'message' => 'Session OpenWA sudah ready.',
+                'device_number' => $deviceNumber,
+                'device_status' => $deviceStatus,
+                'waha_response' => $json,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('OpenWA session check interview exception', [
+                'session' => $sessionId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'session' => $sessionId,
+                'status' => 'error',
+                'message' => 'Gagal memvalidasi OpenWA: ' . $e->getMessage(),
+                'device_number' => null,
+                'device_status' => null,
+            ];
+        }
+    }
+
+    private function extractOpenWaPhoneNumber(array $sessionData): ?string
+    {
+        $candidates = [
+            $sessionData['phone'] ?? null,
+            $sessionData['phoneNumber'] ?? null,
+            $sessionData['number'] ?? null,
+            $sessionData['me']['id'] ?? null,
+            $sessionData['me']['user'] ?? null,
+            $sessionData['state']['phone'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                $candidate = $candidate['number']
+                    ?? $candidate['phone']
+                    ?? $candidate['user']
+                    ?? $candidate['id']
+                    ?? null;
+            }
+
+            if (is_string($candidate) || is_numeric($candidate)) {
+                $normalized = $this->normalizeWhatsappNumber((string) $candidate);
+
+                if ($normalized) {
+                    return $normalized;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function sendOpenWaText(string $target, string $message): array
+    {
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionId = $this->openWaSessionId();
+        $chatId = $this->normalizeWhatsappNumber($target) . '@c.us';
+
+        if (!$sessionId) {
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'response' => null,
+                'message' => 'WAHA_SESSION belum diisi di .env.',
+            ];
+        }
+
+        $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
+        $payload = [
+            'chatId' => $chatId,
+            'text' => $message,
+        ];
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->openWaHeaders())
+                ->timeout(60)
+                ->post($url, $payload);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('OpenWA send interview message response', [
+                'url' => $url,
+                'payload' => $payload,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'chat_id' => $chatId,
+                    'response' => $json ?: $body,
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
+                        . $response->status()
+                        . '. Response: '
+                        . ($body ?: json_encode($json)),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'chat_id' => $chatId,
+                'response' => $json ?: $body,
+                'message' => 'Pesan berhasil dikirim melalui OpenWA.',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('OpenWA send interview message exception', [
+                'url' => $url,
+                'target' => $target,
+                'chat_id' => $chatId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'response' => null,
+                'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
+            ];
+        }
     }
 
     private function normalizeWhatsappNumber(?string $number): ?string

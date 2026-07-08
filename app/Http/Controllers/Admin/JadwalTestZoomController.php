@@ -344,7 +344,7 @@ class JadwalTestZoomController extends Controller
         |--------------------------------------------------------------------------
         | Kirim WhatsApp otomatis setelah jadwal berhasil dibuat
         |--------------------------------------------------------------------------
-        | Pesan dikirim memakai token_api_wa dan no_wa dari perusahaan masing-masing
+        | Pesan dikirim memakai session OpenWA global dan divalidasi agar nomor OpenWA aktif sesuai dengan no_wa perusahaan kandidat.
         | kandidat. Proses kirim WA tidak membatalkan penyimpanan jadwal.
         */
         $waResult = $this->sendJadwalZoomMessages($freshData);
@@ -534,8 +534,8 @@ class JadwalTestZoomController extends Controller
         | Kirim WhatsApp otomatis setelah group jadwal berhasil diperbarui
         |--------------------------------------------------------------------------
         | Saat group test Zoom di-update, semua kandidat pada group tersebut akan
-        | menerima pesan jadwal terbaru. Pengiriman tetap menggunakan token_api_wa
-        | dan no_wa dari perusahaan masing-masing kandidat. Jika WA gagal, update
+        | menerima pesan jadwal terbaru. Pengiriman memakai session OpenWA global
+        | dan divalidasi agar nomor OpenWA aktif sesuai dengan no_wa perusahaan kandidat. Jika WA gagal, update
         | jadwal tetap berhasil dan detail kegagalan dikembalikan pada wa_result.
         */
         $waResult = $this->sendJadwalZoomMessages($freshRows);
@@ -638,9 +638,11 @@ class JadwalTestZoomController extends Controller
             ];
         }
 
+        $openWaSession = $this->checkOpenWaSessionForSending();
+        $openWaDeviceNumber = $this->normalizeWhatsappNumber($openWaSession['device_number'] ?? null);
+
         $groupedMessages = [];
         $skipped = [];
-        $validatedCompanies = [];
 
         foreach ($jadwals as $jadwal) {
             $pelamar = $jadwal->dataRiwayatDiri;
@@ -684,7 +686,6 @@ class JadwalTestZoomController extends Controller
                 continue;
             }
 
-            $tokenApiWa = $this->normalizeTokenApiWa($perusahaan->token_api_wa ?? null);
             $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
 
             if (!$nomerPerusahaan) {
@@ -702,7 +703,7 @@ class JadwalTestZoomController extends Controller
                 continue;
             }
 
-            if (!$tokenApiWa) {
+            if (!($openWaSession['success'] ?? false)) {
                 $skipped[] = [
                     'jadwal_id' => $jadwal->id,
                     'data_riwayat_diri_id' => $pelamar->id,
@@ -712,24 +713,16 @@ class JadwalTestZoomController extends Controller
                     'perusahaan_id' => $perusahaan->id ?? null,
                     'perusahaan' => $perusahaan->nama_perusahaan ?? null,
                     'nomer_perusahaan' => $nomerPerusahaan,
-                    'reason' => 'Token API WA perusahaan kosong.',
+                    'reason' => $openWaSession['message'] ?? 'Session OpenWA belum connect.',
+                    'openwa_device' => $openWaDeviceNumber,
+                    'openwa_status' => $openWaSession['device_status'] ?? null,
+                    'openwa_response' => $openWaSession['waha_response'] ?? null,
                 ];
 
                 continue;
             }
 
-            $companyValidationKey = (string) ($perusahaan->id ?? $tokenApiWa);
-
-            if (!isset($validatedCompanies[$companyValidationKey])) {
-                $validatedCompanies[$companyValidationKey] = $this->checkFonnteCredentialForSending(
-                    $nomerPerusahaan,
-                    $tokenApiWa
-                );
-            }
-
-            $validasiWa = $validatedCompanies[$companyValidationKey];
-
-            if (!$validasiWa['success']) {
+            if ($openWaDeviceNumber && $openWaDeviceNumber !== $nomerPerusahaan) {
                 $skipped[] = [
                     'jadwal_id' => $jadwal->id,
                     'data_riwayat_diri_id' => $pelamar->id,
@@ -739,40 +732,43 @@ class JadwalTestZoomController extends Controller
                     'perusahaan_id' => $perusahaan->id ?? null,
                     'perusahaan' => $perusahaan->nama_perusahaan ?? null,
                     'nomer_perusahaan' => $nomerPerusahaan,
-                    'reason' => $validasiWa['message'],
-                    'fonnte_device' => $validasiWa['device_number'] ?? null,
-                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
-                    'fonnte_response' => $validasiWa['fonnte_response'] ?? null,
+                    'reason' => 'Nomor OpenWA yang aktif tidak sesuai dengan nomor WhatsApp perusahaan kandidat. OpenWA aktif: ' . $openWaDeviceNumber . ', nomor perusahaan: ' . $nomerPerusahaan . '.',
+                    'openwa_device' => $openWaDeviceNumber,
+                    'openwa_status' => $openWaSession['device_status'] ?? null,
+                    'openwa_response' => $openWaSession['waha_response'] ?? null,
                 ];
 
                 continue;
             }
 
-            $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
+            $groupKey = (string) ($perusahaan->id ?? $nomerPerusahaan);
 
             if (!isset($groupedMessages[$groupKey])) {
                 $groupedMessages[$groupKey] = [
                     'perusahaan_id' => $perusahaan->id ?? null,
                     'perusahaan' => $perusahaan->nama_perusahaan ?? null,
                     'nomer_perusahaan' => $nomerPerusahaan,
-                    'token_api_wa' => $tokenApiWa,
-                    'fonnte_device' => $validasiWa['device_number'] ?? null,
-                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                    'openwa_session' => $openWaSession['session'] ?? config('services.waha.session', env('WAHA_SESSION')),
+                    'openwa_device' => $openWaDeviceNumber,
+                    'openwa_status' => $openWaSession['device_status'] ?? null,
                     'messages' => [],
                 ];
             }
 
             $groupedMessages[$groupKey]['messages'][] = [
+                'jadwal_id' => $jadwal->id,
+                'data_riwayat_diri_id' => $pelamar->id,
+                'nama_lengkap' => $pelamar->nama_lengkap,
                 'target' => $target,
+                'chat_id' => $target . '@c.us',
                 'message' => $this->buildPesanJadwalZoom($jadwal, $pelamar, $template),
-                'delay' => '2',
             ];
         }
 
         if (empty($groupedMessages)) {
             return [
                 'success' => false,
-                'message' => 'Tidak ada data valid untuk dikirim pesan WhatsApp jadwal Zoom.',
+                'message' => 'Tidak ada data valid untuk dikirim pesan WhatsApp jadwal Zoom. Pastikan nomor WA kandidat, nomor WA perusahaan, dan session OpenWA sudah sesuai.',
                 'total_data' => $jadwals->count(),
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
@@ -790,71 +786,88 @@ class JadwalTestZoomController extends Controller
         $targets = [];
 
         foreach ($groupedMessages as $group) {
-            try {
-                $response = Http::asForm()
-                    ->withoutVerifying()
-                    ->withHeaders([
-                        'Authorization' => $group['token_api_wa'],
-                    ])
-                    ->timeout(120)
-                    ->post('https://api.fonnte.com/send', [
-                        'data' => json_encode($group['messages']),
-                        'countryCode' => '62',
-                        'typing' => 'false',
-                        'preview' => 'true',
+            $groupSuccess = 0;
+            $groupFailed = 0;
+            $messageResponses = [];
+
+            foreach ($group['messages'] as $messageItem) {
+                try {
+                    $sendResult = $this->sendOpenWaText(
+                        $messageItem['target'],
+                        $messageItem['message']
+                    );
+
+                    $targets[] = $messageItem['target'];
+
+                    if ($sendResult['success']) {
+                        $totalDikirim++;
+                        $groupSuccess++;
+                    } else {
+                        $totalGagalProvider++;
+                        $groupFailed++;
+                    }
+
+                    $messageResponses[] = [
+                        'success' => $sendResult['success'],
+                        'jadwal_id' => $messageItem['jadwal_id'],
+                        'data_riwayat_diri_id' => $messageItem['data_riwayat_diri_id'],
+                        'nama_lengkap' => $messageItem['nama_lengkap'],
+                        'target' => $messageItem['target'],
+                        'chat_id' => $sendResult['chat_id'] ?? $messageItem['chat_id'],
+                        'openwa_response' => $sendResult['response'] ?? null,
+                        'message' => $sendResult['message'] ?? null,
+                    ];
+
+                    usleep(500000);
+                } catch (\Throwable $e) {
+                    $totalGagalProvider++;
+                    $groupFailed++;
+
+                    Log::error('Gagal mengirim pesan OpenWA jadwal Zoom per perusahaan', [
+                        'message' => $e->getMessage(),
+                        'perusahaan_id' => $group['perusahaan_id'],
+                        'perusahaan' => $group['perusahaan'],
+                        'target' => $messageItem['target'],
+                        'jadwal_id' => $messageItem['jadwal_id'],
                     ]);
 
-                $json = $response->json();
-                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-                $isSuccess = $response->successful() && (bool) $fonnteStatus;
-                $countMessages = count($group['messages']);
-
-                if ($isSuccess) {
-                    $totalDikirim += $countMessages;
-                } else {
-                    $totalGagalProvider += $countMessages;
+                    $messageResponses[] = [
+                        'success' => false,
+                        'jadwal_id' => $messageItem['jadwal_id'],
+                        'data_riwayat_diri_id' => $messageItem['data_riwayat_diri_id'],
+                        'nama_lengkap' => $messageItem['nama_lengkap'],
+                        'target' => $messageItem['target'],
+                        'chat_id' => $messageItem['chat_id'],
+                        'message' => 'Terjadi kesalahan saat mengirim pesan OpenWA untuk perusahaan ini: ' . $e->getMessage(),
+                    ];
                 }
-
-                $groupTargets = collect($group['messages'])->pluck('target')->values()->all();
-                $targets = array_merge($targets, $groupTargets);
-
-                $responses[] = [
-                    'success' => $isSuccess,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => $groupTargets,
-                    'fonnte_http_code' => $response->status(),
-                    'fonnte_response' => $json ?: $response->body(),
-                    'message' => $isSuccess
-                        ? 'Pesan jadwal Zoom berhasil dikirim ke antrean Fonnte untuk perusahaan ini.'
-                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan jadwal Zoom gagal dikirim melalui Fonnte untuk perusahaan ini.'),
-                ];
-            } catch (\Throwable $e) {
-                $countMessages = count($group['messages']);
-                $totalGagalProvider += $countMessages;
-
-                Log::error('Gagal mengirim pesan Fonnte jadwal Zoom per perusahaan', [
-                    'message' => $e->getMessage(),
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                ]);
-
-                $responses[] = [
-                    'success' => false,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values()->all(),
-                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
-                ];
             }
+
+            $firstFailedMessage = collect($messageResponses)
+                ->where('success', false)
+                ->pluck('message')
+                ->filter()
+                ->first();
+
+            $groupTargets = collect($group['messages'])->pluck('target')->values()->all();
+
+            $responses[] = [
+                'success' => $groupSuccess > 0 && $groupFailed === 0,
+                'perusahaan_id' => $group['perusahaan_id'],
+                'perusahaan' => $group['perusahaan'],
+                'nomer_perusahaan' => $group['nomer_perusahaan'],
+                'openwa_session' => $group['openwa_session'],
+                'openwa_device' => $group['openwa_device'],
+                'openwa_status' => $group['openwa_status'],
+                'total_data' => count($group['messages']),
+                'total_dikirim' => $groupSuccess,
+                'total_gagal' => $groupFailed,
+                'targets' => $groupTargets,
+                'responses' => $messageResponses,
+                'message' => $groupFailed === 0
+                    ? 'Pesan jadwal Zoom berhasil dikirim melalui OpenWA untuk perusahaan ini.'
+                    : ($firstFailedMessage ?: 'Pesan jadwal Zoom gagal dikirim melalui OpenWA untuk perusahaan ini.'),
+            ];
         }
 
         $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
@@ -927,104 +940,240 @@ class JadwalTestZoomController extends Controller
         ]);
     }
 
-    private function checkFonnteCredentialForSending(?string $nomerPerusahaan, ?string $tokenApiWa): array
+    private function openWaBaseUrl(): string
     {
-        if (!$nomerPerusahaan) {
-            return [
-                'success' => false,
-                'message' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
-            ];
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+
+        if (!Str::endsWith($url, '/api')) {
+            $url .= '/api';
         }
 
-        if (!$tokenApiWa) {
+        return $url;
+    }
+
+   private function wahaHeaders(): array
+{
+    $apiKey = config('services.waha.api_key') ?: env('WAHA_API_KEY');
+
+    $headers = [
+        'Accept' => 'application/json',
+        'Content-Type' => 'application/json',
+    ];
+
+    if (!empty($apiKey)) {
+        $headers['X-API-Key'] = $apiKey;
+    }
+
+    return $headers;
+}
+
+    private function checkOpenWaSessionForSending(): array
+    {
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
+
+        if (!$sessionId) {
             return [
                 'success' => false,
-                'message' => 'Token API WA perusahaan kosong.',
+                'session' => null,
+                'status' => 'error',
+                'message' => 'WAHA_SESSION belum diisi. Isi dengan ID session OpenWA, contoh: 1d88bca0-94f3-4d50-8af6-7c4ef719de7c.',
+                'device_number' => null,
+                'device_status' => null,
             ];
         }
 
         try {
-            $response = Http::withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => $tokenApiWa,
-                ])
-                ->timeout(30)
-                ->post('https://api.fonnte.com/device');
+            $url = $baseUrl . '/sessions/' . urlencode($sessionId);
 
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->wahaHeaders())
+                ->timeout(30)
+                ->get($url);
+
+            $body = $response->body();
             $json = $response->json();
+
+            Log::info('OpenWA session check jadwal Zoom', [
+                'url' => $url,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
 
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'message' => 'Gagal memvalidasi token API WA perusahaan ke Fonnte.',
-                    'fonnte_response' => $json ?: $response->body(),
+                    'session' => $sessionId,
+                    'status' => 'error',
+                    'message' => 'Gagal mengecek session OpenWA. URL: ' . $url . '. HTTP Code: ' . $response->status(),
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json ?: $body,
                 ];
             }
 
-            if (!($json['status'] ?? false)) {
+            $sessionData = is_array($json) ? $json : [];
+
+            if (empty($sessionData)) {
                 return [
                     'success' => false,
-                    'message' => $json['reason']
-                        ?? $json['message']
-                        ?? 'Token API WA perusahaan tidak valid.',
-                    'fonnte_response' => $json,
+                    'session' => $sessionId,
+                    'status' => 'not_found',
+                    'message' => 'Session OpenWA tidak ditemukan.',
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json,
                 ];
             }
 
-            $deviceNumber = $this->normalizeWhatsappNumber($json['device'] ?? null);
+            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
 
-            if (!$deviceNumber) {
+            $isConnected = in_array($deviceStatus, [
+                'connected',
+                'connect',
+                'working',
+                'authenticated',
+                'ready',
+            ], true);
+
+            if (!$isConnected) {
                 return [
                     'success' => false,
-                    'message' => 'Nomor device pada token API WA tidak ditemukan.',
-                    'fonnte_response' => $json,
-                ];
-            }
-
-            if ($deviceNumber !== $nomerPerusahaan) {
-                return [
-                    'success' => false,
-                    'message' => 'Token API WA tidak sesuai dengan nomor perusahaan. Token ini terdaftar untuk nomor ' . ($json['device'] ?? '-') . '.',
+                    'session' => $sessionId,
+                    'status' => 'disconnected',
+                    'message' => 'Session OpenWA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
-                    'device_status' => $json['device_status'] ?? null,
-                    'fonnte_response' => $json,
-                ];
-            }
-
-            if (($json['device_status'] ?? null) !== 'connect') {
-                return [
-                    'success' => false,
-                    'message' => 'Device WhatsApp perusahaan belum connect.',
-                    'device_number' => $deviceNumber,
-                    'device_status' => $json['device_status'] ?? null,
-                    'fonnte_response' => $json,
+                    'device_status' => $deviceStatus ?: null,
+                    'waha_response' => $json,
                 ];
             }
 
             return [
                 'success' => true,
-                'message' => 'Token API WA dan nomor perusahaan valid.',
+                'session' => $sessionId,
+                'status' => 'connected',
+                'message' => 'Session OpenWA sudah connect.',
                 'device_number' => $deviceNumber,
-                'device_status' => $json['device_status'] ?? null,
-                'fonnte_response' => $json,
+                'device_status' => $deviceStatus,
+                'waha_response' => $json,
             ];
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'message' => 'Gagal memvalidasi token API WA perusahaan: ' . $e->getMessage(),
+                'session' => $sessionId,
+                'status' => 'error',
+                'message' => 'Gagal memvalidasi OpenWA: ' . $e->getMessage(),
+                'device_number' => null,
+                'device_status' => null,
             ];
         }
     }
 
-    private function normalizeTokenApiWa(?string $value): ?string
+    private function sendOpenWaText(string $target, string $message): array
     {
-        if ($value === null) {
-            return null;
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
+        $chatId = $target . '@c.us';
+        $url = $baseUrl . '/sessions/' . urlencode((string) $sessionId) . '/messages/send-text';
+
+        $payload = [
+            'chatId' => $chatId,
+            'text' => $message,
+        ];
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->wahaHeaders())
+                ->timeout(60)
+                ->post($url, $payload);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('OpenWA send jadwal Zoom response', [
+                'url' => $url,
+                'payload' => $payload,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'chat_id' => $chatId,
+                    'response' => $json ?: $body,
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
+                        . $response->status()
+                        . '. Response: '
+                        . ($body ?: json_encode($json)),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'chat_id' => $chatId,
+                'response' => $json ?: $body,
+                'message' => 'Pesan berhasil dikirim melalui OpenWA.',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('OpenWA send jadwal Zoom exception', [
+                'url' => $url,
+                'target' => $target,
+                'chat_id' => $chatId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'response' => null,
+                'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private function extractOpenWaPhoneNumber(array $sessionData): ?string
+    {
+        $phone = $sessionData['phone'] ?? null;
+
+        if (is_array($phone)) {
+            $phone = $phone['number']
+                ?? $phone['id']
+                ?? $phone['user']
+                ?? $phone['phone']
+                ?? null;
         }
 
-        $value = trim($value);
+        $candidates = [
+            $phone,
+            $sessionData['phoneNumber'] ?? null,
+            $sessionData['phone_number'] ?? null,
+            $sessionData['me']['id'] ?? null,
+            $sessionData['me']['user'] ?? null,
+            $sessionData['me']['number'] ?? null,
+            $sessionData['me']['phone'] ?? null,
+        ];
 
-        return $value !== '' ? $value : null;
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                $candidate = $candidate['number']
+                    ?? $candidate['id']
+                    ?? $candidate['user']
+                    ?? $candidate['phone']
+                    ?? null;
+            }
+
+            $number = $this->normalizeWhatsappNumber($candidate);
+
+            if ($number) {
+                return $number;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeWhatsappNumber(?string $number): ?string

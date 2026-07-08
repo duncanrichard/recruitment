@@ -353,20 +353,67 @@ class DataPelamarController extends Controller
 
     public function kirimPesanSkrining(Request $request): JsonResponse
     {
+        $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
+
+        $perusahaanRules = [
+            'nullable',
+            'uuid',
+            Rule::exists('data_perusahaan', 'id'),
+        ];
+
+        if (is_array($allowedPerusahaanIds)) {
+            $perusahaanRules[] = Rule::in($allowedPerusahaanIds);
+        }
+
         $validated = $request->validate([
             'tanggal_skrining_mulai' => ['required', 'date'],
             'tanggal_skrining_selesai' => ['required', 'date', 'after_or_equal:tanggal_skrining_mulai'],
+            'perusahaan_dilamar' => $perusahaanRules,
+            'pelamar_ids' => ['required', 'array', 'min:1'],
+            'pelamar_ids.*' => ['required', 'string'],
             'message_template' => ['nullable', 'string', 'max:5000'],
         ], [
             'tanggal_skrining_mulai.required' => 'Tanggal skrining mulai wajib diisi.',
             'tanggal_skrining_selesai.required' => 'Tanggal skrining selesai wajib diisi.',
             'tanggal_skrining_selesai.after_or_equal' => 'Tanggal skrining selesai tidak boleh lebih kecil dari tanggal mulai.',
+            'pelamar_ids.required' => 'Pilih minimal 1 kandidat yang akan dikirim pesan.',
+            'pelamar_ids.array' => 'Format kandidat yang dipilih tidak valid.',
+            'pelamar_ids.min' => 'Pilih minimal 1 kandidat yang akan dikirim pesan.',
+            'perusahaan_dilamar.uuid' => 'Perusahaan tidak valid.',
+            'perusahaan_dilamar.exists' => 'Perusahaan tidak ditemukan.',
+            'perusahaan_dilamar.in' => 'Perusahaan tidak sesuai dengan perusahaan akun login.',
         ]);
 
-        $pelamars = $this->scopedPelamarQuery()
+        $selectedIds = collect($validated['pelamar_ids'] ?? [])
+            ->map(fn ($id) => trim((string) $id))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($selectedIds->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih minimal 1 kandidat yang akan dikirim pesan.',
+                'total_data' => 0,
+                'total_dikirim' => 0,
+                'total_dilewati' => 0,
+                'total_gagal_provider' => 0,
+                'skipped' => [],
+                'perusahaan_responses' => [],
+            ], 422);
+        }
+
+        $query = $this->scopedPelamarQuery()
             ->with($this->safeRelations())
+            ->whereIn('id', $selectedIds->all())
             ->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai'])
-            ->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai'])
+            ->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai']);
+
+        if (!empty($validated['perusahaan_dilamar'])) {
+            $query->where('perusahaan_dilamar', $validated['perusahaan_dilamar']);
+        }
+
+        $pelamars = $query
             ->orderBy('tanggal_skrining', 'asc')
             ->orderBy('nama_lengkap', 'asc')
             ->get()
@@ -377,26 +424,34 @@ class DataPelamarController extends Controller
         if ($pelamars->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada pelamar pada tanggal skrining tersebut.',
+                'message' => 'Tidak ada kandidat terpilih yang sesuai dengan filter tanggal/perusahaan tersebut.',
+                'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
+                'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+                'perusahaan_dilamar' => $validated['perusahaan_dilamar'] ?? null,
                 'total_pelamar' => 0,
                 'total_data' => 0,
+                'total_dipilih' => $selectedIds->count(),
                 'total_dikirim' => 0,
                 'total_dilewati' => 0,
                 'total_gagal_provider' => 0,
                 'total_perusahaan' => 0,
                 'skipped' => [],
+                'targets' => [],
                 'perusahaan_responses' => [],
             ], 404);
         }
 
+        $wahaSession = $this->checkWahaSessionForSending();
+        $wahaDeviceNumber = $this->normalizeWhatsappNumber($wahaSession['device_number'] ?? null);
+
         $groupedMessages = [];
         $skipped = [];
-        $validatedCompanies = [];
 
         foreach ($pelamars as $pelamar) {
             $target = $this->normalizeWhatsappNumber($pelamar->no_wa ?? null);
             $urlPendaftaran = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
             $perusahaan = $pelamar->perusahaan;
+            $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
 
             if (!$target) {
                 $skipped[] = [
@@ -405,7 +460,7 @@ class DataPelamarController extends Controller
                     'no_wa' => $pelamar->no_wa,
                     'perusahaan' => $pelamar->perusahaan_label,
                     'pendaftaran_url' => $urlPendaftaran,
-                    'reason' => 'Nomor WhatsApp pelamar kosong atau tidak valid.',
+                    'reason' => 'Nomor WhatsApp kandidat kosong atau tidak valid.',
                 ];
 
                 continue;
@@ -439,9 +494,6 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            $tokenApiWa = $this->normalizeTokenApiWa($perusahaan->token_api_wa ?? null);
-            $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
-
             if (!$nomerPerusahaan) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
@@ -457,7 +509,7 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            if (!$tokenApiWa) {
+            if (!($wahaSession['success'] ?? false)) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -467,24 +519,15 @@ class DataPelamarController extends Controller
                     'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
                     'nomer_perusahaan' => $nomerPerusahaan,
                     'pendaftaran_url' => $urlPendaftaran,
-                    'reason' => 'Token API WA perusahaan kosong.',
+                    'reason' => $wahaSession['message'] ?? 'Session WAHA belum connect.',
+                    'waha_device' => $wahaDeviceNumber,
+                    'waha_status' => $wahaSession['device_status'] ?? null,
                 ];
 
                 continue;
             }
 
-            $companyValidationKey = (string) ($perusahaan->id ?? $tokenApiWa);
-
-            if (!isset($validatedCompanies[$companyValidationKey])) {
-                $validatedCompanies[$companyValidationKey] = $this->checkFonnteCredentialForSending(
-                    $nomerPerusahaan,
-                    $tokenApiWa
-                );
-            }
-
-            $validasiWa = $validatedCompanies[$companyValidationKey];
-
-            if (!$validasiWa['success']) {
+            if ($wahaDeviceNumber && $wahaDeviceNumber !== $nomerPerusahaan) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -494,46 +537,50 @@ class DataPelamarController extends Controller
                     'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
                     'nomer_perusahaan' => $nomerPerusahaan,
                     'pendaftaran_url' => $urlPendaftaran,
-                    'reason' => $validasiWa['message'],
-                    'fonnte_device' => $validasiWa['device_number'] ?? null,
-                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                    'reason' => 'Nomor WAHA yang aktif tidak sesuai dengan nomor WhatsApp perusahaan kandidat. WAHA aktif: ' . $wahaDeviceNumber . ', nomor perusahaan: ' . $nomerPerusahaan . '.',
+                    'waha_device' => $wahaDeviceNumber,
+                    'waha_status' => $wahaSession['device_status'] ?? null,
                 ];
 
                 continue;
             }
 
-            $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
+            $groupKey = (string) ($perusahaan->id ?? $nomerPerusahaan);
 
             if (!isset($groupedMessages[$groupKey])) {
                 $groupedMessages[$groupKey] = [
                     'perusahaan_id' => $perusahaan->id ?? null,
                     'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
                     'nomer_perusahaan' => $nomerPerusahaan,
-                    'token_api_wa' => $tokenApiWa,
-                    'fonnte_device' => $validasiWa['device_number'] ?? null,
-                    'fonnte_device_status' => $validasiWa['device_status'] ?? null,
+                    'waha_session' => $wahaSession['session'] ?? config('services.waha.session', env('WAHA_SESSION', 'rekruitment')),
+                    'waha_device' => $wahaDeviceNumber,
+                    'waha_status' => $wahaSession['device_status'] ?? null,
                     'messages' => [],
                 ];
             }
 
             $groupedMessages[$groupKey]['messages'][] = [
+                'pelamar_id' => $this->pelamarKey($pelamar),
+                'nama_lengkap' => $pelamar->nama_lengkap,
                 'target' => $target,
+                'chat_id' => $target . '@c.us',
                 'message' => $this->buildPesanSkrining(
                     $pelamar,
                     $validated['message_template'] ?? null
                 ),
-                'delay' => '2',
             ];
         }
 
         if (empty($groupedMessages)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada data valid untuk dikirim pesan. Pastikan nomor WhatsApp pelamar, nomor WhatsApp perusahaan, token API WA perusahaan, token pendaftaran kandidat tersedia, dan token WA sesuai dengan nomor perusahaan.',
+                'message' => 'Tidak ada kandidat valid untuk dikirim pesan. Pastikan nomor WA kandidat, token pendaftaran, nomor WA perusahaan, dan session WAHA sudah sesuai.',
                 'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
                 'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+                'perusahaan_dilamar' => $validated['perusahaan_dilamar'] ?? null,
                 'total_pelamar' => $pelamars->count(),
                 'total_data' => $pelamars->count(),
+                'total_dipilih' => $selectedIds->count(),
                 'total_dikirim' => 0,
                 'total_dilewati' => count($skipped),
                 'total_gagal_provider' => 0,
@@ -541,6 +588,7 @@ class DataPelamarController extends Controller
                 'skipped' => $skipped,
                 'targets' => [],
                 'perusahaan_responses' => [],
+                'provider_responses' => [],
             ], 422);
         }
 
@@ -550,75 +598,84 @@ class DataPelamarController extends Controller
         $targets = [];
 
         foreach ($groupedMessages as $group) {
-            try {
-                $response = Http::asForm()
-                    ->withoutVerifying()
-                    ->withHeaders([
-                        'Authorization' => $group['token_api_wa'],
-                    ])
-                    ->timeout(120)
-                    ->post('https://api.fonnte.com/send', [
-                        'data' => json_encode($group['messages']),
-                        'countryCode' => '62',
-                        'typing' => 'false',
-                        'preview' => 'true',
+            $groupSuccess = 0;
+            $groupFailed = 0;
+            $messageResponses = [];
+
+            foreach ($group['messages'] as $messageItem) {
+                try {
+                    $sendResult = $this->sendWahaText(
+                        $messageItem['target'],
+                        $messageItem['message']
+                    );
+
+                    $targets[] = $messageItem['target'];
+
+                    if ($sendResult['success']) {
+                        $totalDikirim++;
+                        $groupSuccess++;
+                    } else {
+                        $totalGagalProvider++;
+                        $groupFailed++;
+                    }
+
+                    $messageResponses[] = [
+                        'success' => $sendResult['success'],
+                        'pelamar_id' => $messageItem['pelamar_id'],
+                        'nama_lengkap' => $messageItem['nama_lengkap'],
+                        'target' => $messageItem['target'],
+                        'chat_id' => $sendResult['chat_id'] ?? $messageItem['chat_id'],
+                        'waha_response' => $sendResult['response'] ?? null,
+                        'message' => $sendResult['message'] ?? null,
+                    ];
+
+                    usleep(500000);
+                } catch (\Throwable $e) {
+                    $totalGagalProvider++;
+                    $groupFailed++;
+
+                    Log::error('Gagal mengirim pesan WAHA skrining', [
+                        'message' => $e->getMessage(),
+                        'perusahaan_id' => $group['perusahaan_id'],
+                        'perusahaan' => $group['perusahaan'],
+                        'target' => $messageItem['target'],
+                        'pelamar_id' => $messageItem['pelamar_id'],
                     ]);
 
-                $json = $response->json();
-                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-                $isSuccess = $response->successful() && (bool) $fonnteStatus;
-                $countMessages = count($group['messages']);
-
-                if ($isSuccess) {
-                    $totalDikirim += $countMessages;
-                } else {
-                    $totalGagalProvider += $countMessages;
+                    $messageResponses[] = [
+                        'success' => false,
+                        'pelamar_id' => $messageItem['pelamar_id'],
+                        'nama_lengkap' => $messageItem['nama_lengkap'],
+                        'target' => $messageItem['target'],
+                        'chat_id' => $messageItem['chat_id'],
+                        'message' => 'Terjadi kesalahan saat mengirim pesan WAHA: ' . $e->getMessage(),
+                    ];
                 }
-
-                $targets = array_merge(
-                    $targets,
-                    collect($group['messages'])->pluck('target')->values()->all()
-                );
-
-                $responses[] = [
-                    'success' => $isSuccess,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values(),
-                    'fonnte_http_code' => $response->status(),
-                    'fonnte_response' => $json ?: $response->body(),
-                    'message' => $isSuccess
-                        ? 'Pesan berhasil dikirim ke antrean Fonnte untuk perusahaan ini.'
-                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan gagal dikirim melalui Fonnte untuk perusahaan ini.'),
-                ];
-            } catch (\Throwable $e) {
-                $countMessages = count($group['messages']);
-                $totalGagalProvider += $countMessages;
-
-                Log::error('Gagal mengirim pesan Fonnte skrining per perusahaan', [
-                    'message' => $e->getMessage(),
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
-                    'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
-                ]);
-
-                $responses[] = [
-                    'success' => false,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values(),
-                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
-                ];
             }
+
+            $firstFailedMessage = collect($messageResponses)
+                ->where('success', false)
+                ->pluck('message')
+                ->filter()
+                ->first();
+
+            $responses[] = [
+                'success' => $groupSuccess > 0 && $groupFailed === 0,
+                'perusahaan_id' => $group['perusahaan_id'],
+                'perusahaan' => $group['perusahaan'],
+                'nomer_perusahaan' => $group['nomer_perusahaan'],
+                'waha_session' => $group['waha_session'],
+                'waha_device' => $group['waha_device'],
+                'waha_status' => $group['waha_status'],
+                'total_data' => count($group['messages']),
+                'total_dikirim' => $groupSuccess,
+                'total_gagal' => $groupFailed,
+                'targets' => collect($group['messages'])->pluck('target')->values(),
+                'responses' => $messageResponses,
+                'message' => $groupFailed === 0
+                    ? 'Pesan berhasil dikirim melalui WAHA untuk perusahaan ini.'
+                    : ($firstFailedMessage ?: 'Pesan gagal dikirim melalui WAHA untuk perusahaan ini.'),
+            ];
         }
 
         $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
@@ -627,14 +684,16 @@ class DataPelamarController extends Controller
         return response()->json([
             'success' => $totalDikirim > 0,
             'message' => $isAllSuccess
-                ? 'Pesan WhatsApp berhasil dikirim sesuai perusahaan masing-masing.'
+                ? 'Pesan WhatsApp berhasil dikirim sesuai perusahaan kandidat.'
                 : ($isPartialSuccess
-                    ? 'Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal. Cek detail response per perusahaan.'
+                    ? 'Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal/dilewati. Cek detail response per perusahaan.'
                     : 'Pesan WhatsApp gagal dikirim. Cek detail response per perusahaan.'),
             'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
             'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
+            'perusahaan_dilamar' => $validated['perusahaan_dilamar'] ?? null,
             'total_pelamar' => $pelamars->count(),
             'total_data' => $pelamars->count(),
+            'total_dipilih' => $selectedIds->count(),
             'total_dikirim' => $totalDikirim,
             'total_dilewati' => count($skipped),
             'total_gagal_provider' => $totalGagalProvider,
@@ -642,6 +701,7 @@ class DataPelamarController extends Controller
             'skipped' => $skipped,
             'targets' => array_values(array_unique($targets)),
             'perusahaan_responses' => $responses,
+            'provider_responses' => $responses,
         ], $totalDikirim > 0 ? 200 : 422);
     }
 
@@ -1299,6 +1359,227 @@ class DataPelamarController extends Controller
         foreach ($columns as $column) {
             if (!empty($relation->{$column})) {
                 return (string) $relation->{$column};
+            }
+        }
+
+        return null;
+    }
+
+    private function openWaBaseUrl(): string
+    {
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+
+        // WAHA_URL boleh diisi https://domain atau https://domain/api.
+        // Helper ini memastikan base URL final hanya punya satu /api.
+        if (!Str::endsWith($url, '/api')) {
+            $url .= '/api';
+        }
+
+        return $url;
+    }
+
+   private function sendWahaText(string $target, string $message): array
+{
+    $baseUrl = $this->openWaBaseUrl();
+    $sessionId = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+
+    $chatId = $target . '@c.us';
+
+    $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
+
+    $payload = [
+        'chatId' => $chatId,
+        'text' => $message,
+    ];
+
+    try {
+        $response = Http::withoutVerifying()
+            ->withHeaders($this->wahaHeaders())
+            ->timeout(60)
+            ->post($url, $payload);
+
+        $body = $response->body();
+        $json = $response->json();
+
+        Log::info('OpenWA send text response', [
+            'url' => $url,
+            'payload' => $payload,
+            'http_code' => $response->status(),
+            'response_json' => $json,
+            'response_body' => $body,
+        ]);
+
+        if (!$response->successful()) {
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'response' => $json ?: $body,
+                'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
+                    . $response->status()
+                    . '. Response: '
+                    . ($body ?: json_encode($json)),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'chat_id' => $chatId,
+            'response' => $json ?: $body,
+            'message' => 'Pesan berhasil dikirim melalui OpenWA.',
+        ];
+    } catch (\Throwable $e) {
+        Log::error('OpenWA send text exception', [
+            'url' => $url,
+            'target' => $target,
+            'chat_id' => $chatId,
+            'message' => $e->getMessage(),
+        ]);
+
+        return [
+            'success' => false,
+            'chat_id' => $chatId,
+            'response' => null,
+            'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
+        ];
+    }
+}
+
+    private function checkWahaSessionForSending(): array
+    {
+        $baseUrl = $this->openWaBaseUrl();
+        $session = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->wahaHeaders())
+                ->timeout(30)
+                ->get($baseUrl . '/sessions');
+
+            $json = $response->json();
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'session' => $session,
+                    'status' => 'error',
+                    'message' => 'Gagal mengecek session WAHA. URL: ' . $baseUrl . '/sessions. HTTP Code: ' . $response->status(),
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json ?: $response->body(),
+                ];
+            }
+
+            $sessionData = $this->extractWahaSessionData($json, $session);
+
+            if (empty($sessionData)) {
+                return [
+                    'success' => false,
+                    'session' => $session,
+                    'status' => 'not_found',
+                    'message' => 'Session WAHA "' . $session . '" tidak ditemukan. Pastikan WAHA_SESSION sama dengan nama session di OpenWA.',
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json,
+                ];
+            }
+
+            $deviceStatus = strtolower((string) ($sessionData['status'] ?? $sessionData['device_status'] ?? ''));
+            $deviceNumber = $this->extractWahaPhoneNumber($sessionData);
+
+            $isConnected = in_array($deviceStatus, [
+                'connected',
+                'connect',
+                'working',
+                'authenticated',
+                'ready',
+            ], true);
+
+            if (!$isConnected) {
+                return [
+                    'success' => false,
+                    'session' => $session,
+                    'status' => 'disconnected',
+                    'message' => 'Session WAHA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
+                    'device_number' => $deviceNumber,
+                    'device_status' => $deviceStatus ?: null,
+                    'waha_response' => $json,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'session' => $session,
+                'status' => 'connected',
+                'message' => 'Session WAHA sudah connect.',
+                'device_number' => $deviceNumber,
+                'device_status' => $deviceStatus,
+                'waha_response' => $json,
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'success' => false,
+                'session' => $session,
+                'status' => 'error',
+                'message' => 'Gagal memvalidasi WAHA: ' . $e->getMessage(),
+                'device_number' => null,
+                'device_status' => null,
+            ];
+        }
+    }
+
+
+    private function wahaHeaders(): array
+    {
+        $apiKey = config('services.waha.api_key', env('WAHA_API_KEY'));
+
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if (!empty($apiKey)) {
+            $headers['X-Api-Key'] = $apiKey;
+        }
+
+        return $headers;
+    }
+
+    private function extractWahaSessionData($json, string $session): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                if (($item['name'] ?? null) === $session || ($item['session'] ?? null) === $session) {
+                    return $item;
+                }
+            }
+
+            return is_array($json[0] ?? null) ? $json[0] : [];
+        }
+
+        return is_array($json) ? $json : [];
+    }
+
+    private function extractWahaPhoneNumber(array $sessionData): ?string
+    {
+        $candidates = [
+            $sessionData['phone'] ?? null,
+            $sessionData['phoneNumber'] ?? null,
+            $sessionData['phone_number'] ?? null,
+            $sessionData['me']['id'] ?? null,
+            $sessionData['me']['user'] ?? null,
+            $sessionData['me']['number'] ?? null,
+            $sessionData['me']['phone'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $number = $this->normalizeWhatsappNumber($candidate);
+
+            if ($number) {
+                return $number;
             }
         }
 

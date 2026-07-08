@@ -1265,13 +1265,17 @@ class CekTahapanPelamarController extends Controller
             return false;
         }
 
-        foreach ($collection as $row) {
-            if ($this->hasFilledValue($row, $fields)) {
-                return true;
+        if ($collection instanceof \Illuminate\Support\Collection || $collection instanceof \Illuminate\Database\Eloquent\Collection) {
+            foreach ($collection as $row) {
+                if ($this->hasFilledValue($row, $fields)) {
+                    return true;
+                }
             }
+
+            return false;
         }
 
-        return false;
+        return $this->hasFilledValue($collection, $fields);
     }
 
     private function hasFilledValue($target, array $fields): bool
@@ -1280,15 +1284,33 @@ class CekTahapanPelamarController extends Controller
             return false;
         }
 
+        /*
+         |--------------------------------------------------------------------------
+         | Penting
+         |--------------------------------------------------------------------------
+         | Relasi seperti riwayatPekerjaan bisa berupa Collection.
+         | Jangan akses $collection->nama_perusahaan karena akan error:
+         | Property [nama_perusahaan] does not exist on this collection instance.
+         */
+        if ($target instanceof \Illuminate\Support\Collection || $target instanceof \Illuminate\Database\Eloquent\Collection) {
+            foreach ($target as $row) {
+                if ($this->hasFilledValue($row, $fields)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         foreach ($fields as $field) {
+            $value = null;
+
             if (is_array($target)) {
                 $value = $target[$field] ?? null;
             } elseif (is_object($target) && method_exists($target, 'getAttribute')) {
                 $value = $target->getAttribute($field);
             } elseif (is_object($target)) {
-                $value = $target->{$field} ?? null;
-            } else {
-                $value = null;
+                $value = property_exists($target, $field) ? $target->{$field} : null;
             }
 
             if ($this->isFilledValue($value)) {
@@ -1298,6 +1320,7 @@ class CekTahapanPelamarController extends Controller
 
         return false;
     }
+
 
     private function isFilledValue($value): bool
     {
@@ -2098,10 +2121,28 @@ class CekTahapanPelamarController extends Controller
 
     private function getLabelRelasi($model, array $columns, ?string $fallback = null): string
     {
-        if ($model) {
+        if ($model instanceof \Illuminate\Support\Collection || $model instanceof \Illuminate\Database\Eloquent\Collection) {
+            $model = $model->first();
+        }
+
+        if (is_array($model)) {
             foreach ($columns as $column) {
-                if (!empty($model->{$column})) {
-                    return (string) $model->{$column};
+                if (!empty($model[$column])) {
+                    return (string) $model[$column];
+                }
+            }
+        }
+
+        if (is_object($model)) {
+            foreach ($columns as $column) {
+                if (method_exists($model, 'getAttribute')) {
+                    $value = $model->getAttribute($column);
+                } else {
+                    $value = property_exists($model, $column) ? $model->{$column} : null;
+                }
+
+                if (!empty($value)) {
+                    return (string) $value;
                 }
             }
         }

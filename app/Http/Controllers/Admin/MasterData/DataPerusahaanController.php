@@ -16,14 +16,15 @@ class DataPerusahaanController extends Controller
 {
     public function list(): JsonResponse
     {
+        $wahaStatus = $this->checkWahaSession();
+
         $data = DataPerusahaan::query()
             ->orderBy('nama_perusahaan', 'asc')
             ->get()
-            ->map(function ($item) {
+            ->map(function ($item) use ($wahaStatus) {
                 $nomorPerusahaan = $this->normalizeWhatsappNumber($item->no_wa ?? null);
-                $tokenApiWa = $this->normalizeToken($item->token_api_wa ?? null);
 
-                $statusWa = $this->checkFonnteDevice($nomorPerusahaan, $tokenApiWa);
+                $statusWa = $this->buildCompanyWaStatus($nomorPerusahaan, $wahaStatus);
 
                 $item->wa_status = $statusWa['status'] ?? 'unknown';
                 $item->wa_status_label = $statusWa['label'] ?? 'Belum Dicek';
@@ -42,45 +43,47 @@ class DataPerusahaanController extends Controller
     }
 
     public function store(Request $request): JsonResponse
-{
-    $validated = $request->validate([
-        'nama_perusahaan' => [
-            'required',
-            'string',
-            'max:255',
-            Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at'),
-        ],
-        'no_wa' => ['required', 'string', 'max:30'],
-        'token_api_wa' => ['nullable', 'string'],
-    ], [
-        'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
-        'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
-        'no_wa.required' => 'Nomor perusahaan wajib diisi.',
-        'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
-        'token_api_wa.string' => 'Token API WA harus berupa teks.',
-    ]);
+    {
+        $validated = $request->validate([
+            'nama_perusahaan' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at'),
+            ],
+            'no_wa' => ['required', 'string', 'max:30'],
+        ], [
+            'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
+            'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
+            'no_wa.required' => 'Nomor perusahaan wajib diisi.',
+            'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
+        ]);
 
-    $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
-    $tokenApiWa = $this->normalizeToken($validated['token_api_wa'] ?? null);
+        $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
 
-    if ($tokenApiWa) {
-        $this->validateFonnteDeviceOrFail($nomorPerusahaan, $tokenApiWa);
+        if (!$nomorPerusahaan) {
+            throw ValidationException::withMessages([
+                'no_wa' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
+            ]);
+        }
+
+        $perusahaan = DataPerusahaan::create([
+            'kode' => $this->generateKodePerusahaan(),
+            'nama_perusahaan' => trim($validated['nama_perusahaan']),
+            'no_wa' => $nomorPerusahaan,
+
+            // Token tidak dipakai lagi karena WAHA pakai WAHA_API_KEY dari .env
+            'token_api_wa' => null,
+
+            'created_by' => Auth::id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data perusahaan berhasil ditambahkan.',
+            'data' => $perusahaan,
+        ], 201);
     }
-
-    $perusahaan = DataPerusahaan::create([
-        'kode' => $this->generateKodePerusahaan(),
-        'nama_perusahaan' => trim($validated['nama_perusahaan']),
-        'no_wa' => $nomorPerusahaan,
-        'token_api_wa' => $tokenApiWa,
-        'created_by' => Auth::id(),
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Data perusahaan berhasil ditambahkan.',
-        'data' => $perusahaan,
-    ], 201);
-}
 
     public function update(Request $request, string $id): JsonResponse
     {
@@ -96,30 +99,27 @@ class DataPerusahaanController extends Controller
                     ->whereNull('deleted_at'),
             ],
             'no_wa' => ['required', 'string', 'max:30'],
-            'token_api_wa' => ['required', 'string'],
         ], [
             'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
             'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
             'no_wa.required' => 'Nomor perusahaan wajib diisi.',
             'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
-            'token_api_wa.required' => 'Token API WA wajib diisi.',
-            'token_api_wa.string' => 'Token API WA harus berupa teks.',
         ]);
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
-        $tokenApiWa = $this->normalizeToken($validated['token_api_wa']);
 
-        /*
-         * Validasi token tetap jalan.
-         * Tetapi kalau nomor sesuai token dan device belum connect,
-         * data tetap boleh di-update.
-         */
-        $this->validateFonnteDeviceOrFail($nomorPerusahaan, $tokenApiWa);
+        if (!$nomorPerusahaan) {
+            throw ValidationException::withMessages([
+                'no_wa' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
+            ]);
+        }
 
         $payload = [
             'nama_perusahaan' => trim($validated['nama_perusahaan']),
             'no_wa' => $nomorPerusahaan,
-            'token_api_wa' => $tokenApiWa,
+
+            // Token lama dikosongkan karena sudah pindah ke WAHA global
+            'token_api_wa' => null,
         ];
 
         if (array_key_exists('updated_by', $perusahaan->getAttributes())) {
@@ -158,9 +158,8 @@ class DataPerusahaanController extends Controller
         $perusahaan = DataPerusahaan::findOrFail($id);
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
-        $tokenApiWa = $this->normalizeToken($perusahaan->token_api_wa ?? null);
-
-        $result = $this->checkFonnteDevice($nomorPerusahaan, $tokenApiWa);
+        $wahaStatus = $this->checkWahaSession();
+        $result = $this->buildCompanyWaStatus($nomorPerusahaan, $wahaStatus);
 
         return response()->json([
             'success' => $result['success'],
@@ -174,7 +173,7 @@ class DataPerusahaanController extends Controller
                 'wa_status' => $result['status'] ?? 'unknown',
                 'wa_status_label' => $result['label'] ?? 'Belum Dicek',
                 'wa_status_message' => $result['message'] ?? '-',
-                'fonnte_response' => $result['fonnte_response'] ?? null,
+                'waha_response' => $result['waha_response'] ?? null,
             ],
         ], $result['success'] ? 200 : 422);
     }
@@ -188,33 +187,7 @@ class DataPerusahaanController extends Controller
         return $kode;
     }
 
-    private function validateFonnteDeviceOrFail(?string $nomorPerusahaan, ?string $tokenApiWa): void
-    {
-        $result = $this->checkFonnteDevice($nomorPerusahaan, $tokenApiWa);
-
-        /*
-         * Status yang boleh simpan:
-         * connected     = token valid, nomor sesuai, device connect
-         * disconnected  = token valid, nomor sesuai, tetapi device belum connect
-         */
-        if (in_array($result['status'] ?? null, ['connected', 'disconnected'], true)) {
-            return;
-        }
-
-        /*
-         * Status yang tetap gagal:
-         * invalid   = nomor/token tidak valid
-         * mismatch  = nomor perusahaan berbeda dengan nomor pada token
-         * error     = gagal request / response Fonnte error
-         */
-        $field = $result['field'] ?? 'token_api_wa';
-
-        throw ValidationException::withMessages([
-            $field => $result['message'] ?? 'Validasi token API WA gagal.',
-        ]);
-    }
-
-    private function checkFonnteDevice(?string $nomorPerusahaan, ?string $tokenApiWa): array
+    private function buildCompanyWaStatus(?string $nomorPerusahaan, array $wahaStatus): array
     {
         if (!$nomorPerusahaan) {
             return [
@@ -223,118 +196,186 @@ class DataPerusahaanController extends Controller
                 'status' => 'invalid',
                 'label' => 'Tidak Valid',
                 'message' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
+                'device_number' => $wahaStatus['device_number'] ?? null,
+                'device_status' => $wahaStatus['device_status'] ?? null,
+                'waha_response' => $wahaStatus['waha_response'] ?? null,
             ];
         }
 
-        if (!$tokenApiWa) {
+        if (!($wahaStatus['success'] ?? false)) {
             return [
                 'success' => false,
-                'field' => 'token_api_wa',
-                'status' => 'invalid',
-                'label' => 'Token Kosong',
-                'message' => 'Token API WA wajib diisi.',
+                'field' => 'no_wa',
+                'status' => $wahaStatus['status'] ?? 'error',
+                'label' => $wahaStatus['label'] ?? 'Gagal Cek',
+                'message' => $wahaStatus['message'] ?? 'WAHA belum connect.',
+                'device_number' => $wahaStatus['device_number'] ?? null,
+                'device_status' => $wahaStatus['device_status'] ?? null,
+                'waha_response' => $wahaStatus['waha_response'] ?? null,
             ];
         }
 
-        try {
-            $response = Http::withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => $tokenApiWa,
-                ])
-                ->timeout(30)
-                ->post('https://api.fonnte.com/device');
+        $deviceNumber = $this->normalizeWhatsappNumber($wahaStatus['device_number'] ?? null);
 
-            $json = $response->json();
-
-            if (!$response->successful()) {
-                return [
-                    'success' => false,
-                    'field' => 'token_api_wa',
-                    'status' => 'error',
-                    'label' => 'Gagal Cek',
-                    'message' => 'Gagal mengecek token API WA ke Fonnte.',
-                    'fonnte_response' => $json ?: $response->body(),
-                ];
-            }
-
-            if (!($json['status'] ?? false)) {
-                return [
-                    'success' => false,
-                    'field' => 'token_api_wa',
-                    'status' => 'invalid',
-                    'label' => 'Tidak Valid',
-                    'message' => $json['reason']
-                        ?? $json['message']
-                        ?? 'Token API WA tidak valid.',
-                    'fonnte_response' => $json,
-                ];
-            }
-
-            $deviceNumber = $this->normalizeWhatsappNumber($json['device'] ?? null);
-            $deviceStatus = $json['device_status'] ?? null;
-
-            if (!$deviceNumber) {
-                return [
-                    'success' => false,
-                    'field' => 'token_api_wa',
-                    'status' => 'invalid',
-                    'label' => 'Tidak Valid',
-                    'message' => 'Nomor device pada token API WA tidak ditemukan.',
-                    'fonnte_response' => $json,
-                ];
-            }
-
-            if ($deviceNumber !== $nomorPerusahaan) {
-                return [
-                    'success' => false,
-                    'field' => 'no_wa',
-                    'status' => 'mismatch',
-                    'label' => 'Nomor Beda',
-                    'message' => 'Nomor perusahaan tidak sesuai dengan token API WA. Token ini terdaftar untuk nomor ' . ($json['device'] ?? '-') . '.',
-                    'device_number' => $deviceNumber,
-                    'device_status' => $deviceStatus,
-                    'fonnte_response' => $json,
-                ];
-            }
-
-            /*
-             * Nomor sudah sesuai token, tetapi device belum connect.
-             * Untuk validasi manual tetap ditampilkan sebagai belum connect.
-             * Untuk proses simpan/update, status ini tetap boleh lewat
-             * karena token dan nomor sudah benar.
-             */
-            if ($deviceStatus !== 'connect') {
-                return [
-                    'success' => false,
-                    'field' => 'token_api_wa',
-                    'status' => 'disconnected',
-                    'label' => 'Belum Connect',
-                    'message' => 'Nomor sesuai token, tetapi device WhatsApp belum connect.',
-                    'device_number' => $deviceNumber,
-                    'device_status' => $deviceStatus,
-                    'fonnte_response' => $json,
-                ];
-            }
-
+        if ($deviceNumber && $deviceNumber !== $nomorPerusahaan) {
             return [
-                'success' => true,
-                'field' => null,
-                'status' => 'connected',
-                'label' => 'Connect',
-                'message' => 'Nomor perusahaan dan token API WA valid. Device sudah connect.',
+                'success' => false,
+                'field' => 'no_wa',
+                'status' => 'mismatch',
+                'label' => 'Nomor Beda',
+                'message' => 'Nomor perusahaan berbeda dengan nomor WAHA. Nomor WAHA aktif: ' . $deviceNumber . '.',
                 'device_number' => $deviceNumber,
-                'device_status' => $deviceStatus,
-                'fonnte_response' => $json,
+                'device_status' => $wahaStatus['device_status'] ?? null,
+                'waha_response' => $wahaStatus['waha_response'] ?? null,
             ];
-        } catch (\Throwable $e) {
+        }
+
+        return [
+            'success' => true,
+            'field' => null,
+            'status' => 'connected',
+            'label' => 'Connect',
+            'message' => 'WAHA sudah connect dan nomor perusahaan sesuai.',
+            'device_number' => $deviceNumber,
+            'device_status' => $wahaStatus['device_status'] ?? null,
+            'waha_response' => $wahaStatus['waha_response'] ?? null,
+        ];
+    }
+
+   private function checkWahaSession(): array
+{
+    $baseUrl = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
+    $session = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+    $apiKey = config('services.waha.api_key', env('WAHA_API_KEY'));
+
+    $headers = [
+        'Accept' => 'application/json',
+        'Content-Type' => 'application/json',
+    ];
+
+    if (!empty($apiKey)) {
+        $headers['X-Api-Key'] = $apiKey;
+    }
+
+    try {
+        /*
+         * Pakai /api/sessions saja.
+         * Endpoint ini sudah terbukti berhasil dari curl kamu.
+         * Jangan pakai /api/sessions/{session}, karena bisa beda support tergantung versi WAHA/OpenWA.
+         */
+        $response = Http::withoutVerifying()
+            ->withHeaders($headers)
+            ->timeout(30)
+            ->get($baseUrl . '/api/sessions');
+
+        $json = $response->json();
+
+        if (!$response->successful()) {
             return [
                 'success' => false,
-                'field' => 'token_api_wa',
                 'status' => 'error',
                 'label' => 'Gagal Cek',
-                'message' => 'Gagal memvalidasi token API WA: ' . $e->getMessage(),
+                'message' => 'Gagal mengecek session WAHA. HTTP Code: ' . $response->status(),
+                'device_number' => null,
+                'device_status' => null,
+                'waha_response' => $json ?: $response->body(),
             ];
         }
+
+        $sessionData = $this->extractWahaSessionData($json, $session);
+
+        if (empty($sessionData)) {
+            return [
+                'success' => false,
+                'status' => 'not_found',
+                'label' => 'Session Tidak Ada',
+                'message' => 'Session WAHA "' . $session . '" tidak ditemukan. Pastikan WAHA_SESSION di .env sama dengan nama session OpenWA.',
+                'device_number' => null,
+                'device_status' => null,
+                'waha_response' => $json,
+            ];
+        }
+
+        $deviceStatus = strtolower((string) ($sessionData['status'] ?? $sessionData['device_status'] ?? ''));
+        $deviceNumber = $this->extractWahaPhoneNumber($sessionData);
+
+        $isConnected = in_array($deviceStatus, [
+            'connected',
+            'connect',
+            'working',
+            'authenticated',
+            'ready',
+        ], true);
+
+        if (!$isConnected) {
+            return [
+                'success' => false,
+                'status' => 'disconnected',
+                'label' => 'Belum Connect',
+                'message' => 'Session WAHA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
+                'device_number' => $deviceNumber,
+                'device_status' => $deviceStatus ?: null,
+                'waha_response' => $json,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'status' => 'connected',
+            'label' => 'Connect',
+            'message' => 'Session WAHA sudah connect.',
+            'device_number' => $deviceNumber,
+            'device_status' => $deviceStatus,
+            'waha_response' => $json,
+        ];
+    } catch (\Throwable $e) {
+        return [
+            'success' => false,
+            'status' => 'error',
+            'label' => 'Gagal Cek',
+            'message' => 'Gagal memvalidasi WAHA: ' . $e->getMessage(),
+            'device_number' => null,
+            'device_status' => null,
+        ];
+    }
+}
+
+    private function extractWahaSessionData($json, string $session): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (($item['name'] ?? null) === $session || ($item['session'] ?? null) === $session) {
+                    return is_array($item) ? $item : [];
+                }
+            }
+
+            return is_array($json[0] ?? null) ? $json[0] : [];
+        }
+
+        return is_array($json) ? $json : [];
+    }
+
+    private function extractWahaPhoneNumber(array $sessionData): ?string
+    {
+        $candidates = [
+            $sessionData['phone'] ?? null,
+            $sessionData['phoneNumber'] ?? null,
+            $sessionData['phone_number'] ?? null,
+            $sessionData['me']['id'] ?? null,
+            $sessionData['me']['user'] ?? null,
+            $sessionData['me']['number'] ?? null,
+            $sessionData['me']['phone'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $number = $this->normalizeWhatsappNumber($candidate);
+
+            if ($number) {
+                return $number;
+            }
+        }
+
+        return null;
     }
 
     private function normalizeWhatsappNumber(?string $value): ?string
@@ -344,6 +385,11 @@ class DataPerusahaanController extends Controller
         }
 
         $value = trim($value);
+
+        // Hapus suffix WAHA seperti @c.us
+        $value = preg_replace('/@.*/', '', $value);
+
+        // Ambil hanya angka dan +
         $value = preg_replace('/[^0-9+]/', '', $value);
 
         if ($value === '') {
@@ -372,16 +418,5 @@ class DataPerusahaanController extends Controller
     private function normalizePhone(?string $value): ?string
     {
         return $this->normalizeWhatsappNumber($value);
-    }
-
-    private function normalizeToken(?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        $value = trim($value);
-
-        return $value !== '' ? $value : null;
     }
 }

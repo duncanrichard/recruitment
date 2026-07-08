@@ -8,9 +8,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | This file is for storing the credentials for third party services such
-    | as Mailgun, Postmark, AWS and more. This file provides the de facto
-    | location for this type of information, allowing packages to have
-    | a conventional file to locate the various service credentials.
+    | as Mailgun, Postmark, AWS, OpenWA / WAHA and more. This file provides
+    | the de facto location for this type of information, allowing packages
+    | to have a conventional file to locate the various service credentials.
     |
     */
 
@@ -33,6 +33,23 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | OpenWA / WAHA WhatsApp API
+    |--------------------------------------------------------------------------
+    |
+    | WAHA_URL harus mengarah ke base API.
+    | Contoh:
+    | WAHA_URL=https://wa.blast.dsicorp.id/api
+    |
+    */
+
+    'waha' => [
+        'url' => env('WAHA_URL', 'https://wa.blast.dsicorp.id/api'),
+        'session' => env('WAHA_SESSION', 'rekruitment'),
+        'api_key' => env('WAHA_API_KEY'),
     ],
 
 ];

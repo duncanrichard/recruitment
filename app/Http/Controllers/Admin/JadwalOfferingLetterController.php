@@ -249,13 +249,16 @@ public function destroy(string $id)
         $review = $jadwalOl->hasilReviewManagement;
 
         if (!$review) {
-            return $this->waFailed('Data review management tidak ditemukan.');
+            return $this->waFailed('Data review management tidak ditemukan.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
+            ]);
         }
 
         $kandidat = $this->getDataKandidatUntukWa($review);
 
         if (!$kandidat) {
             return $this->waFailed('Data kandidat tidak ditemukan dari review management.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
                 'hasil_review_management_id' => $review->id ?? null,
             ]);
         }
@@ -264,71 +267,77 @@ public function destroy(string $id)
 
         if (!$target) {
             return $this->waFailed('Nomor WhatsApp kandidat kosong atau tidak valid.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
                 'kandidat_id' => $kandidat->id ?? null,
                 'nama_kandidat' => $kandidat->nama_lengkap ?? null,
                 'no_wa' => $kandidat->no_wa ?? null,
             ]);
         }
 
-        $tokenApiWa = $this->normalizeTokenApiWa($kandidat->token_api_wa ?? null);
+        $nomorPerusahaan = $this->normalizeWhatsappNumber($kandidat->no_wa_perusahaan ?? null);
 
-        if (!$tokenApiWa) {
-            return $this->waFailed('Token API WA perusahaan kandidat kosong.', [
+        if (!$nomorPerusahaan) {
+            return $this->waFailed('Nomor WhatsApp perusahaan kandidat kosong atau tidak valid.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
+                'target' => $target,
                 'kandidat_id' => $kandidat->id ?? null,
                 'nama_kandidat' => $kandidat->nama_lengkap ?? null,
                 'perusahaan_id' => $kandidat->perusahaan_id ?? null,
                 'perusahaan' => $kandidat->nama_perusahaan ?? null,
+                'no_wa_perusahaan' => $kandidat->no_wa_perusahaan ?? null,
+            ]);
+        }
+
+        $openWaSession = $this->checkOpenWaSessionForSending();
+
+        if (!($openWaSession['success'] ?? false)) {
+            return $this->waFailed($openWaSession['message'] ?? 'Session OpenWA belum siap.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
+                'target' => $target,
+                'kandidat_id' => $kandidat->id ?? null,
+                'nama_kandidat' => $kandidat->nama_lengkap ?? null,
+                'perusahaan_id' => $kandidat->perusahaan_id ?? null,
+                'perusahaan' => $kandidat->nama_perusahaan ?? null,
+                'nomor_perusahaan' => $nomorPerusahaan,
+                'openwa_session' => $openWaSession,
+            ]);
+        }
+
+        $deviceNumber = $this->normalizeWhatsappNumber($openWaSession['device_number'] ?? null);
+
+        if ($deviceNumber && $deviceNumber !== $nomorPerusahaan) {
+            return $this->waFailed('Nomor OpenWA aktif tidak sesuai dengan nomor WhatsApp perusahaan kandidat.', [
+                'jadwal_ol_id' => $jadwalOl->id ?? null,
+                'target' => $target,
+                'kandidat_id' => $kandidat->id ?? null,
+                'nama_kandidat' => $kandidat->nama_lengkap ?? null,
+                'perusahaan_id' => $kandidat->perusahaan_id ?? null,
+                'perusahaan' => $kandidat->nama_perusahaan ?? null,
+                'nomor_perusahaan' => $nomorPerusahaan,
+                'openwa_device_number' => $deviceNumber,
+                'openwa_session' => $openWaSession,
             ]);
         }
 
         $message = $this->buildPesanJadwalOl($jadwalOl, $kandidat, $isUpdate);
+        $sendResult = $this->sendOpenWaText($target, $message);
 
-        try {
-            $response = Http::asForm()
-                ->withoutVerifying()
-                ->withHeaders([
-                    'Authorization' => $tokenApiWa,
-                ])
-                ->timeout(120)
-                ->post('https://api.fonnte.com/send', [
-                    'target' => $target,
-                    'message' => $message,
-                    'countryCode' => '62',
-                    'typing' => 'false',
-                    'preview' => 'true',
-                ]);
-
-            $json = $response->json();
-            $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-            $isSuccess = $response->successful() && (bool) $fonnteStatus;
-
-            return [
-                'success' => $isSuccess,
-                'message' => $isSuccess
-                    ? 'Pesan jadwal Offering Letter berhasil dikirim ke kandidat.'
-                    : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan jadwal Offering Letter gagal dikirim melalui Fonnte.'),
-                'target' => $target,
-                'kandidat_id' => $kandidat->id ?? null,
-                'nama_kandidat' => $kandidat->nama_lengkap ?? null,
-                'perusahaan_id' => $kandidat->perusahaan_id ?? null,
-                'perusahaan' => $kandidat->nama_perusahaan ?? null,
-                'fonnte_http_code' => $response->status(),
-                'fonnte_response' => $json ?: $response->body(),
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Gagal mengirim pesan jadwal Offering Letter ke kandidat', [
-                'message' => $e->getMessage(),
-                'jadwal_ol_id' => $jadwalOl->id ?? null,
-                'hasil_review_management_id' => $review->id ?? null,
-                'kandidat_id' => $kandidat->id ?? null,
-            ]);
-
-            return $this->waFailed('Terjadi kesalahan saat mengirim pesan WhatsApp: ' . $e->getMessage(), [
-                'target' => $target,
-                'kandidat_id' => $kandidat->id ?? null,
-                'nama_kandidat' => $kandidat->nama_lengkap ?? null,
-            ]);
-        }
+        return [
+            'success' => (bool) ($sendResult['success'] ?? false),
+            'message' => ($sendResult['success'] ?? false)
+                ? 'Pesan jadwal Offering Letter berhasil dikirim ke kandidat melalui OpenWA.'
+                : ($sendResult['message'] ?? 'Pesan jadwal Offering Letter gagal dikirim melalui OpenWA.'),
+            'target' => $target,
+            'chat_id' => $sendResult['chat_id'] ?? ($target . '@c.us'),
+            'kandidat_id' => $kandidat->id ?? null,
+            'nama_kandidat' => $kandidat->nama_lengkap ?? null,
+            'perusahaan_id' => $kandidat->perusahaan_id ?? null,
+            'perusahaan' => $kandidat->nama_perusahaan ?? null,
+            'nomor_perusahaan' => $nomorPerusahaan,
+            'openwa_session' => $openWaSession,
+            'openwa_response' => $sendResult['response'] ?? null,
+            'openwa_http_code' => $sendResult['http_code'] ?? null,
+        ];
     }
 
     private function buildPesanJadwalOl(JadwalOfferingLetter $jadwalOl, object $kandidat, bool $isUpdate = false): string
@@ -775,14 +784,249 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
         ], true);
     }
 
+    private function openWaBaseUrl(): string
+    {
+        $url = rtrim((string) config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+
+        if (!str_ends_with($url, '/api')) {
+            $url .= '/api';
+        }
+
+        return $url;
+    }
+
+    private function openWaSessionId(): ?string
+    {
+        $session = trim((string) config('services.waha.session', env('WAHA_SESSION', '')));
+
+        return $session !== '' ? $session : null;
+    }
+
+    private function openWaHeaders(): array
+    {
+        $apiKey = trim((string) config('services.waha.api_key', env('WAHA_API_KEY', '')));
+
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if ($apiKey !== '') {
+            $headers['X-API-Key'] = $apiKey;
+        }
+
+        return $headers;
+    }
+
+    private function checkOpenWaSessionForSending(): array
+    {
+        $sessionId = $this->openWaSessionId();
+
+        if (!$sessionId) {
+            return [
+                'success' => false,
+                'session' => null,
+                'status' => 'error',
+                'message' => 'WAHA_SESSION belum diatur di file .env.',
+                'device_number' => null,
+                'device_status' => null,
+            ];
+        }
+
+        $url = $this->openWaBaseUrl() . '/sessions/' . rawurlencode($sessionId);
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->openWaHeaders())
+                ->timeout(30)
+                ->get($url);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('OpenWA session check Offering Letter', [
+                'url' => $url,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'session' => $sessionId,
+                    'status' => 'error',
+                    'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . ($body ?: json_encode($json)),
+                    'device_number' => null,
+                    'device_status' => null,
+                    'openwa_response' => $json ?: $body,
+                ];
+            }
+
+            $sessionData = is_array($json) ? $json : [];
+            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
+
+            $isConnected = in_array($deviceStatus, [
+                'ready',
+                'connected',
+                'connect',
+                'working',
+                'authenticated',
+            ], true);
+
+            if (!$isConnected) {
+                return [
+                    'success' => false,
+                    'session' => $sessionId,
+                    'status' => 'disconnected',
+                    'message' => 'Session OpenWA belum ready. Status saat ini: ' . ($deviceStatus ?: '-'),
+                    'device_number' => $deviceNumber,
+                    'device_status' => $deviceStatus ?: null,
+                    'openwa_response' => $json,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'session' => $sessionId,
+                'status' => 'connected',
+                'message' => 'Session OpenWA ready.',
+                'device_number' => $deviceNumber,
+                'device_status' => $deviceStatus,
+                'openwa_response' => $json,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Gagal mengecek session OpenWA Offering Letter', [
+                'url' => $url,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'session' => $sessionId,
+                'status' => 'error',
+                'message' => 'Gagal mengecek session OpenWA: ' . $e->getMessage(),
+                'device_number' => null,
+                'device_status' => null,
+            ];
+        }
+    }
+
+    private function sendOpenWaText(string $target, string $message): array
+    {
+        $sessionId = $this->openWaSessionId();
+        $chatId = $target . '@c.us';
+
+        if (!$sessionId) {
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'http_code' => null,
+                'response' => null,
+                'message' => 'WAHA_SESSION belum diatur di file .env.',
+            ];
+        }
+
+        $url = $this->openWaBaseUrl() . '/sessions/' . rawurlencode($sessionId) . '/messages/send-text';
+        $payload = [
+            'chatId' => $chatId,
+            'text' => $message,
+        ];
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->openWaHeaders())
+                ->timeout(60)
+                ->post($url, $payload);
+
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('OpenWA send Offering Letter message', [
+                'url' => $url,
+                'payload' => $payload,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'chat_id' => $chatId,
+                    'http_code' => $response->status(),
+                    'response' => $json ?: $body,
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . ($body ?: json_encode($json)),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'chat_id' => $chatId,
+                'http_code' => $response->status(),
+                'response' => $json ?: $body,
+                'message' => 'Pesan berhasil dikirim melalui OpenWA.',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Gagal mengirim pesan OpenWA Offering Letter', [
+                'url' => $url,
+                'target' => $target,
+                'chat_id' => $chatId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'http_code' => null,
+                'response' => null,
+                'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private function extractOpenWaPhoneNumber(array $sessionData): ?string
+    {
+        $candidates = [
+            $sessionData['phone'] ?? null,
+            $sessionData['phoneNumber'] ?? null,
+            $sessionData['me']['id'] ?? null,
+            $sessionData['me']['user'] ?? null,
+            $sessionData['me']['wid']['user'] ?? null,
+            $sessionData['account']['id'] ?? null,
+            $sessionData['account']['user'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                $nested = $this->extractOpenWaPhoneNumber($candidate);
+
+                if ($nested) {
+                    return $nested;
+                }
+
+                continue;
+            }
+
+            $normalized = $this->normalizeWhatsappNumber($candidate);
+
+            if ($normalized) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
     private function waFailed(string $message, array $extra = []): array
     {
         return array_merge([
             'success' => false,
             'message' => $message,
             'target' => null,
-            'fonnte_http_code' => null,
-            'fonnte_response' => null,
+            'openwa_http_code' => null,
+            'openwa_response' => null,
         ], $extra);
     }
 }

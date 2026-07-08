@@ -21,7 +21,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
         kode: "",
         nama_perusahaan: "",
         no_wa: "",
-        token_api_wa: "",
     });
 
     const currentSignal = actionSignals?.masterPerusahaan || 0;
@@ -40,7 +39,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
             kode: "",
             nama_perusahaan: "",
             no_wa: "",
-            token_api_wa: "",
         });
     };
 
@@ -107,7 +105,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const kode = String(item.kode || "").toLowerCase();
             const namaPerusahaan = String(item.nama_perusahaan || "").toLowerCase();
             const noWa = String(item.no_wa || "").toLowerCase();
-            const tokenApiWa = String(item.token_api_wa || "").toLowerCase();
             const waStatus = String(item.wa_status_label || "").toLowerCase();
             const waMessage = String(item.wa_status_message || "").toLowerCase();
             const waDevice = String(item.wa_device_number || "").toLowerCase();
@@ -116,7 +113,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
                 kode.includes(keyword) ||
                 namaPerusahaan.includes(keyword) ||
                 noWa.includes(keyword) ||
-                tokenApiWa.includes(keyword) ||
                 waStatus.includes(keyword) ||
                 waMessage.includes(keyword) ||
                 waDevice.includes(keyword)
@@ -222,7 +218,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
             kode: item.kode || "",
             nama_perusahaan: item.nama_perusahaan || "",
             no_wa: item.no_wa || "",
-            token_api_wa: item.token_api_wa || "",
         });
 
         setModalOpen(true);
@@ -242,7 +237,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const payload = {
                 nama_perusahaan: form.nama_perusahaan,
                 no_wa: form.no_wa,
-                token_api_wa: form.token_api_wa,
             };
 
             const response = await fetch(url, {
@@ -354,7 +348,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const result = await parseJsonResponse(response);
 
             if (!response.ok || !result.success) {
-                alert(result.message || "Nomor perusahaan dan token API WA tidak valid.");
+                alert(result.message || "WAHA belum valid atau belum connect.");
                 fetchData();
                 return;
             }
@@ -365,58 +359,46 @@ export default function DataPerusahaanPage({ actionSignals }) {
 ` +
                     `Nomor database: ${result?.data?.nomor_database || "-"}
 ` +
-                    `Nomor device: ${result?.data?.nomor_device || "-"}
+                    `Nomor WAHA: ${result?.data?.nomor_device || "-"}
 ` +
-                    `Status device: ${result?.data?.device_status || "-"}`
+                    `Status WAHA: ${result?.data?.device_status || "-"}`
             );
 
             fetchData();
         } catch (error) {
-            console.error("Gagal validasi WA:", error);
-            alert("Terjadi kesalahan saat validasi nomor dan token API WA.");
+            console.error("Gagal validasi WAHA:", error);
+            alert("Terjadi kesalahan saat validasi WAHA.");
         } finally {
             setValidatingId(null);
         }
     };
 
-    const maskToken = (token) => {
-        if (!token) return "-";
+    const renderWaStatus = (item) => {
+        const status = item.wa_status || "unknown";
+        const label = item.wa_status_label || "Belum Dicek";
+        const message = item.wa_status_message || "-";
 
-        const value = String(token);
+        const className =
+            status === "connected"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                : status === "disconnected"
+                ? "bg-amber-50 text-amber-700 border-amber-100"
+                : status === "mismatch"
+                ? "bg-orange-50 text-orange-700 border-orange-100"
+                : status === "error"
+                ? "bg-slate-50 text-slate-700 border-slate-200"
+                : "bg-rose-50 text-rose-700 border-rose-100";
 
-        if (value.length <= 10) {
-            return "••••••";
-        }
-
-        return `${value.slice(0, 6)}••••••${value.slice(-4)}`;
+        return (
+            <span
+                title={message}
+                className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-black ${className}`}
+            >
+                {label}
+            </span>
+        );
     };
 
-
-    const renderWaStatus = (item) => {
-    const status = item.wa_status || "unknown";
-    const label = item.wa_status_label || "Belum Dicek";
-    const message = item.wa_status_message || "-";
-
-    const className =
-        status === "connected"
-            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-            : status === "disconnected"
-            ? "bg-amber-50 text-amber-700 border-amber-100"
-            : status === "mismatch"
-            ? "bg-orange-50 text-orange-700 border-orange-100"
-            : status === "error"
-            ? "bg-slate-50 text-slate-700 border-slate-200"
-            : "bg-rose-50 text-rose-700 border-rose-100";
-
-    return (
-        <span
-            title={message}
-            className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-black ${className}`}
-        >
-            {label}
-        </span>
-    );
-};
     return (
         <div className="space-y-6">
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
@@ -431,7 +413,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         </h1>
 
                         <p className="mt-1 text-sm font-medium text-slate-500">
-                            Kelola daftar perusahaan, nomer WA, dan token API WA.
+                            Kelola daftar perusahaan dan nomor WhatsApp yang terhubung ke WAHA.
                         </p>
                     </div>
 
@@ -483,7 +465,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 type="text"
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Cari kode, nama, nomer, atau token..."
+                                placeholder="Cari kode, nama, nomor, atau status WAHA..."
                                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
                             />
                         </div>
@@ -511,20 +493,13 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 />
 
                                 <SortableTableHead
-                                    label="Nomer Perusahaan"
+                                    label="Nomor Perusahaan"
                                     sortKey="no_wa"
                                     onSort={handleSort}
                                     icon={sortIcon("no_wa")}
                                 />
 
-                                <SortableTableHead
-                                    label="Token API WA"
-                                    sortKey="token_api_wa"
-                                    onSort={handleSort}
-                                    icon={sortIcon("token_api_wa")}
-                                />
-
-                                <TableHead>Status Fonnte</TableHead>
+                                <TableHead>Status WAHA</TableHead>
 
                                 <TableHead align="right">Aksi</TableHead>
                             </tr>
@@ -533,7 +508,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16">
+                                    <td colSpan="6" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
@@ -568,15 +543,6 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                         </td>
 
                                         <td className="whitespace-nowrap px-6 py-5">
-                                            <div
-                                                className="max-w-[260px] truncate whitespace-nowrap font-mono text-xs font-black text-slate-600"
-                                                title={item.token_api_wa || "-"}
-                                            >
-                                                {maskToken(item.token_api_wa)}
-                                            </div>
-                                        </td>
-
-                                        <td className="whitespace-nowrap px-6 py-5">
                                             {renderWaStatus(item)}
                                         </td>
 
@@ -588,7 +554,9 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                                     onClick={() => handleValidasiWa(item)}
                                                     className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
-                                                    {validatingId === item.id ? "Validasi..." : "Validasi"}
+                                                    {validatingId === item.id
+                                                        ? "Cek WAHA..."
+                                                        : "Cek WAHA"}
                                                 </button>
 
                                                 <button
@@ -601,9 +569,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
-                                                        handleDelete(item.id)
-                                                    }
+                                                    onClick={() => handleDelete(item.id)}
                                                     className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
                                                 >
                                                     Hapus
@@ -614,7 +580,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16">
+                                    <td colSpan="6" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ▥
@@ -707,7 +673,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Kode dibuat otomatis oleh sistem. Lengkapi nama, nomer, dan token API WA perusahaan.
+                                        Kode dibuat otomatis oleh sistem. Lengkapi nama perusahaan dan nomor WhatsApp.
                                     </p>
                                 </div>
 
@@ -756,23 +722,13 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 />
 
                                 <Input
-                                    label="Nomer Perusahaan"
+                                    label="Nomor Perusahaan"
                                     name="no_wa"
                                     value={form.no_wa}
                                     onChange={handleChange}
                                     placeholder="Contoh: 081234567890"
                                     required
                                 />
-
-                                <div className="md:col-span-2">
-                                    <Textarea
-                                        label="Token API WA"
-                                        name="token_api_wa"
-                                        value={form.token_api_wa}
-                                        onChange={handleChange}
-                                        placeholder="Masukkan token API WhatsApp perusahaan"
-                                    />
-                                </div>
                             </div>
 
                             <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
@@ -859,36 +815,6 @@ function Input({
                 disabled={disabled}
                 placeholder={placeholder}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-            />
-        </div>
-    );
-}
-
-function Textarea({
-    label,
-    name,
-    value,
-    onChange,
-    required = false,
-    placeholder = "",
-    disabled = false,
-}) {
-    return (
-        <div>
-            <label className="mb-2 block text-sm font-black text-slate-700">
-                {label}
-                {required && <span className="text-rose-500"> *</span>}
-            </label>
-
-            <textarea
-                name={name}
-                value={value}
-                onChange={onChange}
-                required={required}
-                disabled={disabled}
-                placeholder={placeholder}
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
             />
         </div>
     );

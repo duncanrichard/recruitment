@@ -26,6 +26,9 @@ export default function DataPelamarPage({
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [sendingMessage, setSendingMessage] = useState(false);
+    const [messagePreviewOpen, setMessagePreviewOpen] = useState(false);
+    const [messagePreviewCandidates, setMessagePreviewCandidates] = useState([]);
+    const [selectedMessageCandidateIds, setSelectedMessageCandidateIds] = useState([]);
     const [alamatSama, setAlamatSama] = useState(false);
 
     const [tanggalSkriningMulai, setTanggalSkriningMulai] = useState("");
@@ -540,6 +543,141 @@ export default function DataPelamarPage({
         fetchData(nextFilter);
     };
 
+    const defaultSkriningMessageTemplate =
+        "Halo {nama},\n\n" +
+        "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n" +
+        "Mohon untuk selalu mengecek link pendaftaran Anda dan melengkapi seluruh data diri sesuai informasi yang diminta pada formulir.\n" +
+        "Link pendaftaran Anda:\n{url_pendaftaran}\n\n" +
+        "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n" +
+        "Jika ada kendala, silakan hubungi WA perusahaan yang mengirimkan pesan ini.\n\n" +
+        "Terima kasih.\n" +
+        "Tim Rekrutmen {perusahaan}";
+
+    const getCurrentMessageFilters = () => ({
+        perusahaan_dilamar: filterPerusahaan,
+        tanggal_skrining_mulai: tanggalSkriningMulai,
+        tanggal_skrining_selesai: tanggalSkriningSelesai,
+    });
+
+    const fetchCandidatesForMessage = async () => {
+        const params = new URLSearchParams();
+        const filters = getCurrentMessageFilters();
+
+        if (filters.perusahaan_dilamar) {
+            params.append("perusahaan_dilamar", filters.perusahaan_dilamar);
+        }
+
+        if (filters.tanggal_skrining_mulai) {
+            params.append("tanggal_skrining_mulai", filters.tanggal_skrining_mulai);
+        }
+
+        if (filters.tanggal_skrining_selesai) {
+            params.append("tanggal_skrining_selesai", filters.tanggal_skrining_selesai);
+        }
+
+        const url = params.toString()
+            ? `/admin/data-pelamar/list?${params.toString()}`
+            : "/admin/data-pelamar/list";
+
+        const result = await fetchJson(url);
+
+        if (!result.success) {
+            throw {
+                result,
+            };
+        }
+
+        const candidates = Array.isArray(result.data) ? result.data : [];
+
+        setAppliedTanggalSkrining(filters);
+        setDataPelamar(candidates);
+
+        return candidates;
+    };
+
+    const getCandidateId = (item) => String(item?.id || item?.uuid || "");
+
+    const isCandidateSelectable = (item) => {
+        return Boolean(getCandidateId(item) && item?.no_wa && getPendaftaranUrl(item));
+    };
+
+    const groupedMessagePreviewCandidates = useMemo(() => {
+        const groups = new Map();
+
+        messagePreviewCandidates.forEach((item) => {
+            const perusahaanId = String(item?.perusahaan_dilamar || item?.perusahaan?.id || "tanpa-perusahaan");
+            const perusahaanData = dataPerusahaan.find(
+                (data) => String(data.id) === String(item?.perusahaan_dilamar || item?.perusahaan?.id || "")
+            );
+            const perusahaanLabel =
+                item?.perusahaan?.nama_perusahaan ||
+                item?.perusahaan_label ||
+                perusahaanData?.nama_perusahaan ||
+                "Tanpa Perusahaan";
+
+            if (!groups.has(perusahaanId)) {
+                groups.set(perusahaanId, {
+                    id: perusahaanId,
+                    label: perusahaanLabel,
+                    items: [],
+                });
+            }
+
+            groups.get(perusahaanId).items.push(item);
+        });
+
+        return Array.from(groups.values());
+    }, [messagePreviewCandidates, dataPerusahaan]);
+
+    const selectableMessageCandidateIds = useMemo(() => {
+        return messagePreviewCandidates
+            .filter((item) => isCandidateSelectable(item))
+            .map((item) => getCandidateId(item))
+            .filter(Boolean);
+    }, [messagePreviewCandidates]);
+
+    const selectedMessageCandidateCount = selectedMessageCandidateIds.length;
+    const isAllMessageCandidatesSelected =
+        selectableMessageCandidateIds.length > 0 &&
+        selectableMessageCandidateIds.every((id) =>
+            selectedMessageCandidateIds.includes(id)
+        );
+
+    const handleToggleMessageCandidate = (item) => {
+        const id = getCandidateId(item);
+
+        if (!id || !isCandidateSelectable(item)) {
+            return;
+        }
+
+        setSelectedMessageCandidateIds((prev) => {
+            if (prev.includes(id)) {
+                return prev.filter((value) => value !== id);
+            }
+
+            return [...prev, id];
+        });
+    };
+
+    const handleToggleAllMessageCandidates = () => {
+        if (isAllMessageCandidatesSelected) {
+            setSelectedMessageCandidateIds([]);
+            return;
+        }
+
+        setSelectedMessageCandidateIds(selectableMessageCandidateIds);
+    };
+
+    const closeMessagePreviewModal = () => {
+        if (sendingMessage) {
+            return;
+        }
+
+        setMessagePreviewOpen(false);
+        setMessagePreviewCandidates([]);
+        setSelectedMessageCandidateIds([]);
+    };
+
     const handleKirimPesanSkrining = async (event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
@@ -558,8 +696,39 @@ export default function DataPelamarPage({
             return;
         }
 
+        try {
+            const candidates = await fetchCandidatesForMessage();
+
+            if (candidates.length === 0) {
+                alert("Tidak ada kandidat pada filter tanggal/perusahaan tersebut.");
+                return;
+            }
+
+            const selectableIds = candidates
+                .filter((item) => Boolean(getCandidateId(item) && item?.no_wa && getPendaftaranUrl(item)))
+                .map((item) => getCandidateId(item));
+
+            setMessagePreviewCandidates(candidates);
+            setSelectedMessageCandidateIds(selectableIds);
+            setMessagePreviewOpen(true);
+        } catch (error) {
+            console.error("Gagal mengambil data kandidat untuk pesan:", error);
+            alert(error?.result?.message || "Gagal mengambil data kandidat untuk dikirim pesan.");
+        }
+    };
+
+    const handleConfirmKirimPesanSkrining = async () => {
+        if (sendingMessage) {
+            return;
+        }
+
+        if (selectedMessageCandidateIds.length === 0) {
+            alert("Pilih minimal 1 kandidat yang akan dikirim pesan.");
+            return;
+        }
+
         const confirmSend = confirm(
-            `Kirim pesan WhatsApp ke semua pelamar dengan tanggal skrining ${tanggalSkriningMulai} sampai ${tanggalSkriningSelesai}?`
+            `Kirim pesan WhatsApp ke ${selectedMessageCandidateIds.length} kandidat yang dipilih?`
         );
 
         if (!confirmSend) return;
@@ -577,44 +746,42 @@ export default function DataPelamarPage({
                     "X-CSRF-TOKEN": getCsrfToken() || "",
                 },
                 body: JSON.stringify({
+                    perusahaan_dilamar: filterPerusahaan || null,
                     tanggal_skrining_mulai: tanggalSkriningMulai,
                     tanggal_skrining_selesai: tanggalSkriningSelesai,
-                    message_template:
-                        "Halo {nama},\n\n" +
-                        "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n" +
-                        
-                        "Mohon untuk selalu mengecek link pendaftaran Anda dan melengkapi seluruh data diri sesuai informasi yang diminta pada formulir.\n" +
-                        "Link pendaftaran Anda:\n{url_pendaftaran}\n\n" +
-                        "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n" +
-                        "Jika ada kendala, silakan hubungi WA ini.\n\n" +
-                        "Terima kasih.\n" +
-                        "Tim Rekrutmen {perusahaan}",
+                    pelamar_ids: selectedMessageCandidateIds,
+                    message_template: defaultSkriningMessageTemplate,
                 }),
             });
 
             const result = await parseJsonResponse(response);
 
             if (!response.ok || !result.success) {
-                const fonnteMessage =
-                    result?.fonnte_response?.reason ||
-                    result?.fonnte_response?.detail ||
-                    result?.fonnte_response?.message ||
+                const providerMessage =
+                    result?.provider_responses?.[0]?.message ||
+                    result?.perusahaan_responses?.[0]?.message ||
+                    result?.skipped?.[0]?.reason ||
                     result?.error ||
                     result?.message ||
-                    "Pesan skrining gagal dikirim. Pastikan tombol ini memanggil endpoint dengan method POST.";
+                    "Pesan skrining gagal dikirim melalui WAHA.";
 
-                alert(fonnteMessage);
+                alert(providerMessage);
                 return;
             }
 
             alert(
                 `${result.message || "Pesan skrining berhasil dikirim."}
 Total data: ${result.total_data || 0}
+Total dipilih: ${result.total_dipilih || selectedMessageCandidateIds.length}
 Total dikirim: ${result.total_dikirim || 0}
-Dilewati: ${result.total_dilewati || 0}`
+Dilewati: ${result.total_dilewati || 0}
+Gagal provider: ${result.total_gagal_provider || 0}`
             );
 
-            fetchData(appliedTanggalSkrining);
+            setMessagePreviewOpen(false);
+            setMessagePreviewCandidates([]);
+            setSelectedMessageCandidateIds([]);
+            fetchData(getCurrentMessageFilters());
         } catch (error) {
             console.error("Gagal mengirim pesan skrining:", error);
 
@@ -1033,6 +1200,235 @@ Dilewati: ${result.total_dilewati || 0}`
                     emptyDescription="Belum ada data pelamar atau kata kunci pencarian tidak cocok."
                 />
             </div>
+
+            {messagePreviewOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+                    <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+                        <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-5">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">
+                                        Konfirmasi Kirim Pesan WA
+                                    </div>
+
+                                    <h2 className="mt-2 text-2xl font-black text-slate-950">
+                                        Pilih Kandidat Yang Akan Dikirim Pesan
+                                    </h2>
+
+                                    <p className="mt-1 text-sm font-medium text-slate-500">
+                                        Pesan akan dikirim sesuai perusahaan kandidat. Kandidat dengan nomor WA atau URL pendaftaran kosong tidak bisa dipilih.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={closeMessagePreviewModal}
+                                    disabled={sendingMessage}
+                                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-4">
+                                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-black uppercase text-slate-400">
+                                        Filter Perusahaan
+                                    </p>
+                                    <p className="mt-1 text-sm font-black text-slate-800">
+                                        {getNamaPerusahaan(filterPerusahaan) || "Semua Perusahaan"}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-black uppercase text-slate-400">
+                                        Tanggal Mulai
+                                    </p>
+                                    <p className="mt-1 text-sm font-black text-slate-800">
+                                        {tanggalSkriningMulai || "-"}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-black uppercase text-slate-400">
+                                        Tanggal Selesai
+                                    </p>
+                                    <p className="mt-1 text-sm font-black text-slate-800">
+                                        {tanggalSkriningSelesai || "-"}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                                    <p className="text-xs font-black uppercase text-emerald-500">
+                                        Dipilih
+                                    </p>
+                                    <p className="mt-1 text-sm font-black text-emerald-800">
+                                        {selectedMessageCandidateCount} dari {selectableMessageCandidateIds.length} kandidat valid
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                                <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAllMessageCandidatesSelected}
+                                        onChange={handleToggleAllMessageCandidates}
+                                        disabled={selectableMessageCandidateIds.length === 0 || sendingMessage}
+                                        className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                    />
+                                    Pilih semua kandidat valid
+                                </label>
+
+                                <p className="text-sm font-bold text-slate-500">
+                                    Total kandidat tampil: {messagePreviewCandidates.length}
+                                </p>
+                            </div>
+
+                            <div className="space-y-5">
+                                {groupedMessagePreviewCandidates.map((group) => (
+                                    <div
+                                        key={group.id}
+                                        className="overflow-hidden rounded-3xl border border-slate-200 bg-white"
+                                    >
+                                        <div className="border-b border-slate-100 bg-slate-50 px-5 py-4">
+                                            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                                                <h3 className="text-sm font-black text-slate-900">
+                                                    {group.label}
+                                                </h3>
+                                                <p className="text-xs font-bold text-slate-500">
+                                                    {group.items.length} kandidat
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full table-auto whitespace-nowrap">
+                                                <thead>
+                                                    <tr className="bg-white">
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            Pilih
+                                                        </th>
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            Kandidat
+                                                        </th>
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            Posisi
+                                                        </th>
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            WA
+                                                        </th>
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            Tanggal Skrining
+                                                        </th>
+                                                        <th className="px-5 py-3 text-left text-xs font-black uppercase tracking-wide text-slate-400">
+                                                            Status
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {group.items.map((item) => {
+                                                        const candidateId = getCandidateId(item);
+                                                        const selectable = isCandidateSelectable(item);
+                                                        const checked = selectedMessageCandidateIds.includes(candidateId);
+                                                        const pendaftaranUrl = getPendaftaranUrl(item);
+
+                                                        return (
+                                                            <tr
+                                                                key={candidateId || `${item.nama_lengkap}-${item.no_wa}`}
+                                                                className={selectable ? "hover:bg-slate-50" : "bg-rose-50/30"}
+                                                            >
+                                                                <td className="px-5 py-4">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={checked}
+                                                                        disabled={!selectable || sendingMessage}
+                                                                        onChange={() => handleToggleMessageCandidate(item)}
+                                                                        className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                    />
+                                                                </td>
+
+                                                                <td className="px-5 py-4">
+                                                                    <div className="font-black text-slate-900">
+                                                                        {item.nama_lengkap || "-"}
+                                                                    </div>
+                                                                    <div className="mt-0.5 text-xs font-bold text-slate-400">
+                                                                        Token: {item.token || "-"}
+                                                                    </div>
+                                                                </td>
+
+                                                                <td className="px-5 py-4 text-sm font-bold text-slate-600">
+                                                                    {getNamaPosisi(item.posisi_yang_dilamar, item)}
+                                                                </td>
+
+                                                                <td className="px-5 py-4 text-sm font-bold text-teal-700">
+                                                                    {item.no_wa || "-"}
+                                                                </td>
+
+                                                                <td className="px-5 py-4 text-sm font-bold text-slate-600">
+                                                                    {formatTanggal(item.tanggal_skrining)}
+                                                                </td>
+
+                                                                <td className="px-5 py-4">
+                                                                    {selectable ? (
+                                                                        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
+                                                                            Siap dikirim
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span
+                                                                            title={!item?.no_wa ? "Nomor WA kosong" : !pendaftaranUrl ? "URL pendaftaran kosong" : "Data tidak valid"}
+                                                                            className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-black text-rose-700"
+                                                                        >
+                                                                            Tidak valid
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <p className="text-sm font-bold text-slate-500">
+                                    Pastikan perusahaan dan kandidat sudah benar sebelum mengirim pesan.
+                                </p>
+
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={closeMessagePreviewModal}
+                                        disabled={sendingMessage}
+                                        className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        Batal
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleConfirmKirimPesanSkrining}
+                                        disabled={sendingMessage || selectedMessageCandidateIds.length === 0}
+                                        className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-100 transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {sendingMessage
+                                            ? "Mengirim..."
+                                            : `Kirim ke ${selectedMessageCandidateIds.length} Kandidat`}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
