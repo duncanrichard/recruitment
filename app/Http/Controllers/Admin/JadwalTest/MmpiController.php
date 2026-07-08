@@ -695,9 +695,14 @@ class MmpiController extends Controller
     private function sendOpenWaText(string $target, string $message): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
+
+        // Untuk kirim pesan, OpenWA/WAHA di server Anda memakai Session ID UUID.
+        // WAHA_SESSION tetap dipakai sebagai nama session untuk pengecekan.
+        $sessionId = $this->openWaSendSessionId();
+
         $chatId = $target . '@c.us';
-        $url = $baseUrl . '/sessions/' . urlencode((string) $sessionId) . '/messages/send-text';
+        $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
+
         $payload = [
             'chatId' => $chatId,
             'text' => $message,
@@ -714,6 +719,11 @@ class MmpiController extends Controller
 
             Log::info('OpenWA send text MMPI response', [
                 'url' => $url,
+                'session_id_used_for_send' => $sessionId,
+                'session_name_env' => $this->openWaSessionName(),
+                'session_id_env' => $this->openWaSessionId(),
+                'target' => $target,
+                'chat_id' => $chatId,
                 'payload' => $payload,
                 'http_code' => $response->status(),
                 'response_json' => $json,
@@ -724,20 +734,30 @@ class MmpiController extends Controller
                 return [
                     'success' => false,
                     'chat_id' => $chatId,
+                    'target' => $target,
+                    'session_id_used_for_send' => $sessionId,
                     'response' => $json ?: $body,
-                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . ($body ?: json_encode($json)),
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
+                        . $response->status()
+                        . '. Session yang dipakai: '
+                        . $sessionId
+                        . '. Response: '
+                        . ($body ?: json_encode($json)),
                 ];
             }
 
             return [
                 'success' => true,
                 'chat_id' => $chatId,
+                'target' => $target,
+                'session_id_used_for_send' => $sessionId,
                 'response' => $json ?: $body,
                 'message' => 'Pesan berhasil dikirim melalui OpenWA.',
             ];
         } catch (\Throwable $e) {
             Log::error('OpenWA send text MMPI exception', [
                 'url' => $url,
+                'session_id_used_for_send' => $sessionId,
                 'target' => $target,
                 'chat_id' => $chatId,
                 'message' => $e->getMessage(),
@@ -746,6 +766,8 @@ class MmpiController extends Controller
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'target' => $target,
+                'session_id_used_for_send' => $sessionId,
                 'response' => null,
                 'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
             ];
@@ -755,39 +777,73 @@ class MmpiController extends Controller
     private function checkOpenWaSessionForSending(): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
-        $url = $baseUrl . '/sessions/' . urlencode((string) $sessionId);
+        $sessionName = $this->openWaSessionName();
+        $sessionId = $this->openWaSessionId();
+        $sendSessionId = $this->openWaSendSessionId();
 
         try {
+            // Pakai /sessions agar bisa cocokkan berdasarkan name atau UUID.
+            // Beberapa versi WAHA/OpenWA tidak stabil jika langsung /sessions/{name}.
+            $url = $baseUrl . '/sessions';
+
             $response = Http::withoutVerifying()
                 ->withHeaders($this->wahaHeaders())
                 ->timeout(30)
                 ->get($url);
 
+            $body = $response->body();
             $json = $response->json();
 
             Log::info('OpenWA session check MMPI', [
                 'url' => $url,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'http_code' => $response->status(),
                 'response_json' => $json,
-                'response_body' => $response->body(),
+                'response_body' => $body,
             ]);
 
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'error',
-                    'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . $response->body(),
+                    'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . $body,
                     'device_number' => null,
                     'device_status' => null,
-                    'waha_response' => $json ?: $response->body(),
+                    'waha_response' => $json ?: $body,
                 ];
             }
 
-            $sessionData = is_array($json) ? $json : [];
-            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $sessionData = $this->extractOpenWaSessionData($json, $sessionName, $sessionId);
+
+            if (empty($sessionData)) {
+                return [
+                    'success' => false,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
+                    'status' => 'not_found',
+                    'message' => 'Session OpenWA tidak ditemukan. Pastikan WAHA_SESSION berisi nama session dan WAHA_SESSION_ID berisi UUID session.',
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json,
+                ];
+            }
+
+            $deviceStatus = strtolower((string) (
+                $sessionData['status']
+                ?? $sessionData['device_status']
+                ?? $sessionData['state']
+                ?? $sessionData['engine']['state']
+                ?? ''
+            ));
+
             $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
+
             $isConnected = in_array($deviceStatus, [
                 'connected',
                 'connect',
@@ -799,7 +855,9 @@ class MmpiController extends Controller
             if (!$isConnected) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'disconnected',
                     'message' => 'Session OpenWA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
@@ -810,7 +868,9 @@ class MmpiController extends Controller
 
             return [
                 'success' => true,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'connected',
                 'message' => 'Session OpenWA sudah connect.',
                 'device_number' => $deviceNumber,
@@ -820,7 +880,9 @@ class MmpiController extends Controller
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'error',
                 'message' => 'Gagal memvalidasi OpenWA: ' . $e->getMessage(),
                 'device_number' => null,
@@ -831,8 +893,10 @@ class MmpiController extends Controller
 
     private function openWaBaseUrl(): string
     {
-        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
 
+        // WAHA_URL boleh diisi domain saja atau domain + /api.
+        // Hasil akhir dijaga agar hanya memiliki satu /api.
         if (!Str::endsWith($url, '/api')) {
             $url .= '/api';
         }
@@ -840,19 +904,70 @@ class MmpiController extends Controller
         return $url;
     }
 
+    private function openWaSessionName(): string
+    {
+        return (string) (config('services.waha.session', env('WAHA_SESSION', 'rekruitment')) ?: 'rekruitment');
+    }
+
+    private function openWaSessionId(): ?string
+    {
+        $sessionId = config('services.waha.session_id', env('WAHA_SESSION_ID'));
+
+        return $sessionId ? (string) $sessionId : null;
+    }
+
+    private function openWaSendSessionId(): string
+    {
+        // Untuk endpoint kirim pesan, gunakan UUID jika tersedia.
+        return $this->openWaSessionId() ?: $this->openWaSessionName();
+    }
+
     private function wahaHeaders(): array
     {
         $apiKey = config('services.waha.api_key') ?: env('WAHA_API_KEY');
+
         $headers = [
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
         ];
 
         if (!empty($apiKey)) {
-            $headers['X-API-Key'] = $apiKey;
+            // Gunakan format header yang sama dengan controller WAHA lain.
+            $headers['X-Api-Key'] = $apiKey;
         }
 
         return $headers;
+    }
+
+    private function extractOpenWaSessionData($json, string $sessionName, ?string $sessionId = null): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $itemName = $item['name'] ?? null;
+                $itemSession = $item['session'] ?? null;
+                $itemId = $item['id'] ?? null;
+                $itemSessionId = $item['sessionId'] ?? null;
+                $itemUuid = $item['uuid'] ?? null;
+
+                if (
+                    $itemName === $sessionName ||
+                    $itemSession === $sessionName ||
+                    ($sessionId && $itemId === $sessionId) ||
+                    ($sessionId && $itemSessionId === $sessionId) ||
+                    ($sessionId && $itemUuid === $sessionId)
+                ) {
+                    return $item;
+                }
+            }
+
+            return [];
+        }
+
+        return is_array($json) ? $json : [];
     }
 
     private function extractOpenWaPhoneNumber(array $sessionData): ?string
@@ -880,6 +995,14 @@ class MmpiController extends Controller
         ]);
 
         foreach ($candidates as $candidate) {
+            if (is_array($candidate)) {
+                $candidate = $candidate['number']
+                    ?? $candidate['id']
+                    ?? $candidate['user']
+                    ?? $candidate['phone']
+                    ?? null;
+            }
+
             $number = $this->normalizeWhatsappNumber($candidate);
 
             if ($number) {

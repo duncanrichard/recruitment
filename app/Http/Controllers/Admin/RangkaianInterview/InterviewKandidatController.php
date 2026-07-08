@@ -1710,8 +1710,13 @@ class InterviewKandidatController extends Controller
 
     private function openWaBaseUrl(): string
     {
-        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
 
+        // WAHA_URL boleh diisi:
+        // https://wa.blast.dsicorp.id
+        // atau
+        // https://wa.blast.dsicorp.id/api
+        // Function ini memastikan hasil akhirnya hanya 1x /api.
         if (!Str::endsWith($url, '/api')) {
             $url .= '/api';
         }
@@ -1719,12 +1724,27 @@ class InterviewKandidatController extends Controller
         return $url;
     }
 
+    private function openWaSessionName(): string
+    {
+        $sessionName = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+        $sessionName = trim((string) $sessionName);
+
+        return $sessionName !== '' ? $sessionName : 'rekruitment';
+    }
+
     private function openWaSessionId(): ?string
     {
-        $session = config('services.waha.session', env('WAHA_SESSION'));
-        $session = trim((string) $session);
+        $sessionId = config('services.waha.session_id', env('WAHA_SESSION_ID'));
+        $sessionId = trim((string) $sessionId);
 
-        return $session !== '' ? $session : null;
+        return $sessionId !== '' ? $sessionId : null;
+    }
+
+    private function openWaSendSessionId(): string
+    {
+        // Untuk endpoint kirim pesan, OpenWA/WAHA Anda memakai Session ID UUID.
+        // Kalau WAHA_SESSION_ID kosong, fallback ke nama session agar tetap kompatibel.
+        return $this->openWaSessionId() ?: $this->openWaSessionName();
     }
 
     private function openWaHeaders(): array
@@ -1737,7 +1757,8 @@ class InterviewKandidatController extends Controller
         ];
 
         if (!empty($apiKey)) {
-            $headers['X-API-Key'] = $apiKey;
+            // WAHA/OpenWA membaca header ini.
+            $headers['X-Api-Key'] = $apiKey;
         }
 
         return $headers;
@@ -1746,50 +1767,69 @@ class InterviewKandidatController extends Controller
     private function checkOpenWaSessionForSending(): array
     {
         $baseUrl = $this->openWaBaseUrl();
+        $sessionName = $this->openWaSessionName();
         $sessionId = $this->openWaSessionId();
-
-        if (!$sessionId) {
-            return [
-                'success' => false,
-                'session' => null,
-                'status' => 'error',
-                'message' => 'WAHA_SESSION belum diisi di .env.',
-                'device_number' => null,
-                'device_status' => null,
-            ];
-        }
+        $sendSessionId = $this->openWaSendSessionId();
 
         try {
-            $url = $baseUrl . '/sessions/' . urlencode($sessionId);
+            $url = $baseUrl . '/sessions';
 
             $response = Http::withoutVerifying()
                 ->withHeaders($this->openWaHeaders())
                 ->timeout(30)
                 ->get($url);
 
+            $body = $response->body();
             $json = $response->json();
 
             Log::info('OpenWA session check interview', [
                 'url' => $url,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'http_code' => $response->status(),
                 'response_json' => $json,
-                'response_body' => $response->body(),
+                'response_body' => $body,
             ]);
 
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'error',
                     'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status(),
                     'device_number' => null,
                     'device_status' => null,
-                    'waha_response' => $json ?: $response->body(),
+                    'waha_response' => $json ?: $body,
                 ];
             }
 
-            $sessionData = is_array($json) ? $json : [];
-            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $sessionData = $this->extractOpenWaSessionData($json, $sessionName, $sessionId);
+
+            if (empty($sessionData)) {
+                return [
+                    'success' => false,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
+                    'status' => 'not_found',
+                    'message' => 'Session OpenWA tidak ditemukan. Pastikan WAHA_SESSION berisi nama session dan WAHA_SESSION_ID berisi UUID session.',
+                    'device_number' => null,
+                    'device_status' => null,
+                    'waha_response' => $json,
+                ];
+            }
+
+            $deviceStatus = strtolower((string) (
+                $sessionData['status']
+                ?? $sessionData['device_status']
+                ?? $sessionData['state']
+                ?? $sessionData['engine']['state']
+                ?? ''
+            ));
+
             $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
 
             $isConnected = in_array($deviceStatus, [
@@ -1803,7 +1843,9 @@ class InterviewKandidatController extends Controller
             if (!$isConnected) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'disconnected',
                     'message' => 'Session OpenWA belum ready. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
@@ -1814,7 +1856,9 @@ class InterviewKandidatController extends Controller
 
             return [
                 'success' => true,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'connected',
                 'message' => 'Session OpenWA sudah ready.',
                 'device_number' => $deviceNumber,
@@ -1823,13 +1867,17 @@ class InterviewKandidatController extends Controller
             ];
         } catch (\Throwable $e) {
             Log::error('OpenWA session check interview exception', [
-                'session' => $sessionId,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'message' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'error',
                 'message' => 'Gagal memvalidasi OpenWA: ' . $e->getMessage(),
                 'device_number' => null,
@@ -1838,15 +1886,65 @@ class InterviewKandidatController extends Controller
         }
     }
 
+    private function extractOpenWaSessionData($json, string $sessionName, ?string $sessionId = null): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $itemName = $item['name'] ?? null;
+                $itemSession = $item['session'] ?? null;
+                $itemId = $item['id'] ?? null;
+                $itemSessionId = $item['sessionId'] ?? null;
+                $itemUuid = $item['uuid'] ?? null;
+
+                if (
+                    $itemName === $sessionName ||
+                    $itemSession === $sessionName ||
+                    ($sessionId && $itemId === $sessionId) ||
+                    ($sessionId && $itemSessionId === $sessionId) ||
+                    ($sessionId && $itemUuid === $sessionId)
+                ) {
+                    return $item;
+                }
+            }
+
+            return [];
+        }
+
+        if (is_array($json)) {
+            return $json;
+        }
+
+        return [];
+    }
+
     private function extractOpenWaPhoneNumber(array $sessionData): ?string
     {
+        $phone = $sessionData['phone'] ?? null;
+
+        if (is_array($phone)) {
+            $phone = $phone['number']
+                ?? $phone['phone']
+                ?? $phone['user']
+                ?? $phone['id']
+                ?? null;
+        }
+
         $candidates = [
-            $sessionData['phone'] ?? null,
+            $phone,
             $sessionData['phoneNumber'] ?? null,
+            $sessionData['phone_number'] ?? null,
             $sessionData['number'] ?? null,
             $sessionData['me']['id'] ?? null,
             $sessionData['me']['user'] ?? null,
+            $sessionData['me']['number'] ?? null,
+            $sessionData['me']['phone'] ?? null,
             $sessionData['state']['phone'] ?? null,
+            $sessionData['engine']['me']['id'] ?? null,
+            $sessionData['engine']['me']['user'] ?? null,
         ];
 
         foreach ($candidates as $candidate) {
@@ -1873,19 +1971,32 @@ class InterviewKandidatController extends Controller
     private function sendOpenWaText(string $target, string $message): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $sessionId = $this->openWaSessionId();
-        $chatId = $this->normalizeWhatsappNumber($target) . '@c.us';
+        $sessionId = $this->openWaSendSessionId();
+        $normalizedTarget = $this->normalizeWhatsappNumber($target);
+        $chatId = $normalizedTarget ? $normalizedTarget . '@c.us' : $target . '@c.us';
 
         if (!$sessionId) {
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => null,
                 'response' => null,
-                'message' => 'WAHA_SESSION belum diisi di .env.',
+                'message' => 'WAHA_SESSION_ID / WAHA_SESSION belum diisi di .env.',
+            ];
+        }
+
+        if (!$normalizedTarget) {
+            return [
+                'success' => false,
+                'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
+                'response' => null,
+                'message' => 'Nomor tujuan WhatsApp tidak valid: ' . $target,
             ];
         }
 
         $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
+
         $payload = [
             'chatId' => $chatId,
             'text' => $message,
@@ -1902,6 +2013,11 @@ class InterviewKandidatController extends Controller
 
             Log::info('OpenWA send interview message response', [
                 'url' => $url,
+                'session_id_used_for_send' => $sessionId,
+                'session_name_env' => $this->openWaSessionName(),
+                'session_id_env' => $this->openWaSessionId(),
+                'target' => $normalizedTarget,
+                'chat_id' => $chatId,
                 'payload' => $payload,
                 'http_code' => $response->status(),
                 'response_json' => $json,
@@ -1912,9 +2028,12 @@ class InterviewKandidatController extends Controller
                 return [
                     'success' => false,
                     'chat_id' => $chatId,
+                    'session_id_used_for_send' => $sessionId,
                     'response' => $json ?: $body,
                     'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
                         . $response->status()
+                        . '. Session yang dipakai: '
+                        . $sessionId
                         . '. Response: '
                         . ($body ?: json_encode($json)),
                 ];
@@ -1923,13 +2042,15 @@ class InterviewKandidatController extends Controller
             return [
                 'success' => true,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'response' => $json ?: $body,
                 'message' => 'Pesan berhasil dikirim melalui OpenWA.',
             ];
         } catch (\Throwable $e) {
             Log::error('OpenWA send interview message exception', [
                 'url' => $url,
-                'target' => $target,
+                'session_id_used_for_send' => $sessionId,
+                'target' => $normalizedTarget,
                 'chat_id' => $chatId,
                 'message' => $e->getMessage(),
             ]);
@@ -1937,6 +2058,7 @@ class InterviewKandidatController extends Controller
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'response' => null,
                 'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
             ];
@@ -1945,30 +2067,41 @@ class InterviewKandidatController extends Controller
 
     private function normalizeWhatsappNumber(?string $number): ?string
     {
-        if (!$number) {
+        if ($number === null) {
             return null;
         }
 
-        $number = preg_replace('/[^0-9]/', '', $number);
+        $number = trim($number);
 
-        if (!$number) {
+        // Hapus suffix WAHA seperti @c.us / @s.whatsapp.net / @lid.
+        $number = preg_replace('/@.*/', '', $number);
+
+        // Ambil hanya angka dan +.
+        $number = preg_replace('/[^0-9+]/', '', $number);
+
+        if ($number === '') {
             return null;
         }
 
-        if (str_starts_with($number, '0')) {
+        if (Str::startsWith($number, '+')) {
+            $number = substr($number, 1);
+        }
+
+        if (Str::startsWith($number, '0')) {
             $number = '62' . substr($number, 1);
         }
 
-        if (str_starts_with($number, '8')) {
+        if (Str::startsWith($number, '8')) {
             $number = '62' . $number;
         }
 
-        if (!str_starts_with($number, '62')) {
+        if (!preg_match('/^62[0-9]{8,15}$/', $number)) {
             return null;
         }
 
         return $number;
     }
+
 
     private function normalizeTokenApiWa(?string $token): ?string
     {

@@ -786,8 +786,10 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
 
     private function openWaBaseUrl(): string
     {
-        $url = rtrim((string) config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+        $url = rtrim((string) config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
 
+        // WAHA_URL boleh diisi domain utama atau sudah dengan /api.
+        // Helper ini memastikan URL final hanya punya satu /api.
         if (!str_ends_with($url, '/api')) {
             $url .= '/api';
         }
@@ -795,11 +797,25 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
         return $url;
     }
 
+    private function openWaSessionName(): ?string
+    {
+        $sessionName = trim((string) config('services.waha.session', env('WAHA_SESSION', 'rekruitment')));
+
+        return $sessionName !== '' ? $sessionName : null;
+    }
+
+    private function openWaSessionUuid(): ?string
+    {
+        $sessionUuid = trim((string) config('services.waha.session_id', env('WAHA_SESSION_ID', '')));
+
+        return $sessionUuid !== '' ? $sessionUuid : null;
+    }
+
     private function openWaSessionId(): ?string
     {
-        $session = trim((string) config('services.waha.session', env('WAHA_SESSION', '')));
-
-        return $session !== '' ? $session : null;
+        // Untuk endpoint kirim pesan, gunakan UUID WAHA_SESSION_ID.
+        // Jika kosong, fallback ke nama session agar tidak memutus konfigurasi lama.
+        return $this->openWaSessionUuid() ?: $this->openWaSessionName();
     }
 
     private function openWaHeaders(): array
@@ -812,7 +828,8 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
         ];
 
         if ($apiKey !== '') {
-            $headers['X-API-Key'] = $apiKey;
+            // WAHA memakai X-Api-Key. Hindari X-API-Key agar konsisten dengan controller lain.
+            $headers['X-Api-Key'] = $apiKey;
         }
 
         return $headers;
@@ -820,20 +837,26 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
 
     private function checkOpenWaSessionForSending(): array
     {
-        $sessionId = $this->openWaSessionId();
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionName = $this->openWaSessionName();
+        $sessionUuid = $this->openWaSessionUuid();
+        $sendSessionId = $this->openWaSessionId();
 
-        if (!$sessionId) {
+        if (!$sessionName && !$sessionUuid) {
             return [
                 'success' => false,
                 'session' => null,
+                'session_name' => null,
+                'session_id' => null,
+                'send_session_id' => null,
                 'status' => 'error',
-                'message' => 'WAHA_SESSION belum diatur di file .env.',
+                'message' => 'WAHA_SESSION / WAHA_SESSION_ID belum diatur di file .env.',
                 'device_number' => null,
                 'device_status' => null,
             ];
         }
 
-        $url = $this->openWaBaseUrl() . '/sessions/' . rawurlencode($sessionId);
+        $url = $baseUrl . '/sessions';
 
         try {
             $response = Http::withoutVerifying()
@@ -846,6 +869,9 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
 
             Log::info('OpenWA session check Offering Letter', [
                 'url' => $url,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionUuid,
+                'send_session_id' => $sendSessionId,
                 'http_code' => $response->status(),
                 'response_json' => $json,
                 'response_body' => $body,
@@ -854,7 +880,10 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName ?: $sendSessionId,
+                    'session_name' => $sessionName,
+                    'session_id' => $sessionUuid,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'error',
                     'message' => 'Gagal mengecek session OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . ($body ?: json_encode($json)),
                     'device_number' => null,
@@ -863,8 +892,30 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
                 ];
             }
 
-            $sessionData = is_array($json) ? $json : [];
-            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $sessionData = $this->extractOpenWaSessionData($json, $sessionName, $sessionUuid);
+
+            if (empty($sessionData)) {
+                return [
+                    'success' => false,
+                    'session' => $sessionName ?: $sendSessionId,
+                    'session_name' => $sessionName,
+                    'session_id' => $sessionUuid,
+                    'send_session_id' => $sendSessionId,
+                    'status' => 'not_found',
+                    'message' => 'Session OpenWA tidak ditemukan. Pastikan WAHA_SESSION adalah nama session dan WAHA_SESSION_ID adalah UUID session.',
+                    'device_number' => null,
+                    'device_status' => null,
+                    'openwa_response' => $json,
+                ];
+            }
+
+            $deviceStatus = strtolower((string) (
+                $sessionData['status']
+                ?? $sessionData['device_status']
+                ?? $sessionData['state']
+                ?? $sessionData['engine']['state']
+                ?? ''
+            ));
             $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
 
             $isConnected = in_array($deviceStatus, [
@@ -878,7 +929,10 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
             if (!$isConnected) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName ?: $sendSessionId,
+                    'session_name' => $sessionName,
+                    'session_id' => $sessionUuid,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'disconnected',
                     'message' => 'Session OpenWA belum ready. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
@@ -889,7 +943,10 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
 
             return [
                 'success' => true,
-                'session' => $sessionId,
+                'session' => $sessionName ?: $sendSessionId,
+                'session_name' => $sessionName,
+                'session_id' => $sessionUuid,
+                'send_session_id' => $sendSessionId,
                 'status' => 'connected',
                 'message' => 'Session OpenWA ready.',
                 'device_number' => $deviceNumber,
@@ -899,12 +956,18 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
         } catch (\Throwable $e) {
             Log::error('Gagal mengecek session OpenWA Offering Letter', [
                 'url' => $url,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionUuid,
+                'send_session_id' => $sendSessionId,
                 'message' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
-                'session' => $sessionId,
+                'session' => $sessionName ?: $sendSessionId,
+                'session_name' => $sessionName,
+                'session_id' => $sessionUuid,
+                'send_session_id' => $sendSessionId,
                 'status' => 'error',
                 'message' => 'Gagal mengecek session OpenWA: ' . $e->getMessage(),
                 'device_number' => null,
@@ -922,9 +985,10 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => null,
                 'http_code' => null,
                 'response' => null,
-                'message' => 'WAHA_SESSION belum diatur di file .env.',
+                'message' => 'WAHA_SESSION_ID / WAHA_SESSION belum diatur di file .env.',
             ];
         }
 
@@ -945,6 +1009,11 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
 
             Log::info('OpenWA send Offering Letter message', [
                 'url' => $url,
+                'target' => $target,
+                'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
+                'session_name_env' => $this->openWaSessionName(),
+                'session_id_env' => $this->openWaSessionUuid(),
                 'payload' => $payload,
                 'http_code' => $response->status(),
                 'response_json' => $json,
@@ -955,15 +1024,17 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
                 return [
                     'success' => false,
                     'chat_id' => $chatId,
+                    'session_id_used_for_send' => $sessionId,
                     'http_code' => $response->status(),
                     'response' => $json ?: $body,
-                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: ' . $response->status() . '. Response: ' . ($body ?: json_encode($json)),
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: ' . $response->status() . '. Session yang dipakai: ' . $sessionId . '. Response: ' . ($body ?: json_encode($json)),
                 ];
             }
 
             return [
                 'success' => true,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'http_code' => $response->status(),
                 'response' => $json ?: $body,
                 'message' => 'Pesan berhasil dikirim melalui OpenWA.',
@@ -973,12 +1044,14 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
                 'url' => $url,
                 'target' => $target,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'message' => $e->getMessage(),
             ]);
 
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'http_code' => null,
                 'response' => null,
                 'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
@@ -986,13 +1059,48 @@ private function getDataKandidatUntukWa(?HasilReviewManagement $review): ?object
         }
     }
 
+    private function extractOpenWaSessionData($json, ?string $sessionName = null, ?string $sessionUuid = null): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $itemName = $item['name'] ?? null;
+                $itemSession = $item['session'] ?? null;
+                $itemId = $item['id'] ?? null;
+                $itemSessionId = $item['sessionId'] ?? null;
+                $itemUuid = $item['uuid'] ?? null;
+
+                if (
+                    ($sessionName && ($itemName === $sessionName || $itemSession === $sessionName)) ||
+                    ($sessionUuid && ($itemId === $sessionUuid || $itemSessionId === $sessionUuid || $itemUuid === $sessionUuid || $itemSession === $sessionUuid))
+                ) {
+                    return $item;
+                }
+            }
+
+            return [];
+        }
+
+        if (is_array($json)) {
+            return $json;
+        }
+
+        return [];
+    }
+
     private function extractOpenWaPhoneNumber(array $sessionData): ?string
     {
         $candidates = [
             $sessionData['phone'] ?? null,
             $sessionData['phoneNumber'] ?? null,
+            $sessionData['phone_number'] ?? null,
             $sessionData['me']['id'] ?? null,
             $sessionData['me']['user'] ?? null,
+            $sessionData['me']['number'] ?? null,
+            $sessionData['me']['phone'] ?? null,
             $sessionData['me']['wid']['user'] ?? null,
             $sessionData['account']['id'] ?? null,
             $sessionData['account']['user'] ?? null,

@@ -942,8 +942,12 @@ class JadwalTestZoomController extends Controller
 
     private function openWaBaseUrl(): string
     {
-        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
 
+        // WAHA_URL boleh diisi:
+        // - https://wa.blast.dsicorp.id
+        // - https://wa.blast.dsicorp.id/api
+        // Function ini memastikan hasil akhirnya hanya memiliki satu /api.
         if (!Str::endsWith($url, '/api')) {
             $url .= '/api';
         }
@@ -951,40 +955,65 @@ class JadwalTestZoomController extends Controller
         return $url;
     }
 
-   private function wahaHeaders(): array
-{
-    $apiKey = config('services.waha.api_key') ?: env('WAHA_API_KEY');
-
-    $headers = [
-        'Accept' => 'application/json',
-        'Content-Type' => 'application/json',
-    ];
-
-    if (!empty($apiKey)) {
-        $headers['X-API-Key'] = $apiKey;
+    private function wahaSessionName(): string
+    {
+        return (string) (config('services.waha.session') ?: env('WAHA_SESSION', 'rekruitment'));
     }
 
-    return $headers;
-}
+    private function wahaSessionId(): ?string
+    {
+        $sessionId = config('services.waha.session_id') ?: env('WAHA_SESSION_ID');
+
+        return $sessionId ? (string) $sessionId : null;
+    }
+
+    private function wahaSendSessionId(): string
+    {
+        // Untuk endpoint kirim pesan OpenWA/WAHA, gunakan UUID session jika tersedia.
+        // Ini menghindari error: Session 'rekruitment' is not active.
+        return $this->wahaSessionId() ?: $this->wahaSessionName();
+    }
+
+    private function wahaHeaders(): array
+    {
+        $apiKey = config('services.waha.api_key') ?: env('WAHA_API_KEY');
+
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
+
+        if (!empty($apiKey)) {
+            $headers['X-Api-Key'] = $apiKey;
+        }
+
+        return $headers;
+    }
 
     private function checkOpenWaSessionForSending(): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
+        $sessionName = $this->wahaSessionName();
+        $sessionId = $this->wahaSessionId();
+        $sendSessionId = $this->wahaSendSessionId();
 
-        if (!$sessionId) {
+        if (!$sessionName && !$sessionId) {
             return [
                 'success' => false,
                 'session' => null,
+                'session_id' => null,
+                'send_session_id' => null,
                 'status' => 'error',
-                'message' => 'WAHA_SESSION belum diisi. Isi dengan ID session OpenWA, contoh: 1d88bca0-94f3-4d50-8af6-7c4ef719de7c.',
+                'message' => 'WAHA_SESSION atau WAHA_SESSION_ID belum diisi.',
                 'device_number' => null,
                 'device_status' => null,
             ];
         }
 
         try {
-            $url = $baseUrl . '/sessions/' . urlencode($sessionId);
+            // Ambil semua session agar bisa dicocokkan berdasarkan name "rekruitment"
+            // maupun UUID "WAHA_SESSION_ID".
+            $url = $baseUrl . '/sessions';
 
             $response = Http::withoutVerifying()
                 ->withHeaders($this->wahaHeaders())
@@ -996,6 +1025,9 @@ class JadwalTestZoomController extends Controller
 
             Log::info('OpenWA session check jadwal Zoom', [
                 'url' => $url,
+                'session_name_env' => $sessionName,
+                'session_id_env' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'http_code' => $response->status(),
                 'response_json' => $json,
                 'response_body' => $body,
@@ -1004,7 +1036,9 @@ class JadwalTestZoomController extends Controller
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'error',
                     'message' => 'Gagal mengecek session OpenWA. URL: ' . $url . '. HTTP Code: ' . $response->status(),
                     'device_number' => null,
@@ -1013,21 +1047,30 @@ class JadwalTestZoomController extends Controller
                 ];
             }
 
-            $sessionData = is_array($json) ? $json : [];
+            $sessionData = $this->extractOpenWaSessionData($json, $sessionName, $sessionId);
 
             if (empty($sessionData)) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'not_found',
-                    'message' => 'Session OpenWA tidak ditemukan.',
+                    'message' => 'Session OpenWA tidak ditemukan. Pastikan WAHA_SESSION berisi nama session dan WAHA_SESSION_ID berisi UUID session.',
                     'device_number' => null,
                     'device_status' => null,
                     'waha_response' => $json,
                 ];
             }
 
-            $deviceStatus = strtolower((string) ($sessionData['status'] ?? ''));
+            $deviceStatus = strtolower((string) (
+                $sessionData['status']
+                ?? $sessionData['device_status']
+                ?? $sessionData['state']
+                ?? $sessionData['engine']['state']
+                ?? ''
+            ));
+
             $deviceNumber = $this->extractOpenWaPhoneNumber($sessionData);
 
             $isConnected = in_array($deviceStatus, [
@@ -1041,7 +1084,9 @@ class JadwalTestZoomController extends Controller
             if (!$isConnected) {
                 return [
                     'success' => false,
-                    'session' => $sessionId,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'disconnected',
                     'message' => 'Session OpenWA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
@@ -1052,7 +1097,9 @@ class JadwalTestZoomController extends Controller
 
             return [
                 'success' => true,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'connected',
                 'message' => 'Session OpenWA sudah connect.',
                 'device_number' => $deviceNumber,
@@ -1062,7 +1109,9 @@ class JadwalTestZoomController extends Controller
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'session' => $sessionId,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'error',
                 'message' => 'Gagal memvalidasi OpenWA: ' . $e->getMessage(),
                 'device_number' => null,
@@ -1074,9 +1123,9 @@ class JadwalTestZoomController extends Controller
     private function sendOpenWaText(string $target, string $message): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $sessionId = config('services.waha.session', env('WAHA_SESSION'));
+        $sessionId = $this->wahaSendSessionId();
         $chatId = $target . '@c.us';
-        $url = $baseUrl . '/sessions/' . urlencode((string) $sessionId) . '/messages/send-text';
+        $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
 
         $payload = [
             'chatId' => $chatId,
@@ -1094,6 +1143,9 @@ class JadwalTestZoomController extends Controller
 
             Log::info('OpenWA send jadwal Zoom response', [
                 'url' => $url,
+                'session_id_used_for_send' => $sessionId,
+                'session_name_env' => $this->wahaSessionName(),
+                'session_id_env' => $this->wahaSessionId(),
                 'payload' => $payload,
                 'http_code' => $response->status(),
                 'response_json' => $json,
@@ -1104,9 +1156,12 @@ class JadwalTestZoomController extends Controller
                 return [
                     'success' => false,
                     'chat_id' => $chatId,
+                    'session_id_used_for_send' => $sessionId,
                     'response' => $json ?: $body,
                     'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
                         . $response->status()
+                        . '. Session yang dipakai: '
+                        . $sessionId
                         . '. Response: '
                         . ($body ?: json_encode($json)),
                 ];
@@ -1115,12 +1170,14 @@ class JadwalTestZoomController extends Controller
             return [
                 'success' => true,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'response' => $json ?: $body,
                 'message' => 'Pesan berhasil dikirim melalui OpenWA.',
             ];
         } catch (\Throwable $e) {
             Log::error('OpenWA send jadwal Zoom exception', [
                 'url' => $url,
+                'session_id_used_for_send' => $sessionId,
                 'target' => $target,
                 'chat_id' => $chatId,
                 'message' => $e->getMessage(),
@@ -1129,10 +1186,46 @@ class JadwalTestZoomController extends Controller
             return [
                 'success' => false,
                 'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
                 'response' => null,
                 'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
             ];
         }
+    }
+
+    private function extractOpenWaSessionData($json, string $sessionName, ?string $sessionId = null): array
+    {
+        if (is_array($json) && array_is_list($json)) {
+            foreach ($json as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $itemName = $item['name'] ?? null;
+                $itemSession = $item['session'] ?? null;
+                $itemId = $item['id'] ?? null;
+                $itemSessionId = $item['sessionId'] ?? null;
+                $itemUuid = $item['uuid'] ?? null;
+
+                if (
+                    $itemName === $sessionName ||
+                    $itemSession === $sessionName ||
+                    ($sessionId && $itemId === $sessionId) ||
+                    ($sessionId && $itemSessionId === $sessionId) ||
+                    ($sessionId && $itemUuid === $sessionId)
+                ) {
+                    return $item;
+                }
+            }
+
+            return [];
+        }
+
+        if (is_array($json)) {
+            return $json;
+        }
+
+        return [];
     }
 
     private function extractOpenWaPhoneNumber(array $sessionData): ?string
@@ -1183,6 +1276,11 @@ class JadwalTestZoomController extends Controller
         }
 
         $number = trim($number);
+
+        // Hapus suffix dari WAHA/OpenWA seperti @c.us.
+        $number = preg_replace('/@.*/', '', $number);
+
+        // Ambil angka dan tanda + saja.
         $number = preg_replace('/[^0-9+]/', '', $number);
 
         if ($number === '') {
@@ -1207,6 +1305,7 @@ class JadwalTestZoomController extends Controller
 
         return $number;
     }
+
 
 
     private function scopedPelamarQuery()
