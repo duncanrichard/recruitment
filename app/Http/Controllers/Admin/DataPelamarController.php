@@ -1367,9 +1367,11 @@ class DataPelamarController extends Controller
 
     private function openWaBaseUrl(): string
     {
-        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id/api')), '/');
+        $url = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
 
-        // WAHA_URL boleh diisi https://domain atau https://domain/api.
+        // WAHA_URL boleh diisi:
+        // - https://wa.blast.dsicorp.id
+        // - https://wa.blast.dsicorp.id/api
         // Helper ini memastikan base URL final hanya punya satu /api.
         if (!Str::endsWith($url, '/api')) {
             $url .= '/api';
@@ -1378,76 +1380,104 @@ class DataPelamarController extends Controller
         return $url;
     }
 
-   private function sendWahaText(string $target, string $message): array
-{
-    $baseUrl = $this->openWaBaseUrl();
-    $sessionId = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+    private function wahaSessionName(): string
+    {
+        return (string) config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+    }
 
-    $chatId = $target . '@c.us';
+    private function wahaSessionId(): ?string
+    {
+        $sessionId = config('services.waha.session_id', env('WAHA_SESSION_ID'));
 
-    $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
+        return $sessionId ? (string) $sessionId : null;
+    }
 
-    $payload = [
-        'chatId' => $chatId,
-        'text' => $message,
-    ];
+    private function wahaSendSessionId(): string
+    {
+        // Untuk kirim pesan, OpenWA Anda membutuhkan Session ID UUID.
+        // Kalau WAHA_SESSION_ID kosong, baru fallback ke WAHA_SESSION.
+        return $this->wahaSessionId() ?: $this->wahaSessionName();
+    }
 
-    try {
-        $response = Http::withoutVerifying()
-            ->withHeaders($this->wahaHeaders())
-            ->timeout(60)
-            ->post($url, $payload);
+    private function sendWahaText(string $target, string $message): array
+    {
+        $baseUrl = $this->openWaBaseUrl();
+        $sessionId = $this->wahaSendSessionId();
+        $chatId = $target . '@c.us';
+        $url = $baseUrl . '/sessions/' . urlencode($sessionId) . '/messages/send-text';
 
-        $body = $response->body();
-        $json = $response->json();
+        $payload = [
+            'chatId' => $chatId,
+            'text' => $message,
+        ];
 
-        Log::info('OpenWA send text response', [
-            'url' => $url,
-            'payload' => $payload,
-            'http_code' => $response->status(),
-            'response_json' => $json,
-            'response_body' => $body,
-        ]);
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders($this->wahaHeaders())
+                ->timeout(60)
+                ->post($url, $payload);
 
-        if (!$response->successful()) {
+            $body = $response->body();
+            $json = $response->json();
+
+            Log::info('OpenWA send text response', [
+                'url' => $url,
+                'session_id_used_for_send' => $sessionId,
+                'session_name_env' => $this->wahaSessionName(),
+                'session_id_env' => $this->wahaSessionId(),
+                'payload' => $payload,
+                'http_code' => $response->status(),
+                'response_json' => $json,
+                'response_body' => $body,
+            ]);
+
+            if (!$response->successful()) {
+                return [
+                    'success' => false,
+                    'chat_id' => $chatId,
+                    'session_id_used_for_send' => $sessionId,
+                    'response' => $json ?: $body,
+                    'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
+                        . $response->status()
+                        . '. Session yang dipakai: '
+                        . $sessionId
+                        . '. Response: '
+                        . ($body ?: json_encode($json)),
+                ];
+            }
+
+            return [
+                'success' => true,
+                'chat_id' => $chatId,
+                'session_id_used_for_send' => $sessionId,
+                'response' => $json ?: $body,
+                'message' => 'Pesan berhasil dikirim melalui OpenWA.',
+            ];
+        } catch (\Throwable $e) {
+            Log::error('OpenWA send text exception', [
+                'url' => $url,
+                'session_id_used_for_send' => $sessionId,
+                'target' => $target,
+                'chat_id' => $chatId,
+                'message' => $e->getMessage(),
+            ]);
+
             return [
                 'success' => false,
                 'chat_id' => $chatId,
-                'response' => $json ?: $body,
-                'message' => 'Gagal mengirim pesan melalui OpenWA. HTTP Code: '
-                    . $response->status()
-                    . '. Response: '
-                    . ($body ?: json_encode($json)),
+                'session_id_used_for_send' => $sessionId,
+                'response' => null,
+                'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
             ];
         }
-
-        return [
-            'success' => true,
-            'chat_id' => $chatId,
-            'response' => $json ?: $body,
-            'message' => 'Pesan berhasil dikirim melalui OpenWA.',
-        ];
-    } catch (\Throwable $e) {
-        Log::error('OpenWA send text exception', [
-            'url' => $url,
-            'target' => $target,
-            'chat_id' => $chatId,
-            'message' => $e->getMessage(),
-        ]);
-
-        return [
-            'success' => false,
-            'chat_id' => $chatId,
-            'response' => null,
-            'message' => 'Gagal mengirim pesan melalui OpenWA: ' . $e->getMessage(),
-        ];
     }
-}
 
     private function checkWahaSessionForSending(): array
     {
         $baseUrl = $this->openWaBaseUrl();
-        $session = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
+        $sessionName = $this->wahaSessionName();
+        $sessionId = $this->wahaSessionId();
+        $sendSessionId = $this->wahaSendSessionId();
 
         try {
             $response = Http::withoutVerifying()
@@ -1460,7 +1490,9 @@ class DataPelamarController extends Controller
             if (!$response->successful()) {
                 return [
                     'success' => false,
-                    'session' => $session,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'error',
                     'message' => 'Gagal mengecek session WAHA. URL: ' . $baseUrl . '/sessions. HTTP Code: ' . $response->status(),
                     'device_number' => null,
@@ -1469,21 +1501,30 @@ class DataPelamarController extends Controller
                 ];
             }
 
-            $sessionData = $this->extractWahaSessionData($json, $session);
+            $sessionData = $this->extractWahaSessionData($json, $sessionName, $sessionId);
 
             if (empty($sessionData)) {
                 return [
                     'success' => false,
-                    'session' => $session,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'not_found',
-                    'message' => 'Session WAHA "' . $session . '" tidak ditemukan. Pastikan WAHA_SESSION sama dengan nama session di OpenWA.',
+                    'message' => 'Session WAHA tidak ditemukan. Pastikan WAHA_SESSION = nama session dan WAHA_SESSION_ID = UUID session OpenWA.',
                     'device_number' => null,
                     'device_status' => null,
                     'waha_response' => $json,
                 ];
             }
 
-            $deviceStatus = strtolower((string) ($sessionData['status'] ?? $sessionData['device_status'] ?? ''));
+            $deviceStatus = strtolower((string) (
+                $sessionData['status']
+                ?? $sessionData['device_status']
+                ?? $sessionData['state']
+                ?? $sessionData['engine']['state']
+                ?? ''
+            ));
+
             $deviceNumber = $this->extractWahaPhoneNumber($sessionData);
 
             $isConnected = in_array($deviceStatus, [
@@ -1497,7 +1538,9 @@ class DataPelamarController extends Controller
             if (!$isConnected) {
                 return [
                     'success' => false,
-                    'session' => $session,
+                    'session' => $sessionName,
+                    'session_id' => $sessionId,
+                    'send_session_id' => $sendSessionId,
                     'status' => 'disconnected',
                     'message' => 'Session WAHA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
                     'device_number' => $deviceNumber,
@@ -1508,7 +1551,9 @@ class DataPelamarController extends Controller
 
             return [
                 'success' => true,
-                'session' => $session,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'connected',
                 'message' => 'Session WAHA sudah connect.',
                 'device_number' => $deviceNumber,
@@ -1518,7 +1563,9 @@ class DataPelamarController extends Controller
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'session' => $session,
+                'session' => $sessionName,
+                'session_id' => $sessionId,
+                'send_session_id' => $sendSessionId,
                 'status' => 'error',
                 'message' => 'Gagal memvalidasi WAHA: ' . $e->getMessage(),
                 'device_number' => null,
@@ -1526,7 +1573,6 @@ class DataPelamarController extends Controller
             ];
         }
     }
-
 
     private function wahaHeaders(): array
     {
@@ -1544,7 +1590,7 @@ class DataPelamarController extends Controller
         return $headers;
     }
 
-    private function extractWahaSessionData($json, string $session): array
+    private function extractWahaSessionData($json, string $sessionName, ?string $sessionId = null): array
     {
         if (is_array($json) && array_is_list($json)) {
             foreach ($json as $item) {
@@ -1552,12 +1598,24 @@ class DataPelamarController extends Controller
                     continue;
                 }
 
-                if (($item['name'] ?? null) === $session || ($item['session'] ?? null) === $session) {
+                $itemName = $item['name'] ?? null;
+                $itemSession = $item['session'] ?? null;
+                $itemId = $item['id'] ?? null;
+                $itemSessionId = $item['sessionId'] ?? null;
+                $itemUuid = $item['uuid'] ?? null;
+
+                if (
+                    $itemName === $sessionName ||
+                    $itemSession === $sessionName ||
+                    ($sessionId && $itemId === $sessionId) ||
+                    ($sessionId && $itemSessionId === $sessionId) ||
+                    ($sessionId && $itemUuid === $sessionId)
+                ) {
                     return $item;
                 }
             }
 
-            return is_array($json[0] ?? null) ? $json[0] : [];
+            return [];
         }
 
         return is_array($json) ? $json : [];
