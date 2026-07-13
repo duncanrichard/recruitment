@@ -110,19 +110,30 @@ class DataRiwayatDiri extends Model
                 $model->token = self::generateToken();
             }
 
-            if (Schema::hasColumn($model->getTable(), 'created_by') && empty($model->created_by) && Auth::check()) {
+            if (
+                Schema::hasColumn($model->getTable(), 'created_by')
+                && empty($model->created_by)
+                && Auth::check()
+            ) {
                 $model->created_by = Auth::user()?->uuid;
             }
         });
 
         static::updating(function ($model) {
-            if (Schema::hasColumn($model->getTable(), 'updated_by') && Auth::check()) {
+            if (
+                Schema::hasColumn($model->getTable(), 'updated_by')
+                && Auth::check()
+            ) {
                 $model->updated_by = Auth::user()?->uuid;
             }
         });
 
         static::deleting(function ($model) {
-            if (! $model->isForceDeleting() && Schema::hasColumn($model->getTable(), 'deleted_by') && Auth::check()) {
+            if (
+                ! $model->isForceDeleting()
+                && Schema::hasColumn($model->getTable(), 'deleted_by')
+                && Auth::check()
+            ) {
                 $model->deleted_by = Auth::user()?->uuid;
                 $model->saveQuietly();
             }
@@ -132,36 +143,155 @@ class DataRiwayatDiri extends Model
     public static function generateToken(): string
     {
         do {
-            $token = 'KND-' . now()->format('Ymd-His') . '-' . strtoupper(Str::random(6));
-        } while (self::where('token', $token)->exists());
+            $token = 'KND-'
+                . now()->format('Ymd-His')
+                . '-'
+                . strtoupper(Str::random(6));
+        } while (self::query()->where('token', $token)->exists());
 
         return $token;
     }
 
-    public function posisi(): BelongsTo { return $this->belongsTo(Posisi::class, 'posisi_yang_dilamar', 'id'); }
-    public function perusahaan(): BelongsTo { return $this->belongsTo(DataPerusahaan::class, 'perusahaan_dilamar', 'id'); }
-    public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by', 'uuid'); }
-    public function createdBy(): BelongsTo { return $this->belongsTo(User::class, 'created_by', 'uuid'); }
-    public function updatedBy(): BelongsTo { return $this->belongsTo(User::class, 'updated_by', 'uuid'); }
-    public function deletedBy(): BelongsTo { return $this->belongsTo(User::class, 'deleted_by', 'uuid'); }
-    public function pendidikan(): BelongsTo { return $this->belongsTo(Pendidikan::class, 'pendidikan_id', 'id'); }
-    public function agama(): BelongsTo { return $this->belongsTo(Agama::class, 'agama_id', 'id'); }
-    public function kewarganegaraan(): BelongsTo { return $this->belongsTo(Kewarganegaraan::class, 'kewarganegaraan_id', 'id'); }
-    public function statusPernikahan(): BelongsTo { return $this->belongsTo(StatusPernikahan::class, 'status_pernikahan_id', 'id'); }
-    public function sumberInformasi(): BelongsTo { return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id'); }
-    public function provinsi(): BelongsTo { return $this->belongsTo(Provinsi::class, 'provinsi_id', 'id'); }
-    public function kabupaten(): BelongsTo { return $this->belongsTo(Kabupaten::class, 'kabupaten_id', 'id'); }
-    public function kecamatan(): BelongsTo { return $this->belongsTo(Kecamatan::class, 'kecamatan_id', 'id'); }
-    public function kelurahan(): BelongsTo { return $this->belongsTo(Kelurahan::class, 'kelurahan_id', 'id'); }
+    public function posisi(): BelongsTo
+    {
+        return $this->belongsTo(Posisi::class, 'posisi_yang_dilamar', 'id');
+    }
 
-    public function sosialMedia(): HasMany { return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id'); }
-    public function riwayatKeluarga(): HasOne { return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id'); }
-    public function saudaraKandung(): HasMany { return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id'); }
-    public function saudaraIpar(): HasMany { return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id'); }
-    public function riwayatKesehatan(): HasOne { return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id'); }
-    public function riwayatPekerjaan(): HasMany { return $this->hasMany(DataRiwayatPekerjaan::class, 'data_riwayat_diri_id', 'id'); }
-    public function kesiapanBekerja(): HasOne { return $this->hasOne(DataKesiapanBekerja::class, 'data_riwayat_diri_id', 'id'); }
-    public function jadwalTestZoom(): HasOne { return $this->hasOne(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')->orderByDesc('jadwal'); }
-    public function jadwalTestZooms(): HasMany { return $this->hasMany(JadwalTestZoom::class, 'data_riwayat_diri_id', 'id')->orderByDesc('jadwal'); }
-    public function jadwalInterviewKandidat(): HasMany { return $this->hasMany(JadwalInterviewKandidat::class, 'data_riwayat_diri_id', 'id'); }
+    public function perusahaan(): BelongsTo
+    {
+        return $this->belongsTo(DataPerusahaan::class, 'perusahaan_dilamar', 'id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by', 'uuid');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by', 'uuid');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'uuid');
+    }
+
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deleted_by', 'uuid');
+    }
+
+    public function pendidikan(): BelongsTo
+    {
+        return $this->belongsTo(Pendidikan::class, 'pendidikan_id', 'id');
+    }
+
+    public function agama(): BelongsTo
+    {
+        return $this->belongsTo(Agama::class, 'agama_id', 'id');
+    }
+
+    public function kewarganegaraan(): BelongsTo
+    {
+        return $this->belongsTo(Kewarganegaraan::class, 'kewarganegaraan_id', 'id');
+    }
+
+    public function statusPernikahan(): BelongsTo
+    {
+        return $this->belongsTo(StatusPernikahan::class, 'status_pernikahan_id', 'id');
+    }
+
+    public function sumberInformasi(): BelongsTo
+    {
+        return $this->belongsTo(SumberInformasi::class, 'sumber_informasi_id', 'id');
+    }
+
+    public function provinsi(): BelongsTo
+    {
+        return $this->belongsTo(Provinsi::class, 'provinsi_id', 'id');
+    }
+
+    public function kabupaten(): BelongsTo
+    {
+        return $this->belongsTo(Kabupaten::class, 'kabupaten_id', 'id');
+    }
+
+    public function kecamatan(): BelongsTo
+    {
+        return $this->belongsTo(Kecamatan::class, 'kecamatan_id', 'id');
+    }
+
+    public function kelurahan(): BelongsTo
+    {
+        return $this->belongsTo(Kelurahan::class, 'kelurahan_id', 'id');
+    }
+
+    public function sosialMedia(): HasMany
+    {
+        return $this->hasMany(SosialMedia::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function riwayatKeluarga(): HasOne
+    {
+        return $this->hasOne(DataRiwayatKeluarga::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function saudaraKandung(): HasMany
+    {
+        return $this->hasMany(DataSaudaraKandung::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function saudaraIpar(): HasMany
+    {
+        return $this->hasMany(DataSaudaraIpar::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function riwayatKesehatan(): HasOne
+    {
+        return $this->hasOne(DataRiwayatKesehatan::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function riwayatPekerjaan(): HasMany
+    {
+        return $this->hasMany(DataRiwayatPekerjaan::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    public function kesiapanBekerja(): HasOne
+    {
+        return $this->hasOne(DataKesiapanBekerja::class, 'data_riwayat_diri_id', 'id');
+    }
+
+    /**
+     * Jadwal Zoom terbaru.
+     *
+     * Jangan gunakan latestOfMany() atau ofMany() karena primary key `id`
+     * bertipe UUID dan PostgreSQL tidak mendukung fungsi MAX(uuid).
+     */
+    public function jadwalTestZoom(): HasOne
+    {
+        return $this->hasOne(
+            JadwalTestZoom::class,
+            'data_riwayat_diri_id',
+            'id'
+        )->orderByDesc('jadwal');
+    }
+
+    public function jadwalTestZooms(): HasMany
+    {
+        return $this->hasMany(
+            JadwalTestZoom::class,
+            'data_riwayat_diri_id',
+            'id'
+        )->orderByDesc('jadwal');
+    }
+
+    public function jadwalInterviewKandidat(): HasMany
+    {
+        return $this->hasMany(
+            JadwalInterviewKandidat::class,
+            'data_riwayat_diri_id',
+            'id'
+        );
+    }
 }
