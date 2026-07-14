@@ -21,6 +21,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
         kode: "",
         nama_perusahaan: "",
         no_wa: "",
+        token_api_wa: "",
     });
 
     const currentSignal = actionSignals?.masterPerusahaan || 0;
@@ -39,6 +40,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             kode: "",
             nama_perusahaan: "",
             no_wa: "",
+            token_api_wa: "",
         });
     };
 
@@ -218,6 +220,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             kode: item.kode || "",
             nama_perusahaan: item.nama_perusahaan || "",
             no_wa: item.no_wa || "",
+            token_api_wa: "",
         });
 
         setModalOpen(true);
@@ -237,6 +240,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const payload = {
                 nama_perusahaan: form.nama_perusahaan,
                 no_wa: form.no_wa,
+                token_api_wa: form.token_api_wa,
             };
 
             const response = await fetch(url, {
@@ -333,7 +337,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
 
         try {
             const response = await fetch(
-                `/admin/master-data/perusahaan/${item.id}/validasi-wa`,
+                `/admin/master-data/perusahaan/${item.id}/validasi-fonnte`,
                 {
                     method: "POST",
                     credentials: "same-origin",
@@ -348,7 +352,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             const result = await parseJsonResponse(response);
 
             if (!response.ok || !result.success) {
-                alert(result.message || "WAHA belum valid atau belum connect.");
+                alert(result.message || "Token Fonnte tidak valid atau device belum connect.");
                 fetchData();
                 return;
             }
@@ -359,15 +363,15 @@ export default function DataPerusahaanPage({ actionSignals }) {
 ` +
                     `Nomor database: ${result?.data?.nomor_database || "-"}
 ` +
-                    `Nomor WAHA: ${result?.data?.nomor_device || "-"}
+                    `Nomor Fonnte: ${result?.data?.nomor_device || "-"}
 ` +
-                    `Status WAHA: ${result?.data?.device_status || "-"}`
+                    `Status Fonnte: ${result?.data?.device_status || "-"}`
             );
 
             fetchData();
         } catch (error) {
-            console.error("Gagal validasi WAHA:", error);
-            alert("Terjadi kesalahan saat validasi WAHA.");
+            console.error("Gagal validasi Fonnte:", error);
+            alert("Terjadi kesalahan saat validasi Fonnte.");
         } finally {
             setValidatingId(null);
         }
@@ -413,7 +417,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         </h1>
 
                         <p className="mt-1 text-sm font-medium text-slate-500">
-                            Kelola daftar perusahaan dan nomor WhatsApp yang terhubung ke WAHA.
+                            Kelola perusahaan, nomor WhatsApp, dan token API Fonnte.
                         </p>
                     </div>
 
@@ -465,7 +469,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 type="text"
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Cari kode, nama, nomor, atau status WAHA..."
+                                placeholder="Cari kode, nama, nomor, atau status Fonnte..."
                                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
                             />
                         </div>
@@ -499,7 +503,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     icon={sortIcon("no_wa")}
                                 />
 
-                                <TableHead>Status WAHA</TableHead>
+                                <TableHead>Status Fonnte</TableHead>
 
                                 <TableHead align="right">Aksi</TableHead>
                             </tr>
@@ -555,8 +559,8 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                                     className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     {validatingId === item.id
-                                                        ? "Cek WAHA..."
-                                                        : "Cek WAHA"}
+                                                        ? "Cek Fonnte..."
+                                                        : "Cek Fonnte"}
                                                 </button>
 
                                                 <button
@@ -673,7 +677,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Kode dibuat otomatis oleh sistem. Lengkapi nama perusahaan dan nomor WhatsApp.
+                                        Kode dibuat otomatis. Lengkapi nama perusahaan, nomor WhatsApp, dan token API Fonnte.
                                     </p>
                                 </div>
 
@@ -729,6 +733,25 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     placeholder="Contoh: 081234567890"
                                     required
                                 />
+
+                                <div className="md:col-span-2">
+                                    <Input
+                                    label="Token API Fonnte"
+                                    name="token_api_wa"
+                                    type="password"
+                                    value={form.token_api_wa}
+                                    onChange={handleChange}
+                                    placeholder={
+                                        editId
+                                            ? "Kosongkan jika token tidak berubah"
+                                            : "Tempel token dari dashboard Fonnte"
+                                    }
+                                    required={!editId}
+                                    />
+                                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                                        Token disimpan di server dan tidak ditampilkan kembali. Saat edit, kosongkan kolom jika token tidak berubah.
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\MasterData;
 
 use App\Http\Controllers\Controller;
 use App\Models\DataPerusahaan;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,21 +17,17 @@ class DataPerusahaanController extends Controller
 {
     public function list(): JsonResponse
     {
-        $wahaStatus = $this->checkWahaSession();
-
         $data = DataPerusahaan::query()
-            ->orderBy('nama_perusahaan', 'asc')
+            ->orderBy('nama_perusahaan')
             ->get()
-            ->map(function ($item) use ($wahaStatus) {
-                $nomorPerusahaan = $this->normalizeWhatsappNumber($item->no_wa ?? null);
+            ->map(function (DataPerusahaan $item) {
+                $status = $this->checkFonnteDevice($item->token_api_wa);
 
-                $statusWa = $this->buildCompanyWaStatus($nomorPerusahaan, $wahaStatus);
-
-                $item->wa_status = $statusWa['status'] ?? 'unknown';
-                $item->wa_status_label = $statusWa['label'] ?? 'Belum Dicek';
-                $item->wa_status_message = $statusWa['message'] ?? '-';
-                $item->wa_device_number = $statusWa['device_number'] ?? null;
-                $item->wa_device_status = $statusWa['device_status'] ?? null;
+                $item->setAttribute('wa_status', $status['status']);
+                $item->setAttribute('wa_status_label', $status['label']);
+                $item->setAttribute('wa_status_message', $status['message']);
+                $item->setAttribute('wa_device_number', $status['device_number']);
+                $item->setAttribute('wa_device_status', $status['device_status']);
 
                 return $item;
             });
@@ -44,26 +41,13 @@ class DataPerusahaanController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'nama_perusahaan' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at'),
-            ],
-            'no_wa' => ['required', 'string', 'max:30'],
-        ], [
-            'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
-            'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
-            'no_wa.required' => 'Nomor perusahaan wajib diisi.',
-            'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
-        ]);
+        $validated = $this->validatePayload($request);
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
 
         if (!$nomorPerusahaan) {
             throw ValidationException::withMessages([
-                'no_wa' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
+                'no_wa' => 'Format nomor WhatsApp tidak valid. Gunakan 08xxx, 628xxx, atau +628xxx.',
             ]);
         }
 
@@ -71,10 +55,7 @@ class DataPerusahaanController extends Controller
             'kode' => $this->generateKodePerusahaan(),
             'nama_perusahaan' => trim($validated['nama_perusahaan']),
             'no_wa' => $nomorPerusahaan,
-
-            // Token tidak dipakai lagi karena WAHA pakai WAHA_API_KEY dari .env
-            'token_api_wa' => null,
-
+            'token_api_wa' => trim($validated['token_api_wa']),
             'created_by' => Auth::id(),
         ]);
 
@@ -88,39 +69,24 @@ class DataPerusahaanController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $perusahaan = DataPerusahaan::findOrFail($id);
-
-        $validated = $request->validate([
-            'nama_perusahaan' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('data_perusahaan', 'nama_perusahaan')
-                    ->ignore($perusahaan->id, 'id')
-                    ->whereNull('deleted_at'),
-            ],
-            'no_wa' => ['required', 'string', 'max:30'],
-        ], [
-            'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
-            'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
-            'no_wa.required' => 'Nomor perusahaan wajib diisi.',
-            'no_wa.max' => 'Nomor perusahaan maksimal 30 karakter.',
-        ]);
+        $validated = $this->validatePayload($request, $perusahaan);
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
 
         if (!$nomorPerusahaan) {
             throw ValidationException::withMessages([
-                'no_wa' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
+                'no_wa' => 'Format nomor WhatsApp tidak valid. Gunakan 08xxx, 628xxx, atau +628xxx.',
             ]);
         }
 
         $payload = [
             'nama_perusahaan' => trim($validated['nama_perusahaan']),
             'no_wa' => $nomorPerusahaan,
-
-            // Token lama dikosongkan karena sudah pindah ke WAHA global
-            'token_api_wa' => null,
         ];
+
+        if (!empty($validated['token_api_wa'])) {
+            $payload['token_api_wa'] = trim($validated['token_api_wa']);
+        }
 
         if (array_key_exists('updated_by', $perusahaan->getAttributes())) {
             $payload['updated_by'] = Auth::id();
@@ -140,9 +106,7 @@ class DataPerusahaanController extends Controller
         $perusahaan = DataPerusahaan::findOrFail($id);
 
         if (array_key_exists('deleted_by', $perusahaan->getAttributes())) {
-            $perusahaan->update([
-                'deleted_by' => Auth::id(),
-            ]);
+            $perusahaan->update(['deleted_by' => Auth::id()]);
         }
 
         $perusahaan->delete();
@@ -153,13 +117,23 @@ class DataPerusahaanController extends Controller
         ]);
     }
 
-    public function validasiWa(string $id): JsonResponse
+    public function validasiFonnte(string $id): JsonResponse
     {
         $perusahaan = DataPerusahaan::findOrFail($id);
+        $result = $this->checkFonnteDevice($perusahaan->token_api_wa);
 
-        $nomorPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
-        $wahaStatus = $this->checkWahaSession();
-        $result = $this->buildCompanyWaStatus($nomorPerusahaan, $wahaStatus);
+        $nomorDatabase = $this->normalizeWhatsappNumber($perusahaan->no_wa);
+        $nomorDevice = $this->normalizeWhatsappNumber($result['device_number']);
+
+        if ($result['success'] && $nomorDevice && $nomorDatabase !== $nomorDevice) {
+            $result = [
+                ...$result,
+                'success' => false,
+                'status' => 'mismatch',
+                'label' => 'Nomor Beda',
+                'message' => "Token Fonnte terhubung ke {$nomorDevice}, sedangkan nomor perusahaan {$nomorDatabase}.",
+            ];
+        }
 
         return response()->json([
             'success' => $result['success'],
@@ -167,15 +141,222 @@ class DataPerusahaanController extends Controller
             'data' => [
                 'perusahaan_id' => $perusahaan->id,
                 'nama_perusahaan' => $perusahaan->nama_perusahaan,
-                'nomor_database' => $nomorPerusahaan,
-                'nomor_device' => $result['device_number'] ?? null,
-                'device_status' => $result['device_status'] ?? null,
-                'wa_status' => $result['status'] ?? 'unknown',
-                'wa_status_label' => $result['label'] ?? 'Belum Dicek',
-                'wa_status_message' => $result['message'] ?? '-',
-                'waha_response' => $result['waha_response'] ?? null,
+                'nomor_database' => $nomorDatabase,
+                'nomor_device' => $nomorDevice,
+                'device_status' => $result['device_status'],
+                'wa_status' => $result['status'],
+                'wa_status_label' => $result['label'],
+                'wa_status_message' => $result['message'],
+                'fonnte_response' => $result['response'],
             ],
         ], $result['success'] ? 200 : 422);
+    }
+
+    private function validatePayload(
+        Request $request,
+        ?DataPerusahaan $perusahaan = null
+    ): array {
+        return $request->validate([
+            'nama_perusahaan' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('data_perusahaan', 'nama_perusahaan')
+                    ->ignore($perusahaan?->id, 'id')
+                    ->whereNull('deleted_at'),
+            ],
+            'no_wa' => ['required', 'string', 'max:30'],
+            'token_api_wa' => [
+                $perusahaan ? 'nullable' : 'required',
+                'string',
+                'max:500',
+            ],
+        ], [
+            'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
+            'nama_perusahaan.unique' => 'Nama perusahaan sudah digunakan.',
+            'no_wa.required' => 'Nomor WhatsApp wajib diisi.',
+            'token_api_wa.required' => 'Token API Fonnte wajib diisi.',
+        ]);
+    }
+
+    private function checkFonnteDevice(?string $token): array
+    {
+        if (!$token || trim($token) === '') {
+            return $this->fonnteResult(
+                false,
+                'token_empty',
+                'Token Kosong',
+                'Token API Fonnte belum diisi.'
+            );
+        }
+
+        try {
+            $deviceUrl = env(
+                'FONNTE_DEVICE_URL',
+                'https://api.fonnte.com/device'
+            );
+
+            $connectTimeout = (int) env('FONNTE_CONNECT_TIMEOUT', 10);
+            $timeout = (int) env('FONNTE_TIMEOUT', 20);
+
+            $response = Http::withoutVerifying()
+                ->withOptions([
+                    'verify' => false,
+                ])
+                ->acceptJson()
+                ->withHeaders([
+                    'Authorization' => trim($token),
+                ])
+                ->connectTimeout($connectTimeout)
+                ->timeout($timeout)
+                ->post($deviceUrl);
+
+            $json = $response->json();
+            $payload = is_array($json) ? $json : [];
+
+            if (!$response->successful()) {
+                $message = $response->status() === 405
+                    ? 'Metode request Fonnte ditolak. Endpoint /device harus dipanggil menggunakan POST.'
+                    : (
+                        $payload['reason']
+                        ?? $payload['message']
+                        ?? 'Fonnte mengembalikan HTTP ' . $response->status() . '.'
+                    );
+
+                return $this->fonnteResult(
+                    false,
+                    'error',
+                    'Gagal Cek',
+                    $message,
+                    null,
+                    null,
+                    $payload ?: $response->body()
+                );
+            }
+
+            $apiSuccess = filter_var(
+                $payload['status'] ?? $payload['success'] ?? false,
+                FILTER_VALIDATE_BOOLEAN
+            );
+
+            $deviceNumber = $this->extractFonnteNumber($payload);
+            $deviceStatus = strtolower((string) (
+                $payload['device_status']
+                ?? $payload['deviceStatus']
+                ?? $payload['connection']
+                ?? $payload['status_device']
+                ?? ''
+            ));
+
+            $connectedStatuses = [
+                'connect',
+                'connected',
+                'ready',
+                'online',
+                'authenticated',
+                'working',
+            ];
+
+            /*
+             * Beberapa response Fonnte hanya memberikan status=true dan nomor
+             * device tanpa field device_status. Kondisi tersebut tetap dianggap
+             * terhubung.
+             */
+            $connected = $apiSuccess && (
+                in_array($deviceStatus, $connectedStatuses, true)
+                || ($deviceStatus === '' && $deviceNumber !== null)
+            );
+
+            if (!$connected) {
+                $message = (string) (
+                    $payload['reason']
+                    ?? $payload['message']
+                    ?? $payload['detail']
+                    ?? 'Device Fonnte belum terhubung.'
+                );
+
+                return $this->fonnteResult(
+                    false,
+                    'disconnected',
+                    'Belum Connect',
+                    $message,
+                    $deviceNumber,
+                    $deviceStatus ?: null,
+                    $payload
+                );
+            }
+
+            return $this->fonnteResult(
+                true,
+                'connected',
+                'Connect',
+                'Token Fonnte valid dan device sudah terhubung.',
+                $deviceNumber,
+                $deviceStatus ?: 'connected',
+                $payload
+            );
+        } catch (ConnectionException $e) {
+            return $this->fonnteResult(
+                false,
+                'error',
+                'Koneksi Gagal',
+                'Tidak dapat terhubung ke API Fonnte: ' . $e->getMessage()
+            );
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->fonnteResult(
+                false,
+                'error',
+                'Gagal Cek',
+                'Gagal memvalidasi Fonnte: ' . $e->getMessage()
+            );
+        }
+    }
+
+    private function fonnteResult(
+        bool $success,
+        string $status,
+        string $label,
+        string $message,
+        ?string $deviceNumber = null,
+        ?string $deviceStatus = null,
+        mixed $response = null
+    ): array {
+        return [
+            'success' => $success,
+            'status' => $status,
+            'label' => $label,
+            'message' => $message,
+            'device_number' => $deviceNumber,
+            'device_status' => $deviceStatus,
+            'response' => $response,
+        ];
+    }
+
+    private function extractFonnteNumber(array $payload): ?string
+    {
+        $candidates = [
+            $payload['device'] ?? null,
+            $payload['number'] ?? null,
+            $payload['phone'] ?? null,
+            $payload['phone_number'] ?? null,
+            $payload['data']['device'] ?? null,
+            $payload['data']['number'] ?? null,
+            $payload['data']['phone'] ?? null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $number = $this->normalizeWhatsappNumber(
+                is_scalar($candidate) ? (string) $candidate : null
+            );
+
+            if ($number) {
+                return $number;
+            }
+        }
+
+        return null;
     }
 
     private function generateKodePerusahaan(): string
@@ -187,236 +368,27 @@ class DataPerusahaanController extends Controller
         return $kode;
     }
 
-    private function buildCompanyWaStatus(?string $nomorPerusahaan, array $wahaStatus): array
-    {
-        if (!$nomorPerusahaan) {
-            return [
-                'success' => false,
-                'field' => 'no_wa',
-                'status' => 'invalid',
-                'label' => 'Tidak Valid',
-                'message' => 'Format nomor perusahaan tidak valid. Gunakan format 08xxx, 628xxx, atau +628xxx.',
-                'device_number' => $wahaStatus['device_number'] ?? null,
-                'device_status' => $wahaStatus['device_status'] ?? null,
-                'waha_response' => $wahaStatus['waha_response'] ?? null,
-            ];
-        }
-
-        if (!($wahaStatus['success'] ?? false)) {
-            return [
-                'success' => false,
-                'field' => 'no_wa',
-                'status' => $wahaStatus['status'] ?? 'error',
-                'label' => $wahaStatus['label'] ?? 'Gagal Cek',
-                'message' => $wahaStatus['message'] ?? 'WAHA belum connect.',
-                'device_number' => $wahaStatus['device_number'] ?? null,
-                'device_status' => $wahaStatus['device_status'] ?? null,
-                'waha_response' => $wahaStatus['waha_response'] ?? null,
-            ];
-        }
-
-        $deviceNumber = $this->normalizeWhatsappNumber($wahaStatus['device_number'] ?? null);
-
-        if ($deviceNumber && $deviceNumber !== $nomorPerusahaan) {
-            return [
-                'success' => false,
-                'field' => 'no_wa',
-                'status' => 'mismatch',
-                'label' => 'Nomor Beda',
-                'message' => 'Nomor perusahaan berbeda dengan nomor WAHA. Nomor WAHA aktif: ' . $deviceNumber . '.',
-                'device_number' => $deviceNumber,
-                'device_status' => $wahaStatus['device_status'] ?? null,
-                'waha_response' => $wahaStatus['waha_response'] ?? null,
-            ];
-        }
-
-        return [
-            'success' => true,
-            'field' => null,
-            'status' => 'connected',
-            'label' => 'Connect',
-            'message' => 'WAHA sudah connect dan nomor perusahaan sesuai.',
-            'device_number' => $deviceNumber,
-            'device_status' => $wahaStatus['device_status'] ?? null,
-            'waha_response' => $wahaStatus['waha_response'] ?? null,
-        ];
-    }
-
-   private function checkWahaSession(): array
-{
-    $baseUrl = rtrim(config('services.waha.url', env('WAHA_URL', 'https://wa.blast.dsicorp.id')), '/');
-    $session = config('services.waha.session', env('WAHA_SESSION', 'rekruitment'));
-    $apiKey = config('services.waha.api_key', env('WAHA_API_KEY'));
-
-    $headers = [
-        'Accept' => 'application/json',
-        'Content-Type' => 'application/json',
-    ];
-
-    if (!empty($apiKey)) {
-        $headers['X-Api-Key'] = $apiKey;
-    }
-
-    try {
-        /*
-         * Pakai /api/sessions saja.
-         * Endpoint ini sudah terbukti berhasil dari curl kamu.
-         * Jangan pakai /api/sessions/{session}, karena bisa beda support tergantung versi WAHA/OpenWA.
-         */
-        $response = Http::withoutVerifying()
-            ->withHeaders($headers)
-            ->timeout(30)
-            ->get($baseUrl . '/api/sessions');
-
-        $json = $response->json();
-
-        if (!$response->successful()) {
-            return [
-                'success' => false,
-                'status' => 'error',
-                'label' => 'Gagal Cek',
-                'message' => 'Gagal mengecek session WAHA. HTTP Code: ' . $response->status(),
-                'device_number' => null,
-                'device_status' => null,
-                'waha_response' => $json ?: $response->body(),
-            ];
-        }
-
-        $sessionData = $this->extractWahaSessionData($json, $session);
-
-        if (empty($sessionData)) {
-            return [
-                'success' => false,
-                'status' => 'not_found',
-                'label' => 'Session Tidak Ada',
-                'message' => 'Session WAHA "' . $session . '" tidak ditemukan. Pastikan WAHA_SESSION di .env sama dengan nama session OpenWA.',
-                'device_number' => null,
-                'device_status' => null,
-                'waha_response' => $json,
-            ];
-        }
-
-        $deviceStatus = strtolower((string) ($sessionData['status'] ?? $sessionData['device_status'] ?? ''));
-        $deviceNumber = $this->extractWahaPhoneNumber($sessionData);
-
-        $isConnected = in_array($deviceStatus, [
-            'connected',
-            'connect',
-            'working',
-            'authenticated',
-            'ready',
-        ], true);
-
-        if (!$isConnected) {
-            return [
-                'success' => false,
-                'status' => 'disconnected',
-                'label' => 'Belum Connect',
-                'message' => 'Session WAHA belum connect. Status saat ini: ' . ($deviceStatus ?: '-'),
-                'device_number' => $deviceNumber,
-                'device_status' => $deviceStatus ?: null,
-                'waha_response' => $json,
-            ];
-        }
-
-        return [
-            'success' => true,
-            'status' => 'connected',
-            'label' => 'Connect',
-            'message' => 'Session WAHA sudah connect.',
-            'device_number' => $deviceNumber,
-            'device_status' => $deviceStatus,
-            'waha_response' => $json,
-        ];
-    } catch (\Throwable $e) {
-        return [
-            'success' => false,
-            'status' => 'error',
-            'label' => 'Gagal Cek',
-            'message' => 'Gagal memvalidasi WAHA: ' . $e->getMessage(),
-            'device_number' => null,
-            'device_status' => null,
-        ];
-    }
-}
-
-    private function extractWahaSessionData($json, string $session): array
-    {
-        if (is_array($json) && array_is_list($json)) {
-            foreach ($json as $item) {
-                if (($item['name'] ?? null) === $session || ($item['session'] ?? null) === $session) {
-                    return is_array($item) ? $item : [];
-                }
-            }
-
-            return is_array($json[0] ?? null) ? $json[0] : [];
-        }
-
-        return is_array($json) ? $json : [];
-    }
-
-    private function extractWahaPhoneNumber(array $sessionData): ?string
-    {
-        $candidates = [
-            $sessionData['phone'] ?? null,
-            $sessionData['phoneNumber'] ?? null,
-            $sessionData['phone_number'] ?? null,
-            $sessionData['me']['id'] ?? null,
-            $sessionData['me']['user'] ?? null,
-            $sessionData['me']['number'] ?? null,
-            $sessionData['me']['phone'] ?? null,
-        ];
-
-        foreach ($candidates as $candidate) {
-            $number = $this->normalizeWhatsappNumber($candidate);
-
-            if ($number) {
-                return $number;
-            }
-        }
-
-        return null;
-    }
-
     private function normalizeWhatsappNumber(?string $value): ?string
     {
         if ($value === null) {
             return null;
         }
 
-        $value = trim($value);
-
-        // Hapus suffix WAHA seperti @c.us
-        $value = preg_replace('/@.*/', '', $value);
-
-        // Ambil hanya angka dan +
+        $value = preg_replace('/@.*/', '', trim($value));
         $value = preg_replace('/[^0-9+]/', '', $value);
 
-        if ($value === '') {
+        if (!$value) {
             return null;
         }
 
-        if (Str::startsWith($value, '+')) {
-            $value = substr($value, 1);
-        }
+        $value = ltrim($value, '+');
 
         if (Str::startsWith($value, '0')) {
             $value = '62' . substr($value, 1);
-        }
-
-        if (Str::startsWith($value, '8')) {
+        } elseif (Str::startsWith($value, '8')) {
             $value = '62' . $value;
         }
 
-        if (!preg_match('/^62[0-9]{8,15}$/', $value)) {
-            return null;
-        }
-
-        return $value;
-    }
-
-    private function normalizePhone(?string $value): ?string
-    {
-        return $this->normalizeWhatsappNumber($value);
+        return preg_match('/^62[0-9]{8,15}$/', $value) ? $value : null;
     }
 }

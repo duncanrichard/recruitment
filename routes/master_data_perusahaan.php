@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\DataPerusahaanController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/perusahaan')
     ->name('admin.master-data.perusahaan.')
@@ -22,7 +22,7 @@ Route::prefix('admin/master-data/perusahaan')
             ->middleware('permission:admin.master-data.perusahaan.destroy')
             ->name('destroy');
 
-        Route::post('/{id}/validasi-wa', [DataPerusahaanController::class, 'validasiWa'])
+        Route::post('/{id}/validasi-fonnte', [DataPerusahaanController::class, 'validasiFonnte'])
             ->middleware('permission:admin.master-data.perusahaan.update')
-            ->name('validasi-wa');
+            ->name('validasi-fonnte');
     });

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -23,13 +22,23 @@ class DataPerusahaan extends Model
         'no_wa',
         'token_api_wa',
         'created_by',
+        'updated_by',
+        'deleted_by',
+    ];
+
+    /*
+     * Token tidak ikut terkirim saat model diubah menjadi JSON.
+     * Controller tetap dapat mengakses $model->token_api_wa.
+     */
+    protected $hidden = [
+        'token_api_wa',
     ];
 
     protected static function boot()
     {
         parent::boot();
 
-        static::creating(function ($model) {
+        static::creating(function (self $model) {
             if (empty($model->id)) {
                 $model->id = (string) Str::uuid();
             }
