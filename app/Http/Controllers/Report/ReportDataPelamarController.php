@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
 use App\Models\DataRiwayatDiri;
+use App\Services\CompanyAccessService;
+use App\Services\SpreadsheetValueSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportDataPelamarController extends Controller
@@ -70,7 +73,8 @@ class ReportDataPelamarController extends Controller
         $tanggalAwal = $validated['tanggal_awal'] ?? 'Semua';
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
         $perusahaan = $validated['perusahaan'] ?? 'Semua';
-        $filename = 'report-data-pelamar-' . now()->format('Ymd-His') . '.xls';
+        $rows = app(SpreadsheetValueSanitizer::class)->sanitizeRows($rows);
+        $filename = 'report-data-pelamar-'.now()->format('Ymd-His').'.xls';
 
         return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir, $perusahaan) {
             echo '<html>';
@@ -106,16 +110,15 @@ class ReportDataPelamarController extends Controller
 
             echo '<div class="title">Report Data Pelamar</div>';
             echo '<div class="subtitle">';
-            echo 'Tanggal Skrining: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir);
+            echo 'Tanggal Skrining: '.e($tanggalAwal).' s/d '.e($tanggalAkhir);
             echo '<br>';
-            echo 'Perusahaan: ' . e($perusahaan);
+            echo 'Perusahaan: '.e($perusahaan);
             echo '</div>';
 
             echo '<table>';
             echo '<thead>';
             echo '<tr>';
             echo '<th>No</th>';
-            echo '<th>Token</th>';
             echo '<th>Tanggal Skrining</th>';
             echo '<th>Nama Lengkap</th>';
             echo '<th>Nama Panggil</th>';
@@ -154,34 +157,33 @@ class ReportDataPelamarController extends Controller
 
             foreach ($rows as $index => $row) {
                 echo '<tr>';
-                echo '<td>' . ($index + 1) . '</td>';
-                echo '<td>' . e($row['token']) . '</td>';
-                echo '<td>' . e($row['tanggal_skrining']) . '</td>';
-                echo '<td>' . e($row['nama_lengkap']) . '</td>';
-                echo '<td>' . e($row['nama_panggil']) . '</td>';
-                echo '<td>' . e($row['email']) . '</td>';
-                echo '<td>' . e($row['no_wa']) . '</td>';
-                echo '<td>' . e($row['posisi_yang_dilamar']) . '</td>';
-                echo '<td>' . e($row['perusahaan_dilamar']) . '</td>';
-                echo '<td>' . e($row['pendidikan']) . '</td>';
-                echo '<td>' . e($row['jurusan']) . '</td>';
-                echo '<td>' . e($row['nama_institusi']) . '</td>';
-                echo '<td>' . e($row['agama']) . '</td>';
-                echo '<td>' . e($row['tanggal_lahir']) . '</td>';
-                echo '<td>' . e($row['tempat_lahir']) . '</td>';
-                echo '<td>' . e($row['jenis_kelamin']) . '</td>';
-                echo '<td>' . e($row['alamat_ktp']) . '</td>';
-                echo '<td>' . e($row['alamat_domisili']) . '</td>';
-                echo '<td>' . e($row['kewarganegaraan']) . '</td>';
-                echo '<td>' . e($row['status_pernikahan']) . '</td>';
-                echo '<td>' . e($row['gol_darah']) . '</td>';
-                echo '<td>' . e($row['tinggi_badan']) . '</td>';
-                echo '<td>' . e($row['berat_badan']) . '</td>';
-                echo '<td>' . e($row['str_aktif']) . '</td>';
-                echo '<td>' . e($row['sumber_informasi']) . '</td>';
-                echo '<td>' . e($row['hasil_administrasi']) . '</td>';
-                echo '<td>' . e($row['created_at']) . '</td>';
-                echo '<td>' . e($row['updated_at']) . '</td>';
+                echo '<td>'.($index + 1).'</td>';
+                echo '<td>'.e($row['tanggal_skrining']).'</td>';
+                echo '<td>'.e($row['nama_lengkap']).'</td>';
+                echo '<td>'.e($row['nama_panggil']).'</td>';
+                echo '<td>'.e($row['email']).'</td>';
+                echo '<td>'.e($row['no_wa']).'</td>';
+                echo '<td>'.e($row['posisi_yang_dilamar']).'</td>';
+                echo '<td>'.e($row['perusahaan_dilamar']).'</td>';
+                echo '<td>'.e($row['pendidikan']).'</td>';
+                echo '<td>'.e($row['jurusan']).'</td>';
+                echo '<td>'.e($row['nama_institusi']).'</td>';
+                echo '<td>'.e($row['agama']).'</td>';
+                echo '<td>'.e($row['tanggal_lahir']).'</td>';
+                echo '<td>'.e($row['tempat_lahir']).'</td>';
+                echo '<td>'.e($row['jenis_kelamin']).'</td>';
+                echo '<td>'.e($row['alamat_ktp']).'</td>';
+                echo '<td>'.e($row['alamat_domisili']).'</td>';
+                echo '<td>'.e($row['kewarganegaraan']).'</td>';
+                echo '<td>'.e($row['status_pernikahan']).'</td>';
+                echo '<td>'.e($row['gol_darah']).'</td>';
+                echo '<td>'.e($row['tinggi_badan']).'</td>';
+                echo '<td>'.e($row['berat_badan']).'</td>';
+                echo '<td>'.e($row['str_aktif']).'</td>';
+                echo '<td>'.e($row['sumber_informasi']).'</td>';
+                echo '<td>'.e($row['hasil_administrasi']).'</td>';
+                echo '<td>'.e($row['created_at']).'</td>';
+                echo '<td>'.e($row['updated_at']).'</td>';
                 echo '</tr>';
             }
 
@@ -191,7 +193,7 @@ class ReportDataPelamarController extends Controller
             echo '</html>';
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'max-age=0',
         ]);
     }
@@ -209,7 +211,13 @@ class ReportDataPelamarController extends Controller
                 'sumberInformasi',
             ]);
 
-        if (!empty($filters['tanggal_awal'])) {
+        app(CompanyAccessService::class)->apply(
+            $query,
+            Auth::user(),
+            'data_riwayat_diri.perusahaan_dilamar'
+        );
+
+        if (! empty($filters['tanggal_awal'])) {
             $query->whereDate(
                 'tanggal_skrining',
                 '>=',
@@ -217,7 +225,7 @@ class ReportDataPelamarController extends Controller
             );
         }
 
-        if (!empty($filters['tanggal_akhir'])) {
+        if (! empty($filters['tanggal_akhir'])) {
             $query->whereDate(
                 'tanggal_skrining',
                 '<=',
@@ -225,15 +233,15 @@ class ReportDataPelamarController extends Controller
             );
         }
 
-        if (!empty($filters['perusahaan'])) {
+        if (! empty($filters['perusahaan'])) {
             $keyword = $filters['perusahaan'];
 
             $query->where(function ($q) use ($keyword) {
-                $q->where('perusahaan_dilamar', 'like', '%' . $keyword . '%')
+                $q->where('perusahaan_dilamar', 'like', '%'.$keyword.'%')
                     ->orWhereHas('perusahaan', function ($perusahaanQuery) use ($keyword) {
-                        $perusahaanQuery->where('nama_perusahaan', 'like', '%' . $keyword . '%')
-                            ->orWhere('perusahaan', 'like', '%' . $keyword . '%')
-                            ->orWhere('nama', 'like', '%' . $keyword . '%');
+                        $perusahaanQuery->where('nama_perusahaan', 'like', '%'.$keyword.'%')
+                            ->orWhere('perusahaan', 'like', '%'.$keyword.'%')
+                            ->orWhere('nama', 'like', '%'.$keyword.'%');
                     });
             });
         }
@@ -313,7 +321,7 @@ class ReportDataPelamarController extends Controller
             ->map(function ($item) {
                 $tanggal = $item['tanggal_skrining'] ?? null;
 
-                if (!$tanggal) {
+                if (! $tanggal) {
                     return 'Tidak Diisi';
                 }
 
@@ -350,8 +358,9 @@ class ReportDataPelamarController extends Controller
         foreach ($rows as $item) {
             $tanggalLahir = $item['tanggal_lahir'] ?? null;
 
-            if (!$tanggalLahir) {
+            if (! $tanggalLahir) {
                 $groups['Tidak Diisi']++;
+
                 continue;
             }
 
@@ -359,6 +368,7 @@ class ReportDataPelamarController extends Controller
                 $age = Carbon::parse($tanggalLahir)->age;
             } catch (\Throwable $e) {
                 $groups['Tidak Diisi']++;
+
                 continue;
             }
 
@@ -414,7 +424,6 @@ class ReportDataPelamarController extends Controller
     {
         return [
             'id' => $item->id,
-            'token' => $item->token,
             'tanggal_skrining' => optional($item->tanggal_skrining)->format('Y-m-d') ?: $item->tanggal_skrining,
 
             'nama_lengkap' => $item->nama_lengkap,
@@ -488,12 +497,12 @@ class ReportDataPelamarController extends Controller
 
     private function firstValue($model, array $columns): ?string
     {
-        if (!$model) {
+        if (! $model) {
             return null;
         }
 
         foreach ($columns as $column) {
-            if (!empty($model->{$column})) {
+            if (! empty($model->{$column})) {
                 return (string) $model->{$column};
             }
         }

@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\PosisiController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/posisi')
     ->name('admin.master-data.posisi.')
@@ -13,6 +13,7 @@ Route::prefix('admin/master-data/posisi')
         Route::get('/list', [PosisiController::class, 'list'])
             ->middleware('permission:admin.master-data.posisi.list')
             ->name('list');
+
 
         Route::post('/', [PosisiController::class, 'store'])
             ->middleware('permission:admin.master-data.posisi.store')

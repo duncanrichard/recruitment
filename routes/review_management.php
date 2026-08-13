@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\ReviewManagementController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/review-management')
     ->name('admin.review-management.')

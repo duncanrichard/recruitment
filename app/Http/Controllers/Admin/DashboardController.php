@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\CompanyAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -50,26 +52,31 @@ class DashboardController extends Controller
 
             if ($hasilInterview === 'lolos') {
                 $stageCounts['interview_lolos']++;
+
                 continue;
             }
 
             if ($hasilInterview === 'tidak_lolos') {
                 $stageCounts['interview_tidak_lolos']++;
+
                 continue;
             }
 
             if ($hasilInterview === 'dipertimbangkan') {
                 $stageCounts['interview_dipertimbangkan']++;
+
                 continue;
             }
 
             if ($statusInterview === 'reschedule') {
                 $stageCounts['interview_reschedule']++;
+
                 continue;
             }
 
             if ($interviewRow) {
                 $stageCounts['jadwal_interview']++;
+
                 continue;
             }
 
@@ -77,16 +84,19 @@ class DashboardController extends Controller
 
             if ($hasilMmpiPelamar === 'lolos') {
                 $stageCounts['hasil_test_mmpi_lolos']++;
+
                 continue;
             }
 
             if ($hasilMmpiPelamar === 'gagal') {
                 $stageCounts['hasil_test_mmpi_gagal']++;
+
                 continue;
             }
 
             if ($jadwalMmpiIds->contains($pelamarId)) {
                 $stageCounts['jadwal_test_mmpi']++;
+
                 continue;
             }
 
@@ -94,16 +104,19 @@ class DashboardController extends Controller
 
             if ($hasilZoomPelamar === 'lolos') {
                 $stageCounts['hasil_test_zoom_lolos']++;
+
                 continue;
             }
 
             if ($hasilZoomPelamar === 'gagal') {
                 $stageCounts['hasil_test_zoom_gagal']++;
+
                 continue;
             }
 
             if ($jadwalZoomIds->contains($pelamarId)) {
                 $stageCounts['jadwal_test_zoom']++;
+
                 continue;
             }
 
@@ -148,6 +161,8 @@ class DashboardController extends Controller
                 'stage_counts' => $stageCounts,
                 'monthly_applicants' => $this->getMonthlyApplicants(),
                 'recent_pelamar' => $this->getRecentPelamar(),
+                'insights' => $this->getOperationalInsights($pelamarIds, $stageCounts, $totalPelamar),
+                'company_distribution' => $this->getCompanyDistribution(),
             ],
         ]);
     }
@@ -158,13 +173,17 @@ class DashboardController extends Controller
             return collect();
         }
 
-        if (! Schema::hasColumn('data_riwayat_diri', 'uuid')) {
+        if (! Schema::hasColumn('data_riwayat_diri', 'id')) {
             return collect();
         }
 
-        return DB::table('data_riwayat_diri')
-            ->whereNotNull('uuid')
-            ->pluck('uuid')
+        $query = DB::table('data_riwayat_diri');
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'perusahaan_dilamar');
+
+        return $query
+            ->whereNotNull('id')
+            ->when(Schema::hasColumn('data_riwayat_diri', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+            ->pluck('id')
             ->unique()
             ->values();
     }
@@ -176,6 +195,13 @@ class DashboardController extends Controller
         }
 
         $query = DB::table($table);
+        $pelamarIds = $this->getPelamarIds();
+
+        if ($pelamarIds->isEmpty()) {
+            return collect();
+        }
+
+        $query->whereIn($column, $pelamarIds);
 
         if (Schema::hasColumn($table, 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -206,7 +232,8 @@ class DashboardController extends Controller
         }
 
         $query = DB::table($table)
-            ->select('data_riwayat_diri_id', $hasilColumn);
+            ->select('data_riwayat_diri_id', $hasilColumn)
+            ->whereIn('data_riwayat_diri_id', $this->getPelamarIds());
 
         if (Schema::hasColumn($table, 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -246,7 +273,9 @@ class DashboardController extends Controller
             }
         }
 
-        $query = DB::table('jadwal_interview_kandidat')->select($select);
+        $query = DB::table('jadwal_interview_kandidat')
+            ->select($select)
+            ->whereIn('data_riwayat_diri_id', $this->getPelamarIds());
 
         if (Schema::hasColumn('jadwal_interview_kandidat', 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -281,15 +310,18 @@ class DashboardController extends Controller
 
         $driver = DB::connection()->getDriverName();
 
-        $monthExpression = $driver === 'pgsql'
-            ? "TO_CHAR(created_at, 'YYYY-MM')"
-            : "DATE_FORMAT(created_at, '%Y-%m')";
+        $monthExpression = match ($driver) {
+            'pgsql' => "TO_CHAR(created_at, 'YYYY-MM')",
+            'sqlite' => "strftime('%Y-%m', created_at)",
+            default => "DATE_FORMAT(created_at, '%Y-%m')",
+        };
 
         $rows = DB::table('data_riwayat_diri')
             ->selectRaw("{$monthExpression} as month_key")
             ->selectRaw('COUNT(*) as total')
             ->whereNotNull('created_at')
             ->where('created_at', '>=', $startDate)
+            ->whereIn('id', $this->getPelamarIds())
             ->groupByRaw($monthExpression)
             ->orderBy('month_key')
             ->get()
@@ -316,13 +348,12 @@ class DashboardController extends Controller
             return [];
         }
 
-        if (! Schema::hasColumn('data_riwayat_diri', 'uuid')) {
+        if (! Schema::hasColumn('data_riwayat_diri', 'id')) {
             return [];
         }
 
         $select = [
-            DB::raw('uuid as id'),
-            'uuid',
+            'id',
         ];
 
         foreach ([
@@ -340,6 +371,7 @@ class DashboardController extends Controller
         }
 
         $query = DB::table('data_riwayat_diri')->select($select);
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'perusahaan_dilamar');
 
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -354,8 +386,7 @@ class DashboardController extends Controller
             ->get()
             ->map(function ($item) {
                 return [
-                    'id' => $item->id ?? $item->uuid ?? null,
-                    'uuid' => $item->uuid ?? $item->id ?? null,
+                    'id' => $item->id ?? null,
                     'nama_lengkap' => $item->nama_lengkap ?? $item->nama_panggil ?? '-',
                     'nama_panggil' => $item->nama_panggil ?? null,
                     'email' => $item->email ?? null,
@@ -378,6 +409,91 @@ class DashboardController extends Controller
         }
 
         return null;
+    }
+
+    private function getOperationalInsights(Collection $pelamarIds, array $stages, int $total): array
+    {
+        $accepted = (int) ($stages['interview_lolos'] ?? 0);
+        $failedIntegrations = 0;
+        $staleIntegrations = 0;
+        $auditsToday = 0;
+        $downloadsToday = 0;
+
+        if (Schema::hasTable('integration_deliveries')) {
+            $deliveryQuery = DB::table('integration_deliveries');
+            app(CompanyAccessService::class)->apply($deliveryQuery, Auth::user(), 'company_id');
+            $failedIntegrations = (clone $deliveryQuery)->where('status', 'failed')->count();
+            $staleIntegrations = (clone $deliveryQuery)
+                ->whereIn('status', ['queued', 'processing'])
+                ->where('updated_at', '<', now()->subMinutes(15))
+                ->count();
+        }
+
+        if (Schema::hasTable('recruitment_audits')) {
+            $auditQuery = DB::table('recruitment_audits');
+            if (Schema::hasColumn('recruitment_audits', 'company_id')) {
+                app(CompanyAccessService::class)->apply($auditQuery, Auth::user(), 'company_id');
+            }
+            $auditsToday = (clone $auditQuery)->where('created_at', '>=', now()->startOfDay())->count();
+            $downloadsToday = (clone $auditQuery)
+                ->where('event', 'downloaded')
+                ->where('created_at', '>=', now()->startOfDay())
+                ->count();
+        }
+
+        $offeringPending = 0;
+        if (Schema::hasTable('jadwal_offering_letters') && Schema::hasTable('hasil_review_management')) {
+            $offeringPending = DB::table('jadwal_offering_letters as jol')
+                ->join('hasil_review_management as hrm', 'hrm.id', '=', 'jol.hasil_review_management_id')
+                ->join('jadwal_interview_kandidat as jik', 'jik.id', '=', 'hrm.hasil_interview_id')
+                ->whereIn('jik.data_riwayat_diri_id', $pelamarIds)
+                ->whereNull('jol.status_jadwal')
+                ->count();
+        }
+
+        $attention = collect([
+            ['key' => 'failed_integrations', 'label' => 'Integrasi gagal', 'total' => $failedIntegrations, 'severity' => 'critical', 'menu' => null],
+            ['key' => 'stale_integrations', 'label' => 'Antrean tertunda >15 menit', 'total' => $staleIntegrations, 'severity' => 'warning', 'menu' => null],
+            ['key' => 'interview_reschedule', 'label' => 'Interview perlu dijadwalkan ulang', 'total' => (int) ($stages['interview_reschedule'] ?? 0), 'severity' => 'warning', 'menu' => 'interview-kandidat'],
+            ['key' => 'offering_pending', 'label' => 'Offering Letter menunggu keputusan', 'total' => $offeringPending, 'severity' => 'info', 'menu' => 'jadwal-ol'],
+        ])->filter(fn ($item) => $item['total'] > 0)->values()->all();
+
+        return [
+            'conversion_rate' => $total > 0 ? round(($accepted / $total) * 100, 1) : 0,
+            'accepted_candidates' => $accepted,
+            'failed_integrations' => $failedIntegrations,
+            'stale_integrations' => $staleIntegrations,
+            'offering_pending' => $offeringPending,
+            'audits_today' => $auditsToday,
+            'downloads_today' => $downloadsToday,
+            'attention_items' => $attention,
+            'health' => ($failedIntegrations + $staleIntegrations) > 0 ? 'attention' : 'healthy',
+        ];
+    }
+
+    private function getCompanyDistribution(): array
+    {
+        if (! Schema::hasTable('data_riwayat_diri')) {
+            return [];
+        }
+
+        $query = DB::table('data_riwayat_diri as drd')
+            ->leftJoin('data_perusahaan as dp', 'dp.id', '=', 'drd.perusahaan_dilamar')
+            ->selectRaw('drd.perusahaan_dilamar as company_id')
+            ->selectRaw("COALESCE(dp.nama_perusahaan, '-') as company_name")
+            ->selectRaw('COUNT(*) as total')
+            ->whereNull('drd.deleted_at')
+            ->groupBy('drd.perusahaan_dilamar', 'dp.nama_perusahaan')
+            ->orderByDesc('total')
+            ->limit(8);
+
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'drd.perusahaan_dilamar');
+
+        return $query->get()->map(fn ($row) => [
+            'id' => $row->company_id,
+            'name' => $row->company_name,
+            'total' => (int) $row->total,
+        ])->all();
     }
 
     private function normalizeHasilTest($value): ?string

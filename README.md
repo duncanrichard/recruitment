@@ -1,59 +1,170 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sirekrut
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sirekrut adalah aplikasi recruitment berbasis Laravel 12 dan React. Sistem mencakup pendaftaran kandidat, screening administrasi, test Zoom, MMPI, interview, review management, offering letter, laporan, serta pengelolaan role dan permission.
 
-## About Laravel
+## Kebutuhan sistem
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP 8.4 beserta extension PostgreSQL, mbstring, openssl, fileinfo, curl, dan intl
+- Composer 2
+- Node.js 20 atau lebih baru
+- PostgreSQL
+- Queue worker untuk pekerjaan asynchronous
+- Object storage S3-compatible apabila dokumen tidak disimpan secara lokal
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Dependency yang terkunci saat ini membutuhkan PHP 8.4. Pastikan `php -v` menampilkan versi yang sesuai sebelum menjalankan Composer atau Artisan.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Instalasi lokal
 
-## Learning Laravel
+```bash
+composer install
+copy .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+npm install
+npm run build
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Atur koneksi PostgreSQL dan integrasi yang diperlukan di `.env`. Jangan memasukkan `.env`, credential Google, API key WhatsApp, atau dokumen kandidat ke Git.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Untuk development:
 
-## Laravel Sponsors
+```bash
+composer run dev
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Perintah tersebut menjalankan server Laravel, queue worker, log viewer, dan Vite secara bersamaan.
 
-### Premium Partners
+## Konfigurasi utama
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Database
 
-## Contributing
+```dotenv
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=sirekrut
+DB_USERNAME=
+DB_PASSWORD=
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Penyimpanan dokumen
 
-## Code of Conduct
+Gunakan `local` untuk private local storage atau `s3` untuk MinIO/S3-compatible storage.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```dotenv
+FILESYSTEM_DISK=local
 
-## Security Vulnerabilities
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_URL=
+AWS_ENDPOINT=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Dokumen kandidat adalah data privat. Bucket production tidak boleh memberikan akses publik langsung.
 
-## License
+### WhatsApp
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```dotenv
+
+FONNTE_DEVICE_URL=https://api.fonnte.com/device
+FONNTE_CONNECT_TIMEOUT=10
+FONNTE_TIMEOUT=20
+```
+
+Token Fonnte per perusahaan disimpan melalui modul Data Perusahaan. Batasi hak akses untuk melihat atau mengubah credential tersebut.
+
+### Google Calendar
+
+```dotenv
+GOOGLE_CALENDAR_ENABLED=false
+GOOGLE_CALENDAR_CREDENTIALS=storage/app/private/google-calendar.json
+GOOGLE_CALENDAR_ID=primary
+GOOGLE_CALENDAR_IMPERSONATE_EMAIL=
+GOOGLE_CALENDAR_TIMEZONE=Asia/Jakarta
+GOOGLE_CALENDAR_EVENT_DURATION_MINUTES=60
+```
+
+File credential harus berada di private storage dan tidak boleh tersedia melalui direktori `public`.
+
+## Proses recruitment
+
+Alur utama sistem:
+
+1. Permintaan kandidat dibuat.
+2. Pelamar dibuat dan menerima token pendaftaran.
+3. Pelamar melengkapi data diri, keluarga, kesehatan, pekerjaan, dan kesiapan bekerja.
+4. Administrasi diperiksa.
+5. Kandidat mengikuti test Zoom dan MMPI.
+6. Kandidat yang lolos dijadwalkan untuk interview.
+7. Hasil interview diproses melalui Review Management.
+8. Kandidat yang diterima masuk ke proses Offering Letter.
+
+Endpoint admin menggunakan session authentication dan Spatie Permission. Endpoint publik berbasis token kandidat dilindungi rate limiting. Jangan mengandalkan penyembunyian menu frontend sebagai mekanisme otorisasi.
+
+## Verifikasi sebelum deployment
+
+```bash
+php artisan test
+php vendor/bin/pint --test
+npm run build
+php artisan route:list
+composer audit
+npm audit
+```
+
+Selain perintah tersebut, lakukan smoke test terhadap login, pendaftaran kandidat, upload dokumen, perubahan hasil test, interview, review management, offering letter, dan export laporan.
+
+## Deployment production
+
+Gunakan nilai berikut sebagai baseline:
+
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+SESSION_SECURE_COOKIE=true
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=lax
+QUEUE_CONNECTION=database
+```
+
+Sesudah deployment:
+
+```bash
+php artisan migrate --force
+php artisan optimize
+php artisan queue:restart
+```
+
+Pastikan process manager menjalankan `php artisan queue:work` dan scheduler menjalankan `php artisan schedule:run` setiap menit. Backup database serta object storage sebelum migration production.
+
+Setelah deployment hardening, jalankan `php artisan db:seed --class=PermissionSeeder`
+agar permission report, download dokumen, dan integration alert tersedia. Production
+harus mengaktifkan `MALWARE_SCAN_ENABLED=true`, `MALWARE_SCAN_FAIL_CLOSED=true`,
+serta menyediakan binary ClamAV sesuai `MALWARE_SCAN_BINARY`. Kegagalan permanen
+Fonnte dan Google Calendar dapat diperiksa melalui endpoint
+`/admin/integration-alerts` oleh role yang mempunyai permission terkait.
+Riwayat perubahan recruitment dapat diperiksa melalui
+`/admin/recruitment-audits`; endpoint tersebut mendukung filter, detail,
+dan export CSV serta otomatis dibatasi berdasarkan perusahaan user.
+
+## Keamanan dan pemulihan
+
+- Jangan menghapus atau mengganti kolom production sebelum seluruh kode berhenti menggunakannya.
+- Backup database dan dokumen kandidat secara terjadwal, lalu uji proses restore.
+- Periksa failed jobs serta log kegagalan WhatsApp dan Calendar.
+- Jangan menulis token kandidat, credential, atau data kesehatan ke log.
+- Batasi export dan akses dokumen berdasarkan role serta perusahaan.
+- Jalankan audit dependency secara berkala dan uji upgrade di staging.
+
+## Struktur penting
+
+- `routes/pendaftaran.php`: route publik kandidat
+- `routes/web.php`: autentikasi dan kumpulan route admin
+- `app/Http/Controllers/PendaftaranController.php`: formulir kandidat
+- `app/Http/Controllers/CekTahapanPelamarController.php`: status tahapan kandidat
+- `app/Models/DataRiwayatDiri.php`: entitas utama kandidat
+- `resources/js/pages/admin`: antarmuka admin React
+- `database/migrations`: schema dan histori perubahan database

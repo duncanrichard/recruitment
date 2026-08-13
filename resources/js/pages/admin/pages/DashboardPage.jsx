@@ -8,7 +8,7 @@ const STAGE_COLORS = {
     jadwal_test_mmpi: "bg-indigo-50 text-indigo-700 ring-indigo-100",
     hasil_test_mmpi_lolos: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     hasil_test_mmpi_gagal: "bg-rose-50 text-rose-700 ring-rose-100",
-    jadwal_interview: "bg-cyan-50 text-cyan-700 ring-cyan-100",
+    jadwal_interview: "bg-violet-50 text-violet-700 ring-violet-100",
     interview_reschedule: "bg-sky-50 text-sky-700 ring-sky-100",
     interview_lolos: "bg-emerald-50 text-emerald-700 ring-emerald-100",
     interview_tidak_lolos: "bg-rose-50 text-rose-700 ring-rose-100",
@@ -23,7 +23,7 @@ const STAGE_BAR_COLORS = {
     jadwal_test_mmpi: "from-indigo-400 to-indigo-600",
     hasil_test_mmpi_lolos: "from-emerald-400 to-emerald-600",
     hasil_test_mmpi_gagal: "from-rose-400 to-rose-600",
-    jadwal_interview: "from-cyan-400 to-cyan-600",
+    jadwal_interview: "from-violet-400 to-violet-600",
     interview_reschedule: "from-sky-400 to-sky-600",
     interview_lolos: "from-emerald-400 to-emerald-600",
     interview_tidak_lolos: "from-rose-400 to-rose-600",
@@ -69,6 +69,8 @@ export default function DashboardPage() {
 
     const stages = useMemo(() => summary?.stages || [], [summary]);
     const monthlyApplicants = useMemo(() => summary?.monthly_applicants || [], [summary]);
+    const insights = summary?.insights || {};
+    const companyDistribution = summary?.company_distribution || [];
 
     const highestStage = useMemo(() => {
         if (!stages.length) return null;
@@ -101,28 +103,28 @@ export default function DashboardPage() {
                         label="Total Pelamar"
                         value={summary?.total_pelamar || 0}
                         description="Semua data pelamar"
-                        icon="▤"
-                        accent="from-teal-500 to-cyan-500"
+                        icon="K"
+                        accent="from-indigo-500 to-violet-500"
                     />
                     <SummaryCard
                         label="Jadwal Test Zoom"
                         value={summary?.total_jadwal_test_zoom || 0}
                         description="Pelamar dijadwalkan Zoom"
-                        icon="◎"
-                        accent="from-blue-500 to-cyan-500"
+                        icon="Z"
+                        accent="from-blue-500 to-violet-500"
                     />
                     <SummaryCard
                         label="Jadwal Test MMPI"
                         value={summary?.total_jadwal_test_mmpi || 0}
                         description="Pelamar dijadwalkan MMPI"
-                        icon="◉"
+                        icon="M"
                         accent="from-indigo-500 to-violet-500"
                     />
                     <SummaryCard
                         label="Jadwal Interview"
                         value={summary?.total_jadwal_interview || 0}
                         description="Pelamar masuk interview"
-                        icon="◷"
+                        icon="I"
                         accent="from-amber-500 to-orange-500"
                     />
                 </div>
@@ -131,6 +133,13 @@ export default function DashboardPage() {
                     <LoadingState />
                 ) : (
                     <>
+                        <InsightStrip insights={insights} />
+
+                        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                            <AttentionPanel items={insights.attention_items || []} health={insights.health} />
+                            <CompanyDistribution data={companyDistribution} />
+                        </div>
+
                         <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
                             <MonthlyApplicantsChart data={monthlyApplicants} />
                             <FinalStageCard summary={summary} totalFinal={totalFinal} />
@@ -144,61 +153,189 @@ export default function DashboardPage() {
     );
 }
 
-function HeroSection({ summary, loading, onRefresh, highestStage }) {
-    return (
-        <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl shadow-slate-200">
-            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
-            <div className="absolute -bottom-28 left-12 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_35%),linear-gradient(135deg,rgba(15,23,42,1),rgba(15,118,110,0.85))]" />
+function InsightStrip({ insights }) {
+    const items = [
+        ["Conversion Rate", String(Number(insights.conversion_rate || 0)) + "%", "Pelamar hingga lolos interview", "border-indigo-100 bg-indigo-50 text-indigo-700"],
+        ["Kandidat Diterima", formatNumber(insights.accepted_candidates), "Lolos tahap interview", "border-emerald-100 bg-emerald-50 text-emerald-700"],
+        ["Aktivitas Audit", formatNumber(insights.audits_today), String(insights.downloads_today || 0) + " download hari ini", "border-blue-100 bg-blue-50 text-blue-700"],
+        ["Perlu Perhatian", formatNumber(Number(insights.failed_integrations || 0) + Number(insights.stale_integrations || 0)), "Integrasi gagal atau tertunda", "border-rose-100 bg-rose-50 text-rose-700"],
+    ];
 
-            <div className="relative grid gap-8 px-6 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-8 lg:py-10">
+    return (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {items.map(([label, value, note, tone]) => (
+                <div key={label} className={"rounded-3xl border p-5 " + tone}>
+                    <p className="text-[11px] font-black uppercase tracking-[0.16em] opacity-70">{label}</p>
+                    <p className="mt-2 text-3xl font-black">{value}</p>
+                    <p className="mt-1 text-xs font-bold opacity-75">{note}</p>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function AttentionPanel({ items, health }) {
+    return (
+        <SectionCard>
+            <div className="flex items-start justify-between gap-4">
                 <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-cyan-100 backdrop-blur">
-                        <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                        Dashboard Rekrutmen
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-rose-600">Action Center</p>
+                    <h2 className="mt-2 text-2xl font-black text-slate-950">Perlu Ditindaklanjuti</h2>
+                </div>
+                <span className={"rounded-full px-3 py-1 text-xs font-black " + (health === "healthy" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
+                    {health === "healthy" ? "Sistem Sehat" : "Perlu Perhatian"}
+                </span>
+            </div>
+            <div className="mt-5 space-y-3">
+                {items.length ? items.map((item) => (
+                    <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => item.menu && window.dispatchEvent(new CustomEvent("admin:navigate", { detail: { key: item.menu } }))}
+                        className="flex w-full items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-left transition hover:border-indigo-200 hover:bg-white"
+                    >
+                        <span className="text-sm font-bold text-slate-700">{item.label}</span>
+                        <span className="rounded-xl bg-white px-3 py-1 text-sm font-black text-slate-950 shadow-sm">{formatNumber(item.total)}</span>
+                    </button>
+                )) : (
+                    <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
+                        <p className="font-black text-emerald-800">Tidak ada anomali operasional.</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700">Queue dan proses recruitment tidak memiliki alert aktif.</p>
+                    </div>
+                )}
+            </div>
+        </SectionCard>
+    );
+}
+
+function CompanyDistribution({ data }) {
+    const max = Math.max(...data.map((item) => Number(item.total || 0)), 1);
+    return (
+        <SectionCard>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Distribusi</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Pelamar per Perusahaan</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Hanya menampilkan perusahaan yang dapat diakses akun ini.</p>
+            <div className="mt-6 space-y-4">
+                {data.length ? data.map((item) => (
+                    <div key={item.id || item.name}>
+                        <div className="mb-2 flex justify-between gap-3 text-sm">
+                            <span className="truncate font-black text-slate-700">{item.name}</span>
+                            <span className="font-black text-slate-950">{formatNumber(item.total)}</span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-400" style={{ width: String(Math.max((Number(item.total || 0) / max) * 100, 4)) + "%" }} />
+                        </div>
+                    </div>
+                )) : <EmptyState text="Belum ada distribusi perusahaan." />}
+            </div>
+        </SectionCard>
+    );
+}
+
+function HeroSection({ summary, loading, onRefresh, highestStage }) {
+    const insights = summary?.insights || {};
+    const totalPelamar = Number(summary?.total_pelamar || 0);
+    const interview = Number(summary?.total_jadwal_interview || 0);
+    const accepted = Number(insights.accepted_candidates || 0);
+    const attentionCount = Number(insights.failed_integrations || 0) +
+        Number(insights.stale_integrations || 0) +
+        Number(insights.offering_pending || 0) +
+        Number(summary?.stage_counts?.interview_reschedule || 0);
+    const interviewRate = totalPelamar > 0
+        ? Math.round((interview / totalPelamar) * 100)
+        : 0;
+    const conversionRate = Number(insights.conversion_rate || 0);
+
+    return (
+        <section className="relative overflow-hidden rounded-[2rem] border border-indigo-200/70 bg-white shadow-xl shadow-indigo-100/50">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-600 via-violet-500 to-fuchsia-500" />
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-100/70 blur-3xl" />
+
+            <div className="relative grid lg:grid-cols-[0.92fr_1.08fr]">
+                <div className="flex flex-col justify-between bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-900 px-6 py-7 text-white lg:px-8 lg:py-8">
+                    <div>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-indigo-100 backdrop-blur">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 ring-4 ring-emerald-400/15" />
+                            Executive Recruitment Overview
+                        </div>
+
+                        <h1 className="mt-5 max-w-xl text-3xl font-black leading-[1.12] sm:text-4xl">
+                            Kendalikan pipeline kandidat dari satu ringkasan.
+                        </h1>
+
+                        <p className="mt-3 max-w-xl text-sm font-medium leading-6 text-indigo-100/80">
+                            Fokus pada progres seleksi, tingkat konversi, dan kandidat yang membutuhkan tindakan berikutnya.
+                        </p>
                     </div>
 
-                    <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">
-                        Ringkasan Pelamar yang Lebih Cepat Dibaca
-                    </h1>
-
-                    <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-200 sm:text-base">
-                        Pantau pelamar masuk, progres seleksi, dan hasil akhir kandidat dalam satu tampilan yang lebih rapi.
-                    </p>
-
-                    <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <div className="mt-7 flex flex-wrap items-center gap-3">
                         <button
                             type="button"
                             onClick={onRefresh}
                             disabled={loading}
-                            className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-black/10 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-indigo-950 shadow-lg shadow-indigo-950/20 transition hover:-translate-y-0.5 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            {loading ? "Memuat Data..." : "Refresh Data"}
+                            <span className={loading ? "animate-spin" : ""}>↻</span>
+                            {loading ? "Memperbarui..." : "Perbarui Data"}
                         </button>
 
                         {highestStage && (
-                            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-cyan-50 backdrop-blur">
-                                Tahapan terbanyak: <span className="font-black">{highestStage.label}</span>
+                            <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-indigo-50 backdrop-blur">
+                                Fokus pipeline: <span className="font-black text-white">{highestStage.label}</span>
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <HeroMetric label="Total Pelamar" value={summary?.total_pelamar || 0} />
-                    <HeroMetric label="Interview" value={summary?.total_jadwal_interview || 0} />
-                    <HeroMetric label="Lolos" value={summary?.stage_counts?.interview_lolos || 0} />
+                <div className="p-6 lg:p-8">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Snapshot Pipeline</p>
+                            <h2 className="mt-2 text-xl font-black text-slate-950">Kinerja rekrutmen saat ini</h2>
+                        </div>
+                        <span className={`rounded-full px-3 py-1.5 text-xs font-black ${attentionCount > 0 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"}`}>
+                            {attentionCount > 0 ? `${attentionCount} perlu tindakan` : "Pipeline sehat"}
+                        </span>
+                    </div>
+
+                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                        <HeroMetric label="Total Pelamar" value={totalPelamar} note="Basis kandidat aktif" tone="indigo" />
+                        <HeroMetric label="Masuk Interview" value={interview} note={`${interviewRate}% dari pelamar`} tone="violet" />
+                        <HeroMetric label="Kandidat Lolos" value={accepted} note={`${conversionRate}% conversion`} tone="emerald" />
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                        <div className="flex items-center justify-between gap-4 text-sm">
+                            <span className="font-bold text-slate-600">Konversi pelamar menjadi kandidat lolos</span>
+                            <span className="font-black text-indigo-700">{conversionRate}%</span>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                            <div className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 transition-all duration-700" style={{ width: `${Math.min(conversionRate, 100)}%` }} />
+                        </div>
+                        <p className="mt-3 text-xs font-semibold text-slate-500">
+                            {accepted > 0
+                                ? `${accepted} dari ${totalPelamar} pelamar telah mencapai hasil interview lolos.`
+                                : "Belum ada kandidat yang mencapai hasil interview lolos."}
+                        </p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
     );
 }
 
-function HeroMetric({ label, value }) {
+function HeroMetric({ label, value, note, tone = "indigo" }) {
+    const tones = {
+        indigo: "border-indigo-100 bg-indigo-50/70 text-indigo-700",
+        violet: "border-violet-100 bg-violet-50/70 text-violet-700",
+        emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-700",
+    };
+
     return (
-        <div className="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100">{label}</p>
-            <p className="mt-2 text-4xl font-black text-white">{formatNumber(value)}</p>
+        <div className={`rounded-2xl border p-4 ${tones[tone] || tones.indigo}`}>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-75">{label}</p>
+            <p className="mt-2 text-3xl font-black text-slate-950">{formatNumber(value)}</p>
+            <p className="mt-1 text-xs font-bold opacity-75">{note}</p>
         </div>
     );
 }
@@ -215,7 +352,7 @@ function MonthlyApplicantsChart({ data }) {
             <div className="border-b border-slate-100 p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-600">Tren Bulanan</p>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Tren Bulanan</p>
                         <h2 className="mt-2 text-2xl font-black text-slate-950">Pelamar Masuk per Bulan</h2>
                         <p className="mt-1 text-sm font-semibold text-slate-500">Rekap berdasarkan tanggal daftar kandidat.</p>
                     </div>
@@ -230,7 +367,7 @@ function MonthlyApplicantsChart({ data }) {
             {items.length > 0 ? (
                 <div className="p-6">
                     {bestMonth && maxValue > 0 && (
-                        <div className="mb-5 rounded-3xl bg-gradient-to-r from-teal-50 to-cyan-50 px-4 py-3 text-sm font-bold text-teal-800 ring-1 ring-teal-100">
+                        <div className="mb-5 rounded-3xl bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-3 text-sm font-bold text-indigo-800 ring-1 ring-indigo-100">
                             Bulan tertinggi: <span className="font-black">{bestMonth.label}</span> dengan <span className="font-black">{bestMonth.total}</span> pelamar.
                         </div>
                     )}
@@ -250,7 +387,7 @@ function MonthlyApplicantsChart({ data }) {
                                         <div className="flex h-60 w-full items-end justify-center rounded-t-3xl px-1">
                                             <div
                                                 className={`w-full max-w-12 rounded-t-2xl bg-gradient-to-t ${
-                                                    isHighest ? "from-cyan-500 to-teal-400" : "from-slate-300 to-slate-400"
+                                                    isHighest ? "from-violet-500 to-indigo-400" : "from-slate-300 to-slate-400"
                                                 } shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg`}
                                                 style={{ height: `${height}px` }}
                                                 title={`${item.label}: ${currentTotal} pelamar`}
@@ -275,26 +412,40 @@ function MonthlyApplicantsChart({ data }) {
 }
 
 function StageOverview({ stages, totalPelamar, highestStage }) {
+    const completedCount = stages.filter((stage) => Number(stage.total || 0) > 0).length;
+
     return (
-        <SectionCard>
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <SectionCard className="border-0 bg-gradient-to-br from-white via-white to-slate-50 shadow-lg shadow-slate-200/60">
+            <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-600">Pipeline Seleksi</p>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Pipeline Seleksi</p>
                     <h2 className="mt-2 text-2xl font-black text-slate-950">Kandidat per Tahapan</h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">Dihitung berdasarkan tahap terakhir kandidat.</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-500">
+                        Posisi terakhir setiap kandidat dalam proses recruitment.
+                    </p>
                 </div>
 
-                {highestStage && (
-                    <span className="w-fit rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700 ring-1 ring-teal-100">
-                        Terbanyak: {highestStage.label}
+                <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
+                        {completedCount} tahap aktif
                     </span>
-                )}
+                    {highestStage && (
+                        <span className="rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 ring-1 ring-indigo-100">
+                            Terbanyak: {highestStage.label}
+                        </span>
+                    )}
+                </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
                 {stages.length > 0 ? (
-                    stages.map((stage) => (
-                        <StageProgress key={stage.key} stage={stage} totalPelamar={totalPelamar} />
+                    stages.map((stage, index) => (
+                        <StageProgress
+                            key={stage.key}
+                            stage={stage}
+                            totalPelamar={totalPelamar}
+                            index={index}
+                        />
                     ))
                 ) : (
                     <EmptyState text="Belum ada data tahapan." />
@@ -335,13 +486,13 @@ function FinalStageCard({ summary, totalFinal }) {
     return (
         <SectionCard>
             <div className="mb-6">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-teal-600">Hasil Akhir</p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Hasil Akhir</p>
                 <h2 className="mt-2 text-2xl font-black text-slate-950">Ringkasan Interview</h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">Status akhir kandidat setelah proses interview.</p>
             </div>
 
-            <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-teal-900 p-5 text-white shadow-lg shadow-slate-200">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100">Total Keputusan</p>
+            <div className="rounded-[2rem] bg-gradient-to-br from-slate-950 to-indigo-900 p-5 text-white shadow-lg shadow-slate-200">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-100">Total Keputusan</p>
                 <p className="mt-2 text-5xl font-black">{formatNumber(totalFinal)}</p>
                 <p className="mt-2 text-sm font-semibold text-slate-200">Kandidat dengan hasil interview final.</p>
             </div>
@@ -373,26 +524,41 @@ function SummaryCard({ label, value, description, icon, accent }) {
     );
 }
 
-function StageProgress({ stage, totalPelamar }) {
+function StageProgress({ stage, totalPelamar, index }) {
     const percentage = Number(stage.percentage || 0);
     const color = STAGE_COLORS[stage.key] || "bg-slate-100 text-slate-700 ring-slate-200";
-    const barColor = STAGE_BAR_COLORS[stage.key] || "from-teal-400 to-teal-600";
+    const barColor = STAGE_BAR_COLORS[stage.key] || "from-indigo-400 to-indigo-600";
+    const hasData = Number(stage.total || 0) > 0;
 
     return (
-        <div className="rounded-3xl border border-slate-100 bg-slate-50/70 p-4 transition hover:bg-white hover:shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${color}`}>{stage.label}</span>
-                <span className="whitespace-nowrap text-sm font-black text-slate-700">
-                    {formatNumber(stage.total)} / {formatNumber(totalPelamar)}
+        <div className={"group rounded-2xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-md " + (hasData ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50/60")}>
+            <div className="flex items-center gap-3">
+                <span className={"flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ring-1 " + color}>
+                    {String(index + 1).padStart(2, "0")}
                 </span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className={"truncate text-sm font-black " + (hasData ? "text-slate-800" : "text-slate-500")}>
+                            {stage.label}
+                        </p>
+                        <p className="shrink-0 text-sm font-black text-slate-950">
+                            {formatNumber(stage.total)}
+                            <span className="ml-1 font-bold text-slate-400">/ {formatNumber(totalPelamar)}</span>
+                        </p>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
+                            <div
+                                className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
+                                style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                        </div>
+                        <span className="w-12 text-right text-xs font-black text-slate-500">
+                            {percentage}%
+                        </span>
+                    </div>
+                </div>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-white ring-1 ring-slate-100">
-                <div
-                    className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all duration-500`}
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                />
-            </div>
-            <p className="mt-2 text-xs font-bold text-slate-400">{percentage}% dari total pelamar</p>
         </div>
     );
 }
@@ -429,7 +595,7 @@ function SectionCard({ children, className = "" }) {
 function LoadingState() {
     return (
         <div className="rounded-[2rem] border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-100 border-t-teal-600" />
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-100 border-t-indigo-600" />
             <p className="mt-4 text-sm font-black text-slate-500">Memuat data dashboard...</p>
         </div>
     );
@@ -438,7 +604,7 @@ function LoadingState() {
 function EmptyState({ text }) {
     return (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-xl shadow-sm">▤</div>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-sm font-black shadow-sm">DATA</div>
             <p className="mt-3 text-sm font-black text-slate-500">{text}</p>
         </div>
     );

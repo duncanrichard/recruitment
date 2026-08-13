@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Posisi extends Model
 {
@@ -32,5 +33,10 @@ class Posisi extends Model
     public function uniqueIds(): array
     {
         return ['id'];
+    }
+
+    public function spesifikasi(): HasMany
+    {
+        return $this->hasMany(PosisiSpesifikasi::class)->orderBy('urutan');
     }
 }

@@ -11,11 +11,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 
 class ReviewManagementController extends Controller
@@ -410,10 +410,10 @@ class ReviewManagementController extends Controller
 
     private function listReviewHasilTestZoom(string $tanggalMulai, string $tanggalSelesai): Collection
     {
-        if (!Schema::hasTable('daftar_hadir_test_zoom') ||
-            !Schema::hasTable('jadwal_test_zoom') ||
-            !Schema::hasTable('hasil_review_management') ||
-            !Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+        if (! Schema::hasTable('daftar_hadir_test_zoom') ||
+            ! Schema::hasTable('jadwal_test_zoom') ||
+            ! Schema::hasTable('hasil_review_management') ||
+            ! Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
             return collect();
         }
 
@@ -554,10 +554,10 @@ class ReviewManagementController extends Controller
 
     private function listReviewHasilTestMmpi(string $tanggalMulai, string $tanggalSelesai): Collection
     {
-        if (!Schema::hasTable('daftar_hadir_test_mmpi') ||
-            !Schema::hasTable('jadwal_test_mmpi') ||
-            !Schema::hasTable('hasil_review_management') ||
-            !Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+        if (! Schema::hasTable('daftar_hadir_test_mmpi') ||
+            ! Schema::hasTable('jadwal_test_mmpi') ||
+            ! Schema::hasTable('hasil_review_management') ||
+            ! Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
             return collect();
         }
 
@@ -678,7 +678,7 @@ class ReviewManagementController extends Controller
 
     private function getLatestHasilTestZoomForKandidat(?string $kandidatId): ?array
     {
-        if (!$kandidatId || !Schema::hasTable('daftar_hadir_test_zoom')) {
+        if (! $kandidatId || ! Schema::hasTable('daftar_hadir_test_zoom')) {
             return null;
         }
 
@@ -723,10 +723,10 @@ class ReviewManagementController extends Controller
 
         $row = $query
             ->select($selects)
-            ->orderByDesc(DB::raw('COALESCE(' . (Schema::hasTable('jadwal_test_zoom') && Schema::hasColumn('jadwal_test_zoom', 'jadwal') ? 'jtz.jadwal, ' : '') . 'dhz.tanggal_kehadiran, dhz.created_at)'))
+            ->orderByDesc(DB::raw('COALESCE('.(Schema::hasTable('jadwal_test_zoom') && Schema::hasColumn('jadwal_test_zoom', 'jadwal') ? 'jtz.jadwal, ' : '').'dhz.tanggal_kehadiran, dhz.created_at)'))
             ->first();
 
-        if (!$row) {
+        if (! $row) {
             return null;
         }
 
@@ -735,7 +735,7 @@ class ReviewManagementController extends Controller
 
     private function getLatestHasilTestMmpiForKandidat(?string $kandidatId): ?array
     {
-        if (!$kandidatId || !Schema::hasTable('daftar_hadir_test_mmpi')) {
+        if (! $kandidatId || ! Schema::hasTable('daftar_hadir_test_mmpi')) {
             return null;
         }
 
@@ -774,10 +774,10 @@ class ReviewManagementController extends Controller
 
         $row = $query
             ->select($selects)
-            ->orderByDesc(DB::raw('COALESCE(' . (Schema::hasTable('jadwal_test_mmpi') && Schema::hasColumn('jadwal_test_mmpi', 'tanggal') ? 'jtm.tanggal, ' : '') . 'dhm.tanggal_kehadiran, dhm.created_at)'))
+            ->orderByDesc(DB::raw('COALESCE('.(Schema::hasTable('jadwal_test_mmpi') && Schema::hasColumn('jadwal_test_mmpi', 'tanggal') ? 'jtm.tanggal, ' : '').'dhm.tanggal_kehadiran, dhm.created_at)'))
             ->first();
 
-        if (!$row) {
+        if (! $row) {
             return null;
         }
 
@@ -882,10 +882,10 @@ class ReviewManagementController extends Controller
 
         $reviewSource = $validated['review_source'] ?? null;
 
-        if (!$reviewSource) {
-            $reviewSource = !empty($validated['hasil_test_zoom_id'])
+        if (! $reviewSource) {
+            $reviewSource = ! empty($validated['hasil_test_zoom_id'])
                 ? 'test_zoom'
-                : (!empty($validated['hasil_test_mmpi_id']) ? 'test_mmpi' : 'interview');
+                : (! empty($validated['hasil_test_mmpi_id']) ? 'test_mmpi' : 'interview');
         }
 
         if ($reviewSource === 'test_zoom') {
@@ -916,7 +916,7 @@ class ReviewManagementController extends Controller
             })
             ->first();
 
-        if (!$jadwalKandidat) {
+        if (! $jadwalKandidat) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data hanya bisa direview jika hasil interview Lolos Interview atau Dipertimbangkan.',
@@ -927,8 +927,8 @@ class ReviewManagementController extends Controller
             ->where('hasil_interview_id', $validated['hasil_interview_id'])
             ->first();
 
-        if (!$review) {
-            $review = new HasilReviewManagement();
+        if (! $review) {
+            $review = new HasilReviewManagement;
             $review->id = (string) Str::uuid();
             $review->hasil_interview_id = $validated['hasil_interview_id'];
         }
@@ -958,7 +958,7 @@ class ReviewManagementController extends Controller
 
     private function storeReviewHasilTestZoom(array $validated): JsonResponse
     {
-        if (!Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
+        if (! Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom daftar_hadir_test_zoom_id belum tersedia di tabel hasil_review_management. Jalankan migration terlebih dahulu.',
@@ -990,7 +990,7 @@ class ReviewManagementController extends Controller
             ->select('dhz.*')
             ->first();
 
-        if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
+        if (! $hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
             return response()->json([
                 'success' => false,
                 'message' => 'Data hanya bisa direview jika hasil test Zoom Lolos.',
@@ -1043,7 +1043,7 @@ class ReviewManagementController extends Controller
 
     private function storeReviewHasilTestMmpi(array $validated): JsonResponse
     {
-        if (!Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
+        if (! Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom daftar_hadir_test_mmpi_id belum tersedia di tabel hasil_review_management. Jalankan migration terlebih dahulu.',
@@ -1075,7 +1075,7 @@ class ReviewManagementController extends Controller
             ->select('dhm.*')
             ->first();
 
-        if (!$hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
+        if (! $hasilTest || $this->normalizeHasilTest($hasilTest->hasil_test ?? null) !== 'lolos') {
             return response()->json([
                 'success' => false,
                 'message' => 'Data hanya bisa direview jika hasil test MMPI Lolos.',
@@ -1128,7 +1128,7 @@ class ReviewManagementController extends Controller
 
     public function show(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
-        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+        if (! $this->reviewManagementIsAccessible($hasilReviewManagement)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
@@ -1156,7 +1156,7 @@ class ReviewManagementController extends Controller
 
     public function update(Request $request, HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
-        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+        if (! $this->reviewManagementIsAccessible($hasilReviewManagement)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
@@ -1189,7 +1189,7 @@ class ReviewManagementController extends Controller
 
     public function destroy(HasilReviewManagement $hasilReviewManagement): JsonResponse
     {
-        if (!$this->reviewManagementIsAccessible($hasilReviewManagement)) {
+        if (! $this->reviewManagementIsAccessible($hasilReviewManagement)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data review management tidak ditemukan untuk perusahaan account login.',
@@ -1254,7 +1254,7 @@ class ReviewManagementController extends Controller
 
     private function formatTanggalWaktuIndonesia($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -1285,12 +1285,12 @@ class ReviewManagementController extends Controller
             return asset($path);
         }
 
-        return asset('storage/' . ltrim($path, '/'));
+        return asset('storage/'.ltrim($path, '/'));
     }
 
     private function makePendaftaranUrl(?string $token): ?string
     {
-        if (!$token) {
+        if (! $token) {
             return null;
         }
 
@@ -1426,7 +1426,7 @@ class ReviewManagementController extends Controller
 
     private function targetHasAnyFilledField($target, array $fields): bool
     {
-        if (!$target) {
+        if (! $target) {
             return false;
         }
 
@@ -1531,24 +1531,23 @@ class ReviewManagementController extends Controller
             return true;
         }
 
-        return !empty($value);
+        return ! empty($value);
     }
 
     private function relationValue($relation, array $columns): ?string
     {
-        if (!$relation) {
+        if (! $relation) {
             return null;
         }
 
         foreach ($columns as $column) {
-            if (!empty($relation->{$column})) {
+            if (! empty($relation->{$column})) {
                 return (string) $relation->{$column};
             }
         }
 
         return null;
     }
-
 
     private function applyPerusahaanScopeToEloquent($query, string $column = 'perusahaan_dilamar'): void
     {
@@ -1580,7 +1579,7 @@ class ReviewManagementController extends Controller
             return false;
         }
 
-        if (!empty($review->hasil_interview_id)) {
+        if (! empty($review->hasil_interview_id)) {
             return DB::table('jadwal_interview_kandidat as jik')
                 ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jik.data_riwayat_diri_id')
                 ->where('jik.id', $review->hasil_interview_id)
@@ -1593,7 +1592,7 @@ class ReviewManagementController extends Controller
 
         if (
             Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_zoom_id') &&
-            !empty($review->daftar_hadir_test_zoom_id)
+            ! empty($review->daftar_hadir_test_zoom_id)
         ) {
             return DB::table('daftar_hadir_test_zoom as dhz')
                 ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhz.data_riwayat_diri_id')
@@ -1610,7 +1609,7 @@ class ReviewManagementController extends Controller
 
         if (
             Schema::hasColumn('hasil_review_management', 'daftar_hadir_test_mmpi_id') &&
-            !empty($review->daftar_hadir_test_mmpi_id)
+            ! empty($review->daftar_hadir_test_mmpi_id)
         ) {
             return DB::table('daftar_hadir_test_mmpi as dhm')
                 ->join('data_riwayat_diri as drd', 'drd.id', '=', 'dhm.data_riwayat_diri_id')
@@ -1637,7 +1636,7 @@ class ReviewManagementController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -1661,7 +1660,7 @@ class ReviewManagementController extends Controller
             $ids = [];
         }
 
-        if (empty($ids) && !empty($user->perusahaan_id)) {
+        if (empty($ids) && ! empty($user->perusahaan_id)) {
             $ids[] = (string) $user->perusahaan_id;
         }
 

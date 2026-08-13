@@ -111,7 +111,7 @@ export default function DataTable({
                         <select
                             value={perPage}
                             onChange={(e) => setPerPage(Number(e.target.value))}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         >
                             {perPageOptions.map((option) => (
                                 <option key={option} value={option}>
@@ -131,7 +131,7 @@ export default function DataTable({
                             value={searchTable}
                             onChange={(e) => setSearchTable(e.target.value)}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         />
                     </div>
                 </div>
@@ -152,7 +152,7 @@ export default function DataTable({
                                         <button
                                             type="button"
                                             onClick={() => handleSort(column)}
-                                            className={`inline-flex items-center gap-2 transition hover:text-teal-700 ${
+                                            className={`inline-flex items-center gap-2 transition hover:text-indigo-700 ${
                                                 column.align === "right"
                                                     ? "justify-end"
                                                     : "justify-start"
@@ -249,7 +249,7 @@ export default function DataTable({
                             Prev
                         </button>
 
-                        <span className="rounded-xl bg-teal-50 px-4 py-2 text-sm font-black text-teal-700">
+                        <span className="rounded-xl bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
                             {currentPage} / {totalPages}
                         </span>
 

@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\DataPerusahaan;
-use App\Models\Divisi;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,9 +10,9 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
+    use HasRoles;
     use HasUuids;
     use Notifiable;
-    use HasRoles;
 
     protected $table = 'users';
 
@@ -88,6 +86,7 @@ class User extends Authenticatable
         if (! empty($value)) {
             if (Hash::needsRehash($value)) {
                 $this->attributes['password'] = Hash::make($value);
+
                 return;
             }
 

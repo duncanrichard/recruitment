@@ -1305,6 +1305,9 @@ function DokumenInterviewDalamTahapan({ jadwalInterview, token, onUpdated }) {
                         <p className="text-xs font-black uppercase tracking-wide text-slate-500">
                             CV
                         </p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                            Format PDF, DOC, atau DOCX. Maksimal 5 MB.
+                        </p>
 
                         {localDokumen.file_cv ? (
                             <a
@@ -1341,6 +1344,9 @@ function DokumenInterviewDalamTahapan({ jadwalInterview, token, onUpdated }) {
                     <div className="mb-3">
                         <p className="text-xs font-black uppercase tracking-wide text-slate-500">
                             Foto
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                            Format JPG, JPEG, PNG, atau WEBP. Maksimal 3 MB.
                         </p>
 
                         {localDokumen.file_foto ? (

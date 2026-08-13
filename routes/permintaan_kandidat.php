@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermintaanKandidatRecruitmentController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/permintaan-kandidat-recruitment')
     ->name('admin.permintaan-kandidat-recruitment.')

@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Account\PermissionController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/account/permission')
     ->name('admin.account.permission.')

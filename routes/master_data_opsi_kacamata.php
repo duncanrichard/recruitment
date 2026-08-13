@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\OpsiKacamataController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/opsi-kacamata')
     ->name('admin.master-data.opsi-kacamata.')

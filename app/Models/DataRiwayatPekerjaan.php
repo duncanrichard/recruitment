@@ -90,7 +90,7 @@ class DataRiwayatPekerjaan extends Model
 
         $cleanValue = preg_replace('/[^0-9.]/', '', (string) $value);
 
-        if ($cleanValue === '' || !is_numeric($cleanValue)) {
+        if ($cleanValue === '' || ! is_numeric($cleanValue)) {
             return null;
         }
 

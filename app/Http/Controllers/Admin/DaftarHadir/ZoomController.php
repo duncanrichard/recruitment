@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\DaftarHadir;
 
 use App\Http\Controllers\Controller;
+use App\Rules\MalwareFreeFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,11 +73,11 @@ class ZoomController extends Controller
 
         $this->applyCompanyScope($query, 'drd.perusahaan_dilamar');
 
-        if (!empty($validated['tanggal_mulai'])) {
+        if (! empty($validated['tanggal_mulai'])) {
             $query->whereDate('jtz.jadwal', '>=', $validated['tanggal_mulai']);
         }
 
-        if (!empty($validated['tanggal_selesai'])) {
+        if (! empty($validated['tanggal_selesai'])) {
             $query->whereDate('jtz.jadwal', '<=', $validated['tanggal_selesai']);
         }
 
@@ -148,25 +149,25 @@ class ZoomController extends Controller
         if (Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
             $selects[] = 'dh.file_hasil_test_zoom';
         } else {
-            $selects[] = DB::raw("NULL as file_hasil_test_zoom");
+            $selects[] = DB::raw('NULL as file_hasil_test_zoom');
         }
 
         if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_iq')) {
             $selects[] = 'dh.hasil_test_iq';
         } else {
-            $selects[] = DB::raw("NULL as hasil_test_iq");
+            $selects[] = DB::raw('NULL as hasil_test_iq');
         }
 
         if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_disc')) {
             $selects[] = 'dh.hasil_test_disc';
         } else {
-            $selects[] = DB::raw("NULL as hasil_test_disc");
+            $selects[] = DB::raw('NULL as hasil_test_disc');
         }
 
         if (Schema::hasColumn('daftar_hadir_test_zoom', 'hasil_test_eysenck')) {
             $selects[] = 'dh.hasil_test_eysenck';
         } else {
-            $selects[] = DB::raw("NULL as hasil_test_eysenck");
+            $selects[] = DB::raw('NULL as hasil_test_eysenck');
         }
 
         if ($nameColumn) {
@@ -302,6 +303,7 @@ class ZoomController extends Controller
                 'file',
                 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
                 'max:5120',
+                new MalwareFreeFile,
             ],
         ], [
             'hasil_test.in' => 'Hasil test harus Lolos atau Gagal.',
@@ -313,14 +315,14 @@ class ZoomController extends Controller
             'file_hasil_test_zoom.max' => 'Ukuran file maksimal 5 MB.',
         ]);
 
-        if (!Schema::hasTable('daftar_hadir_test_zoom')) {
+        if (! Schema::hasTable('daftar_hadir_test_zoom')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tabel daftar_hadir_test_zoom tidak ditemukan.',
             ], 500);
         }
 
-        if ($request->hasFile('file_hasil_test_zoom') && !Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
+        if ($request->hasFile('file_hasil_test_zoom') && ! Schema::hasColumn('daftar_hadir_test_zoom', 'file_hasil_test_zoom')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom file_hasil_test_zoom belum tersedia. Jalankan migration terlebih dahulu.',
@@ -330,15 +332,15 @@ class ZoomController extends Controller
         $missingColumns = [];
 
         foreach (['hasil_test_iq', 'hasil_test_disc', 'hasil_test_eysenck'] as $column) {
-            if ($request->has($column) && !Schema::hasColumn('daftar_hadir_test_zoom', $column)) {
+            if ($request->has($column) && ! Schema::hasColumn('daftar_hadir_test_zoom', $column)) {
                 $missingColumns[] = $column;
             }
         }
 
-        if (!empty($missingColumns)) {
+        if (! empty($missingColumns)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Kolom ' . implode(', ', $missingColumns) . ' belum tersedia. Jalankan migration terlebih dahulu.',
+                'message' => 'Kolom '.implode(', ', $missingColumns).' belum tersedia. Jalankan migration terlebih dahulu.',
             ], 500);
         }
 
@@ -355,7 +357,7 @@ class ZoomController extends Controller
             || $request->has('hasil_test_disc')
             || $request->has('hasil_test_eysenck');
 
-        if (!$hasHasilTestInput && !$hasPsikotesInput && !$request->hasFile('file_hasil_test_zoom')) {
+        if (! $hasHasilTestInput && ! $hasPsikotesInput && ! $request->hasFile('file_hasil_test_zoom')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tidak ada data hasil test yang dikirim.',
@@ -393,7 +395,7 @@ class ZoomController extends Controller
 
         $jadwal = $jadwalQuery->first();
 
-        if (!$jadwal) {
+        if (! $jadwal) {
             return response()->json([
                 'success' => false,
                 'message' => 'Jadwal test Zoom tidak ditemukan.',
@@ -408,7 +410,7 @@ class ZoomController extends Controller
 
         $kehadiran = $this->normalizeKehadiranValue($daftarHadir->status_kehadiran ?? null);
 
-        if (!$daftarHadir || $kehadiran !== 'hadir') {
+        if (! $daftarHadir || $kehadiran !== 'hadir') {
             return response()->json([
                 'success' => false,
                 'message' => 'Hasil test hanya bisa diisi untuk peserta yang status kehadirannya Hadir.',
@@ -430,11 +432,11 @@ class ZoomController extends Controller
                 ->file('file_hasil_test_zoom')
                 ->getClientOriginalExtension();
 
-            $fileName = 'hasil-test-zoom-' .
-                now()->format('Ymd-His') .
-                '-' .
-                Str::random(8) .
-                '.' .
+            $fileName = 'hasil-test-zoom-'.
+                now()->format('Ymd-His').
+                '-'.
+                Str::random(8).
+                '.'.
                 $extension;
 
             $storedPath = $request
@@ -450,7 +452,7 @@ class ZoomController extends Controller
              | Contoh:
              | /storage/test zoom/Duncan/dokumen/hasil-test-zoom.pdf
              */
-            $fileUrl = '/storage/' . $storedPath;
+            $fileUrl = '/storage/'.$storedPath;
         }
 
         $updateData = [
@@ -505,7 +507,6 @@ class ZoomController extends Controller
         ]);
     }
 
-
     private function applyCompanyScope($query, string $companyColumn = 'drd.perusahaan_dilamar'): void
     {
         $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
@@ -516,6 +517,7 @@ class ZoomController extends Controller
 
         if (empty($allowedPerusahaanIds)) {
             $query->whereRaw('1 = 0');
+
             return;
         }
 
@@ -531,7 +533,7 @@ class ZoomController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -566,7 +568,7 @@ class ZoomController extends Controller
             }
         }
 
-        if (empty($ids) && !empty($user->perusahaan_id)) {
+        if (empty($ids) && ! empty($user->perusahaan_id)) {
             $ids[] = (string) $user->perusahaan_id;
         }
 
@@ -613,7 +615,7 @@ class ZoomController extends Controller
         $nama = trim((string) $nama);
 
         if ($kode !== '' && $nama !== '') {
-            return $kode . ' - ' . $nama;
+            return $kode.' - '.$nama;
         }
 
         if ($nama !== '') {
@@ -655,7 +657,7 @@ class ZoomController extends Controller
 
     private function normalizeFileUrl(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -671,11 +673,11 @@ class ZoomController extends Controller
          | ubah jadi:
          | /storage/test zoom/Duncan/dokumen/file.pdf
          */
-        if (!str_starts_with($value, 'http://') &&
-            !str_starts_with($value, 'https://') &&
-            !str_starts_with($value, '/storage/')
+        if (! str_starts_with($value, 'http://') &&
+            ! str_starts_with($value, 'https://') &&
+            ! str_starts_with($value, '/storage/')
         ) {
-            return '/storage/' . ltrim($value, '/');
+            return '/storage/'.ltrim($value, '/');
         }
 
         /*
@@ -695,25 +697,25 @@ class ZoomController extends Controller
 
     private function convertPublicUrlToStoragePath(?string $url): ?string
     {
-        if (!$url) {
+        if (! $url) {
             return null;
         }
 
         $url = $this->normalizeFileUrl($url);
 
-        if (!$url) {
+        if (! $url) {
             return null;
         }
 
         $path = parse_url($url, PHP_URL_PATH);
 
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
         $storagePrefix = '/storage/';
 
-        if (!str_starts_with($path, $storagePrefix)) {
+        if (! str_starts_with($path, $storagePrefix)) {
             return null;
         }
 
@@ -739,7 +741,6 @@ class ZoomController extends Controller
 
         return null;
     }
-
 
     private function emptyToNull($value): ?string
     {

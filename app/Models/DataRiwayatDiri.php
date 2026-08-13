@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -18,13 +21,24 @@ class DataRiwayatDiri extends Model
     use SoftDeletes;
 
     protected $table = 'data_riwayat_diri';
+
     protected $primaryKey = 'id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
+    protected $hidden = [
+        'token_hash',
+        'token_ciphertext',
+    ];
 
     protected $fillable = [
         'id',
         'token',
+        'token_hash',
+        'token_ciphertext',
+        'token_expires_at',
         'posisi_yang_dilamar',
         'perusahaan_dilamar',
         'nama_lengkap',
@@ -85,6 +99,7 @@ class DataRiwayatDiri extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'token_expires_at' => 'datetime',
     ];
 
     public function uniqueIds(): array
@@ -106,8 +121,26 @@ class DataRiwayatDiri extends Model
                 $model->id = (string) Str::uuid();
             }
 
-            if (empty($model->token)) {
-                $model->token = self::generateToken();
+            $plainToken = $model->getRawOriginal('token') ?: self::generateToken();
+
+            if (
+                Schema::hasColumn($model->getTable(), 'token_hash')
+                && Schema::hasColumn($model->getTable(), 'token_ciphertext')
+            ) {
+                $model->setAttribute('token_hash', hash('sha256', $plainToken));
+                $model->setAttribute('token_ciphertext', Crypt::encryptString($plainToken));
+                $model->setAttribute('token', null);
+            } else {
+                $model->setAttribute('token', $plainToken);
+            }
+
+            if (
+                Schema::hasColumn($model->getTable(), 'token_expires_at')
+                && empty($model->token_expires_at)
+            ) {
+                $model->token_expires_at = now()->addDays(
+                    (int) config('recruitment.candidate_token_lifetime_days', 90)
+                );
             }
 
             if (
@@ -143,13 +176,44 @@ class DataRiwayatDiri extends Model
     public static function generateToken(): string
     {
         do {
-            $token = 'KND-'
-                . now()->format('Ymd-His')
-                . '-'
-                . strtoupper(Str::random(6));
+            $token = 'KND-'.Str::random(64);
         } while (self::query()->where('token', $token)->exists());
 
         return $token;
+    }
+
+    public function scopeWithValidToken(Builder $query, string $token): Builder
+    {
+        if (Schema::hasColumn($this->getTable(), 'token_hash')) {
+            $query->where(function (Builder $query) use ($token) {
+                $query->where('token_hash', hash('sha256', $token))
+                    ->orWhere('token', $token);
+            });
+        } else {
+            $query->where('token', $token);
+        }
+
+        if (Schema::hasColumn($this->getTable(), 'token_expires_at')) {
+            $query->where(function (Builder $query) {
+                $query->whereNull('token_expires_at')
+                    ->orWhere('token_expires_at', '>', now());
+            });
+        }
+
+        return $query;
+    }
+
+    protected function token(): Attribute
+    {
+        return Attribute::get(function (?string $value, array $attributes): ?string {
+            if (! empty($value)) {
+                return $value;
+            }
+
+            $ciphertext = $attributes['token_ciphertext'] ?? null;
+
+            return $ciphertext ? Crypt::decryptString($ciphertext) : null;
+        });
     }
 
     public function posisi(): BelongsTo

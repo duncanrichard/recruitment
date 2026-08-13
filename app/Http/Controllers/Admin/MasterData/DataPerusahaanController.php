@@ -45,7 +45,7 @@ class DataPerusahaanController extends Controller
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
 
-        if (!$nomorPerusahaan) {
+        if (! $nomorPerusahaan) {
             throw ValidationException::withMessages([
                 'no_wa' => 'Format nomor WhatsApp tidak valid. Gunakan 08xxx, 628xxx, atau +628xxx.',
             ]);
@@ -73,7 +73,7 @@ class DataPerusahaanController extends Controller
 
         $nomorPerusahaan = $this->normalizeWhatsappNumber($validated['no_wa']);
 
-        if (!$nomorPerusahaan) {
+        if (! $nomorPerusahaan) {
             throw ValidationException::withMessages([
                 'no_wa' => 'Format nomor WhatsApp tidak valid. Gunakan 08xxx, 628xxx, atau +628xxx.',
             ]);
@@ -84,7 +84,7 @@ class DataPerusahaanController extends Controller
             'no_wa' => $nomorPerusahaan,
         ];
 
-        if (!empty($validated['token_api_wa'])) {
+        if (! empty($validated['token_api_wa'])) {
             $payload['token_api_wa'] = trim($validated['token_api_wa']);
         }
 
@@ -181,7 +181,7 @@ class DataPerusahaanController extends Controller
 
     private function checkFonnteDevice(?string $token): array
     {
-        if (!$token || trim($token) === '') {
+        if (! $token || trim($token) === '') {
             return $this->fonnteResult(
                 false,
                 'token_empty',
@@ -191,18 +191,11 @@ class DataPerusahaanController extends Controller
         }
 
         try {
-            $deviceUrl = env(
-                'FONNTE_DEVICE_URL',
-                'https://api.fonnte.com/device'
-            );
+            $deviceUrl = config('services.fonnte.device_url');
+            $connectTimeout = (int) config('services.fonnte.connect_timeout', 10);
+            $timeout = (int) config('services.fonnte.timeout', 20);
 
-            $connectTimeout = (int) env('FONNTE_CONNECT_TIMEOUT', 10);
-            $timeout = (int) env('FONNTE_TIMEOUT', 20);
-
-            $response = Http::withoutVerifying()
-                ->withOptions([
-                    'verify' => false,
-                ])
+            $response = Http::withOptions(['verify' => (bool) config('services.http.verify_tls', true)])
                 ->acceptJson()
                 ->withHeaders([
                     'Authorization' => trim($token),
@@ -214,13 +207,13 @@ class DataPerusahaanController extends Controller
             $json = $response->json();
             $payload = is_array($json) ? $json : [];
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $message = $response->status() === 405
                     ? 'Metode request Fonnte ditolak. Endpoint /device harus dipanggil menggunakan POST.'
                     : (
                         $payload['reason']
                         ?? $payload['message']
-                        ?? 'Fonnte mengembalikan HTTP ' . $response->status() . '.'
+                        ?? 'Fonnte mengembalikan HTTP '.$response->status().'.'
                     );
 
                 return $this->fonnteResult(
@@ -267,7 +260,7 @@ class DataPerusahaanController extends Controller
                 || ($deviceStatus === '' && $deviceNumber !== null)
             );
 
-            if (!$connected) {
+            if (! $connected) {
                 $message = (string) (
                     $payload['reason']
                     ?? $payload['message']
@@ -300,7 +293,7 @@ class DataPerusahaanController extends Controller
                 false,
                 'error',
                 'Koneksi Gagal',
-                'Tidak dapat terhubung ke API Fonnte: ' . $e->getMessage()
+                'Tidak dapat terhubung ke API Fonnte: '.$e->getMessage()
             );
         } catch (\Throwable $e) {
             report($e);
@@ -309,7 +302,7 @@ class DataPerusahaanController extends Controller
                 false,
                 'error',
                 'Gagal Cek',
-                'Gagal memvalidasi Fonnte: ' . $e->getMessage()
+                'Gagal memvalidasi Fonnte: '.$e->getMessage()
             );
         }
     }
@@ -362,7 +355,7 @@ class DataPerusahaanController extends Controller
     private function generateKodePerusahaan(): string
     {
         do {
-            $kode = 'PRS-' . now()->format('ymd') . '-' . strtoupper(Str::random(5));
+            $kode = 'PRS-'.now()->format('ymd').'-'.strtoupper(Str::random(5));
         } while (DataPerusahaan::where('kode', $kode)->exists());
 
         return $kode;
@@ -377,16 +370,16 @@ class DataPerusahaanController extends Controller
         $value = preg_replace('/@.*/', '', trim($value));
         $value = preg_replace('/[^0-9+]/', '', $value);
 
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
         $value = ltrim($value, '+');
 
         if (Str::startsWith($value, '0')) {
-            $value = '62' . substr($value, 1);
+            $value = '62'.substr($value, 1);
         } elseif (Str::startsWith($value, '8')) {
-            $value = '62' . $value;
+            $value = '62'.$value;
         }
 
         return preg_match('/^62[0-9]{8,15}$/', $value) ? $value : null;

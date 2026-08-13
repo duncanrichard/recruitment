@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Account\RoleController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/account/role')
     ->name('admin.account.role.')

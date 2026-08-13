@@ -1,11 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+const INITIAL_FORM = {
+    nama_posisi: "",
+    deskripsi: "",
+    spesifikasi_items: [],
+    str_aktif: "non_active",
+};
+
 export default function PosisiPage({ actionSignals }) {
     const [dataPosisi, setDataPosisi] = useState([]);
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [newSpecificationName, setNewSpecificationName] = useState("");
 
     const [search, setSearch] = useState("");
     const [entriesPerPage, setEntriesPerPage] = useState(10);
@@ -15,11 +23,7 @@ export default function PosisiPage({ actionSignals }) {
         direction: "asc",
     });
 
-    const [form, setForm] = useState({
-        nama_posisi: "",
-        deskripsi: "",
-        str_aktif: "non_active",
-    });
+    const [form, setForm] = useState({ ...INITIAL_FORM });
 
     const getCsrfToken = () => {
         return document
@@ -29,12 +33,7 @@ export default function PosisiPage({ actionSignals }) {
 
     const resetForm = () => {
         setEditId(null);
-
-        setForm({
-            nama_posisi: "",
-            deskripsi: "",
-            str_aktif: "non_active",
-        });
+        setForm({ ...INITIAL_FORM });
     };
 
     const getFirstErrorMessage = (errors) => {
@@ -71,7 +70,7 @@ export default function PosisiPage({ actionSignals }) {
 
             return {
                 success: false,
-                message: `Response server bukan JSON valid. Status: ${response.status} ${response.statusText}. Cek Console untuk detail error.`,
+                message: `Response server bukan JSON valid. Status: ${response.status} ${response.statusText}.`,
                 error: error.message,
                 raw: text,
             };
@@ -94,8 +93,6 @@ export default function PosisiPage({ actionSignals }) {
             const result = await parseResponse(response);
 
             if (!response.ok) {
-                console.error("Gagal mengambil data posisi:", result);
-
                 alert(
                     getFirstErrorMessage(result.errors) ||
                         result.message ||
@@ -112,7 +109,10 @@ export default function PosisiPage({ actionSignals }) {
             }
         } catch (error) {
             console.error("Gagal mengambil data posisi:", error);
-            alert(error.message || "Terjadi kesalahan saat mengambil data posisi.");
+            alert(
+                error.message ||
+                    "Terjadi kesalahan saat mengambil data posisi."
+            );
         } finally {
             setTableLoading(false);
         }
@@ -133,9 +133,7 @@ export default function PosisiPage({ actionSignals }) {
         setCurrentPage(1);
     }, [search, entriesPerPage]);
 
-    const isActive = (status) => {
-        return status === "active";
-    };
+    const isActive = (status) => status === "active";
 
     const filteredData = useMemo(() => {
         const keyword = search.toLowerCase().trim();
@@ -145,26 +143,27 @@ export default function PosisiPage({ actionSignals }) {
         }
 
         return dataPosisi.filter((item) => {
-            const namaPosisi = String(item.nama_posisi || "").toLowerCase();
-            const deskripsi = String(item.deskripsi || "").toLowerCase();
-            const statusText = isActive(item.str_aktif)
-                ? "aktif active"
-                : "tidak aktif non_active";
+            const searchableText = [
+                item.nama_posisi,
+                item.deskripsi,
+                ...(item.spesifikasi_items || []).map((entry) => entry.spesifikasi),
+                isActive(item.str_aktif)
+                    ? "aktif active"
+                    : "tidak aktif non_active",
+            ]
+                .map((value) => String(value || "").toLowerCase())
+                .join(" ");
 
-            return (
-                namaPosisi.includes(keyword) ||
-                deskripsi.includes(keyword) ||
-                statusText.includes(keyword)
-            );
+            return searchableText.includes(keyword);
         });
     }, [dataPosisi, search]);
 
     const sortedData = useMemo(() => {
-        const data = [...filteredData];
+        const result = [...filteredData];
 
-        data.sort((a, b) => {
-            let valueA = "";
-            let valueB = "";
+        result.sort((a, b) => {
+            let valueA;
+            let valueB;
 
             if (sortConfig.key === "status") {
                 valueA = isActive(a.str_aktif) ? "aktif" : "tidak aktif";
@@ -185,13 +184,19 @@ export default function PosisiPage({ actionSignals }) {
             return 0;
         });
 
-        return data;
+        return result;
     }, [filteredData, sortConfig]);
 
     const totalPages = Math.max(
         1,
         Math.ceil(sortedData.length / entriesPerPage)
     );
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
     const paginatedData = useMemo(() => {
         const startIndex = (currentPage - 1) * entriesPerPage;
@@ -201,9 +206,14 @@ export default function PosisiPage({ actionSignals }) {
     }, [sortedData, currentPage, entriesPerPage]);
 
     const showingFrom =
-        sortedData.length === 0 ? 0 : (currentPage - 1) * entriesPerPage + 1;
+        sortedData.length === 0
+            ? 0
+            : (currentPage - 1) * entriesPerPage + 1;
 
-    const showingTo = Math.min(currentPage * entriesPerPage, sortedData.length);
+    const showingTo = Math.min(
+        currentPage * entriesPerPage,
+        sortedData.length
+    );
 
     const pageNumbers = useMemo(() => {
         const pages = [];
@@ -214,14 +224,14 @@ export default function PosisiPage({ actionSignals }) {
             currentPage - Math.floor(maxVisiblePages / 2)
         );
 
-        let endPage = startPage + maxVisiblePages - 1;
+        let endPage = Math.min(
+            totalPages,
+            startPage + maxVisiblePages - 1
+        );
 
-        if (endPage > totalPages) {
-            endPage = totalPages;
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
 
-        for (let page = startPage; page <= endPage; page++) {
+        for (let page = startPage; page <= endPage; page += 1) {
             pages.push(page);
         }
 
@@ -229,11 +239,12 @@ export default function PosisiPage({ actionSignals }) {
     }, [currentPage, totalPages]);
 
     const handleSort = (key) => {
-        setSortConfig((prev) => {
-            if (prev.key === key) {
+        setSortConfig((previous) => {
+            if (previous.key === key) {
                 return {
                     key,
-                    direction: prev.direction === "asc" ? "desc" : "asc",
+                    direction:
+                        previous.direction === "asc" ? "desc" : "asc",
                 };
             }
 
@@ -252,11 +263,11 @@ export default function PosisiPage({ actionSignals }) {
         return sortConfig.direction === "asc" ? "↑" : "↓";
     };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
+    const handleChange = (event) => {
+        const { name, value } = event.target;
 
-        setForm((prev) => ({
-            ...prev,
+        setForm((previous) => ({
+            ...previous,
             [name]: value,
         }));
     };
@@ -266,8 +277,26 @@ export default function PosisiPage({ actionSignals }) {
         resetForm();
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        const payload = {
+            nama_posisi: form.nama_posisi.trim(),
+            deskripsi: form.deskripsi.trim() || null,
+            spesifikasi: form.spesifikasi_items.map((item) => item.spesifikasi.trim()).filter(Boolean),
+            str_aktif: form.str_aktif,
+        };
+
+        if (!payload.nama_posisi) {
+            alert("Nama posisi wajib diisi.");
+            return;
+        }
+
+        if (!payload.spesifikasi.length) {
+            alert("Pilih minimal satu spesifikasi kualifikasi.");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -286,14 +315,12 @@ export default function PosisiPage({ actionSignals }) {
                     "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             const result = await parseResponse(response);
 
             if (!response.ok) {
-                console.error("Gagal menyimpan data posisi:", result);
-
                 alert(
                     getFirstErrorMessage(result.errors) ||
                         result.message ||
@@ -308,7 +335,10 @@ export default function PosisiPage({ actionSignals }) {
             fetchData();
         } catch (error) {
             console.error("Gagal menyimpan data posisi:", error);
-            alert(error.message || "Terjadi kesalahan saat menyimpan data posisi.");
+            alert(
+                error.message ||
+                    "Terjadi kesalahan saat menyimpan data posisi."
+            );
         } finally {
             setLoading(false);
         }
@@ -320,6 +350,7 @@ export default function PosisiPage({ actionSignals }) {
         setForm({
             nama_posisi: item.nama_posisi || "",
             deskripsi: item.deskripsi || "",
+            spesifikasi_items: item.spesifikasi_items || [],
             str_aktif: item.str_aktif || "non_active",
         });
 
@@ -327,26 +358,29 @@ export default function PosisiPage({ actionSignals }) {
     };
 
     const handleDelete = async (id) => {
-        const confirmDelete = confirm("Yakin ingin menghapus data posisi ini?");
+        const confirmed = confirm(
+            "Yakin ingin menghapus data posisi ini?"
+        );
 
-        if (!confirmDelete) return;
+        if (!confirmed) return;
 
         try {
-            const response = await fetch(`/admin/master-data/posisi/${id}`, {
-                method: "DELETE",
-                credentials: "same-origin",
-                headers: {
-                    Accept: "application/json",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "X-CSRF-TOKEN": getCsrfToken(),
-                },
-            });
+            const response = await fetch(
+                `/admin/master-data/posisi/${id}`,
+                {
+                    method: "DELETE",
+                    credentials: "same-origin",
+                    headers: {
+                        Accept: "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRF-TOKEN": getCsrfToken(),
+                    },
+                }
+            );
 
             const result = await parseResponse(response);
 
             if (!response.ok) {
-                console.error("Gagal menghapus data posisi:", result);
-
                 alert(
                     getFirstErrorMessage(result.errors) ||
                         result.message ||
@@ -356,24 +390,43 @@ export default function PosisiPage({ actionSignals }) {
                 return;
             }
 
-            if (result.success) {
-                alert(result.message || "Data posisi berhasil dihapus.");
-                fetchData();
-            } else {
-                alert(result.message || "Data posisi gagal dihapus.");
-            }
+            alert(result.message || "Data posisi berhasil dihapus.");
+            fetchData();
         } catch (error) {
             console.error("Gagal menghapus data posisi:", error);
-            alert(error.message || "Terjadi kesalahan saat menghapus data posisi.");
+            alert(
+                error.message ||
+                    "Terjadi kesalahan saat menghapus data posisi."
+            );
         }
     };
 
-    const handlePreviousPage = () => {
-        setCurrentPage((prev) => Math.max(prev - 1, 1));
+    const qualificationPreview = (text) => {
+        const value = String(text || "").trim();
+
+        if (!value) {
+            return [];
+        }
+
+        return value
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
     };
 
-    const handleNextPage = () => {
-        setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+    const createSpecification = () => {
+        const name = newSpecificationName.trim();
+        if (!name) return alert("Spesifikasi wajib diisi.");
+        setForm((previous) => ({ ...previous, spesifikasi_items: [...previous.spesifikasi_items, { id: `local-${Date.now()}`, spesifikasi: name }] }));
+        setNewSpecificationName("");
+    };
+
+    const deleteSpecification = (item) => {
+        if (!confirm(`Hapus spesifikasi “${item.spesifikasi}” dari posisi ini?`)) return;
+        setForm((previous) => ({
+            ...previous,
+            spesifikasi_items: previous.spesifikasi_items.filter((entry) => entry.id !== item.id),
+        }));
     };
 
     return (
@@ -389,15 +442,17 @@ export default function PosisiPage({ actionSignals }) {
                             <select
                                 value={entriesPerPage}
                                 onChange={(event) =>
-                                    setEntriesPerPage(Number(event.target.value))
+                                    setEntriesPerPage(
+                                        Number(event.target.value)
+                                    )
                                 }
                                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
                             >
-                                <option value={5}>5</option>
-                                <option value={10}>10</option>
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
+                                {[5, 10, 25, 50, 100].map((value) => (
+                                    <option key={value} value={value}>
+                                        {value}
+                                    </option>
+                                ))}
                             </select>
 
                             <span className="text-sm font-bold text-slate-600">
@@ -416,7 +471,7 @@ export default function PosisiPage({ actionSignals }) {
                                 onChange={(event) =>
                                     setSearch(event.target.value)
                                 }
-                                placeholder="Cari posisi..."
+                                placeholder="Cari posisi atau kualifikasi..."
                                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
                             />
                         </div>
@@ -442,6 +497,13 @@ export default function PosisiPage({ actionSignals }) {
                                 />
 
                                 <SortableTableHead
+                                    label="Kualifikasi"
+                                    sortKey="kualifikasi"
+                                    onSort={handleSort}
+                                    icon={sortIcon("kualifikasi")}
+                                />
+
+                                <SortableTableHead
                                     label="Status STR"
                                     sortKey="status"
                                     onSort={handleSort}
@@ -455,68 +517,86 @@ export default function PosisiPage({ actionSignals }) {
                         <tbody className="divide-y divide-slate-100 bg-white">
                             {tableLoading ? (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-16">
+                                    <td colSpan="5" className="px-6 py-16">
                                         <div className="text-center text-sm font-black text-slate-500">
                                             Memuat data...
                                         </div>
                                     </td>
                                 </tr>
                             ) : paginatedData.length > 0 ? (
-                                paginatedData.map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        className="group transition hover:bg-slate-50"
-                                    >
-                                        <td className="px-6 py-5">
-                                            <div className="font-black text-slate-950">
-                                                {item.nama_posisi}
-                                            </div>
-                                        </td>
+                                paginatedData.map((item) => {
+                                    const specifications = item.spesifikasi_items || [];
 
-                                        <td className="px-6 py-5 text-sm font-medium text-slate-500">
-                                            {item.deskripsi || "-"}
-                                        </td>
+                                    return (
+                                        <tr
+                                            key={item.id}
+                                            className="group transition hover:bg-slate-50"
+                                        >
+                                            <td className="px-6 py-5 align-top">
+                                                <div className="font-black text-slate-950">
+                                                    {item.nama_posisi}
+                                                </div>
+                                            </td>
 
-                                        <td className="px-6 py-5">
-                                            <span
-                                                className={`inline-flex rounded-full px-3 py-1.5 text-xs font-black ${
-                                                    isActive(item.str_aktif)
-                                                        ? "bg-emerald-50 text-emerald-700"
-                                                        : "bg-rose-50 text-rose-700"
-                                                }`}
-                                            >
-                                                {isActive(item.str_aktif)
-                                                    ? "Aktif"
-                                                    : "Tidak Aktif"}
-                                            </span>
-                                        </td>
+                                            <td className="max-w-xs px-6 py-5 align-top">
+                                                <p className="line-clamp-3 text-sm font-medium leading-6 text-slate-500">
+                                                    {item.deskripsi || "-"}
+                                                </p>
+                                            </td>
 
-                                        <td className="px-6 py-5 text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleEdit(item)}
-                                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                            <td className="min-w-[440px] max-w-[580px] px-6 py-5 align-top">
+                                                <QualificationTableCell items={specifications} />
+                                            </td>
+
+                                            <td className="px-6 py-5 align-top">
+                                                <span
+                                                    className={`inline-flex rounded-full px-3 py-1.5 text-xs font-black ${
+                                                        isActive(
+                                                            item.str_aktif
+                                                        )
+                                                            ? "bg-emerald-50 text-emerald-700"
+                                                            : "bg-rose-50 text-rose-700"
+                                                    }`}
                                                 >
-                                                    Edit
-                                                </button>
+                                                    {isActive(
+                                                        item.str_aktif
+                                                    )
+                                                        ? "Aktif"
+                                                        : "Tidak Aktif"}
+                                                </span>
+                                            </td>
 
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        handleDelete(item.id)
-                                                    }
-                                                    className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50 hover:text-rose-700"
-                                                >
-                                                    Hapus
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                            <td className="px-6 py-5 text-right align-top">
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleEdit(item)
+                                                        }
+                                                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition hover:bg-slate-50"
+                                                    >
+                                                        Edit
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleDelete(
+                                                                item.id
+                                                            )
+                                                        }
+                                                        className="rounded-2xl border border-rose-100 bg-white px-4 py-2 text-xs font-black text-rose-600 shadow-sm transition hover:bg-rose-50"
+                                                    >
+                                                        Hapus
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             ) : (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-16">
+                                    <td colSpan="5" className="px-6 py-16">
                                         <div className="mx-auto max-w-sm text-center">
                                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-2xl">
                                                 ▦
@@ -527,7 +607,8 @@ export default function PosisiPage({ actionSignals }) {
                                             </h3>
 
                                             <p className="mt-2 text-sm font-medium text-slate-500">
-                                                Tidak ada data posisi yang sesuai dengan pencarian.
+                                                Tidak ada data posisi yang
+                                                sesuai dengan pencarian.
                                             </p>
                                         </div>
                                     </td>
@@ -544,20 +625,23 @@ export default function PosisiPage({ actionSignals }) {
                         {search && (
                             <span>
                                 {" "}
-                                filtered from {dataPosisi.length} total entries
+                                filtered from {dataPosisi.length} total
+                                entries
                             </span>
                         )}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
+                        <PaginationButton
                             disabled={currentPage === 1}
-                            onClick={handlePreviousPage}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() =>
+                                setCurrentPage((previous) =>
+                                    Math.max(previous - 1, 1)
+                                )
+                            }
                         >
                             Previous
-                        </button>
+                        </PaginationButton>
 
                         {pageNumbers.map((page) => (
                             <button
@@ -574,49 +658,60 @@ export default function PosisiPage({ actionSignals }) {
                             </button>
                         ))}
 
-                        <button
-                            type="button"
+                        <PaginationButton
                             disabled={currentPage === totalPages}
-                            onClick={handleNextPage}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() =>
+                                setCurrentPage((previous) =>
+                                    Math.min(
+                                        previous + 1,
+                                        totalPages
+                                    )
+                                )
+                            }
                         >
                             Next
-                        </button>
+                        </PaginationButton>
                     </div>
                 </div>
             </div>
 
             {modalOpen && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-                    <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+                    <div className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
                         <div className="shrink-0 border-b border-slate-200 bg-white">
-                            <div className="flex items-center justify-between gap-4 px-6 py-5">
+                            <div className="flex items-start justify-between gap-4 px-6 py-5">
                                 <div>
                                     <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
                                         Form Posisi
                                     </div>
 
                                     <h2 className="mt-2 text-2xl font-black text-slate-950">
-                                        {editId ? "Edit Posisi" : "Tambah Posisi"}
+                                        {editId
+                                            ? "Edit Posisi"
+                                            : "Tambah Posisi"}
                                     </h2>
 
                                     <p className="mt-1 text-sm font-medium text-slate-500">
-                                        Lengkapi nama posisi, deskripsi, dan status STR.
+                                        Lengkapi posisi, deskripsi,
+                                        kualifikasi, dan status STR.
                                     </p>
                                 </div>
 
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-500 transition hover:bg-slate-200 hover:text-slate-800"
+                                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-500 transition hover:bg-slate-200"
                                 >
                                     ×
                                 </button>
                             </div>
                         </div>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="space-y-5 px-6 py-6">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex min-h-0 flex-1 flex-col"
+                        >
+                            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
                                 <Input
                                     label="Nama Posisi"
                                     name="nama_posisi"
@@ -632,7 +727,30 @@ export default function PosisiPage({ actionSignals }) {
                                     value={form.deskripsi}
                                     onChange={handleChange}
                                     placeholder="Masukkan deskripsi posisi"
+                                    rows={4}
                                 />
+
+                                <section className="rounded-3xl border border-indigo-100 bg-indigo-50/40 p-5">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">Kualifikasi Posisi</p>
+                                            <h3 className="mt-1 text-lg font-black text-slate-950">Pilih spesifikasi yang dibutuhkan</h3>
+                                            <p className="mt-1 text-sm font-semibold text-slate-500">Dapat memilih lebih dari satu spesifikasi dari berbagai jenis.</p>
+                                        </div>
+                                        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-indigo-700 shadow-sm">{form.spesifikasi_items.length} spesifikasi</span>
+                                    </div>
+
+                                    <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+                                        <input value={newSpecificationName} onChange={(event) => setNewSpecificationName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createSpecification(); } }} placeholder="Tulis spesifikasi, contoh: Pendidikan minimal S1" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-500" />
+                                        <button type="button" onClick={createSpecification} className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-700">+ Tambah Spesifikasi</button>
+                                    </div>
+
+                                    <QualificationMultiSelect
+                                        items={form.spesifikasi_items}
+                                        onChange={(items) => setForm((previous) => ({ ...previous, spesifikasi_items: items }))}
+                                        onDelete={deleteSpecification}
+                                    />
+                                </section>
 
                                 <StatusSelect
                                     label="Status STR"
@@ -673,8 +791,123 @@ export default function PosisiPage({ actionSignals }) {
     );
 }
 
+function CreatableTypeSelect({ types, selectedId, query, onQueryChange, onSelect, onCreate }) {
+    const [open, setOpen] = useState(false);
+    const normalizedQuery = query.trim().toLowerCase();
+    const matches = types.filter((type) =>
+        !normalizedQuery || type.nama.toLowerCase().includes(normalizedQuery)
+    );
+    const exactMatch = types.some((type) => type.nama.toLowerCase() === normalizedQuery);
+    const selectedType = types.find((type) => type.id === selectedId);
+
+    return (
+        <div className="relative">
+            <label className="mb-2 block text-sm font-black text-slate-700">Cari atau buat jenis kualifikasi</label>
+            <div className={`flex items-center rounded-xl border bg-white px-4 ring-4 ring-transparent transition focus-within:border-indigo-500 focus-within:ring-indigo-100 ${selectedId ? "border-indigo-300" : "border-slate-200"}`}>
+                <span className="mr-3 text-indigo-500">⌕</span>
+                <input
+                    value={query}
+                    onFocus={() => setOpen(true)}
+                    onChange={(event) => { onQueryChange(event.target.value); setOpen(true); }}
+                    placeholder="Contoh: Pendidikan, Pengalaman Kerja, Soft Skill"
+                    className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-slate-700 outline-none"
+                />
+                {selectedType && <span className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">Terpilih</span>}
+            </div>
+
+            {open && (
+                <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+                    {matches.map((type) => (
+                        <button key={type.id} type="button" onClick={() => { onSelect(type); setOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold transition hover:bg-indigo-50 ${selectedId === type.id ? "bg-indigo-50 text-indigo-700" : "text-slate-700"}`}>
+                            <span>{type.nama}</span>
+                            <span className="text-xs text-slate-400">{(type.spesifikasi || []).length} spesifikasi</span>
+                        </button>
+                    ))}
+                    {normalizedQuery && !exactMatch && (
+                        <button type="button" onClick={() => { onCreate(); setOpen(false); }} className="mt-1 flex w-full items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-left text-sm font-black text-white">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">+</span>
+                            Buat jenis “{query.trim()}”
+                        </button>
+                    )}
+                    {!matches.length && !normalizedQuery && <p className="px-4 py-5 text-center text-sm font-bold text-slate-400">Ketik nama jenis kualifikasi.</p>}
+                </div>
+            )}
+            <p className="mt-2 text-xs font-semibold text-slate-500">Cari data yang tersedia. Jika tidak ditemukan, buat jenis baru dari hasil pencarian.</p>
+        </div>
+    );
+}
+
+function QualificationTableCell({ items }) {
+    const [expanded, setExpanded] = useState(false);
+    const visibleItems = expanded ? items : items.slice(0, 3);
+
+    if (!items.length) {
+        return (
+            <div className="inline-flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm text-slate-400 shadow-sm">—</span>
+                <div>
+                    <p className="text-sm font-black text-slate-500">Belum ada spesifikasi</p>
+                    <p className="text-xs font-semibold text-slate-400">Tambahkan melalui menu Edit.</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-2.5">
+            <div className="mb-1 flex items-center gap-2">
+                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700 ring-1 ring-indigo-100">
+                    {items.length} spesifikasi
+                </span>
+            </div>
+
+            {visibleItems.map((item, index) => (
+                <div key={item.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5 transition hover:border-indigo-100 hover:bg-indigo-50/50">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-[11px] font-black text-indigo-700">
+                        {index + 1}
+                    </span>
+                    <p className="min-w-0 text-sm font-semibold leading-5 text-slate-700">
+                        {item.spesifikasi}
+                    </p>
+                </div>
+            ))}
+
+            {items.length > 3 && (
+                <button type="button" onClick={() => setExpanded((value) => !value)} className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-black text-indigo-600 transition hover:bg-indigo-50 hover:text-violet-700">
+                    {expanded ? "Ringkas" : `Lihat ${items.length - 3} spesifikasi lainnya`}
+                    <span>{expanded ? "↑" : "↓"}</span>
+                </button>
+            )}
+        </div>
+    );
+}
+
+function QualificationMultiSelect({ items, onChange, onDelete }) {
+    const updateValue = (id, value) => onChange(items.map((item) =>
+        item.id === id ? { ...item, spesifikasi: value } : item
+    ));
+    return (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="max-h-72 overflow-y-auto p-4">
+                <div className="grid gap-2 sm:grid-cols-2">
+                            {items.map((item, index) => (
+                                <div key={item.id} className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2.5">
+                                    <span className="text-xs font-black text-indigo-400">{index + 1}.</span>
+                                    <input value={item.spesifikasi} onChange={(event) => updateValue(item.id, event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none focus:text-indigo-800" aria-label="Edit spesifikasi" />
+                                    <span title="Dapat diedit" className="text-xs text-indigo-400">✎</span>
+                                    <button type="button" onClick={() => onDelete(item)} title="Hapus dari posisi ini" aria-label={`Hapus ${item.spesifikasi}`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-black text-slate-400 transition hover:bg-rose-100 hover:text-rose-600">×</button>
+                                </div>
+                            ))}
+                </div>
+                {!items.length && <p className="py-5 text-center text-sm font-bold text-slate-400">Belum ada kualifikasi untuk posisi ini.</p>}
+            </div>
+        </div>
+    );
+}
+
 function TableHead({ children, align = "left" }) {
-    const alignClass = align === "right" ? "text-right" : "text-left";
+    const alignClass =
+        align === "right" ? "text-right" : "text-left";
 
     return (
         <th
@@ -685,7 +918,12 @@ function TableHead({ children, align = "left" }) {
     );
 }
 
-function SortableTableHead({ label, sortKey, onSort, icon }) {
+function SortableTableHead({
+    label,
+    sortKey,
+    onSort,
+    icon,
+}) {
     return (
         <th className="px-6 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-500">
             <button
@@ -713,7 +951,9 @@ function Input({
         <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
                 {label}
-                {required && <span className="text-rose-500"> *</span>}
+                {required && (
+                    <span className="text-rose-500"> *</span>
+                )}
             </label>
 
             <input
@@ -729,21 +969,40 @@ function Input({
     );
 }
 
-function Textarea({ label, name, value, onChange, placeholder = "" }) {
+function Textarea({
+    label,
+    name,
+    value,
+    onChange,
+    placeholder = "",
+    rows = 4,
+    required = false,
+    helperText = "",
+}) {
     return (
         <div>
             <label className="mb-2 block text-sm font-black text-slate-700">
                 {label}
+                {required && (
+                    <span className="text-rose-500"> *</span>
+                )}
             </label>
 
             <textarea
                 name={name}
                 value={value}
                 onChange={onChange}
-                rows="4"
+                rows={rows}
+                required={required}
                 placeholder={placeholder}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold leading-7 text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
             />
+
+            {helperText && (
+                <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-500">
+                    {helperText}
+                </p>
+            )}
         </div>
     );
 }
@@ -764,10 +1023,23 @@ function StatusSelect({ label, name, value, onChange }) {
                 <option value="non_active">Tidak Aktif</option>
                 <option value="active">Aktif</option>
             </select>
-
-            <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold leading-5 text-slate-500">
-                Default saat tambah data: Tidak Aktif. Value database: {value}
-            </p>
         </div>
+    );
+}
+
+function PaginationButton({
+    children,
+    disabled,
+    onClick,
+}) {
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onClick}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+            {children}
+        </button>
     );
 }

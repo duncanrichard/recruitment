@@ -15,6 +15,16 @@ export default function DataPelamarPage({
 
     const today = getTodayDate();
     const [dataPelamar, setDataPelamar] = useState([]);
+    const [listLoading, setListLoading] = useState(true);
+    const [listMeta, setListMeta] = useState({
+        current_page: 1,
+        last_page: 1,
+        per_page: 10,
+        total: 0,
+        from: 0,
+        to: 0,
+    });
+    const listQueryRef = useRef({ page: 1, per_page: 10, search: "" });
     const [dataPosisi, setDataPosisi] = useState([]);
     const [dataPerusahaan, setDataPerusahaan] = useState([]);
     const [dataSumberInformasi, setDataSumberInformasi] = useState([]);
@@ -147,9 +157,16 @@ export default function DataPelamarPage({
         return result;
     };
 
-    const fetchData = async (filters = appliedTanggalSkrining) => {
+    const fetchData = async (filters = appliedTanggalSkrining, queryOverrides = {}) => {
+        const query = { ...listQueryRef.current, ...queryOverrides };
+        listQueryRef.current = query;
+        setListLoading(true);
         try {
             const params = new URLSearchParams();
+
+            params.append("page", String(query.page || 1));
+            params.append("per_page", String(query.per_page || 10));
+            if (query.search) params.append("search", query.search);
 
             if (filters?.perusahaan_dilamar) {
                 params.append("perusahaan_dilamar", filters.perusahaan_dilamar);
@@ -171,12 +188,15 @@ export default function DataPelamarPage({
 
             if (result.success) {
                 setDataPelamar(result.data || []);
+                setListMeta(result.meta || {});
             } else {
                 alert(result.message || "Gagal mengambil data pelamar.");
             }
         } catch (error) {
             console.error("Gagal mengambil data pelamar:", error);
             alert(error?.result?.message || "Gagal mengambil data pelamar.");
+        } finally {
+            setListLoading(false);
         }
     };
 
@@ -514,7 +534,7 @@ export default function DataPelamarPage({
         };
 
         setAppliedTanggalSkrining(nextFilter);
-        fetchData(nextFilter);
+        fetchData(nextFilter, { page: 1 });
     };
 
     const handleResetTanggalSkrining = () => {
@@ -528,7 +548,7 @@ export default function DataPelamarPage({
         setTanggalSkriningMulai("");
         setTanggalSkriningSelesai("");
         setAppliedTanggalSkrining(nextFilter);
-        fetchData(nextFilter);
+        fetchData(nextFilter, { page: 1 });
     };
 
     const handleSetTanggalSkriningHariIni = () => {
@@ -541,7 +561,7 @@ export default function DataPelamarPage({
         setTanggalSkriningMulai(today);
         setTanggalSkriningSelesai(today);
         setAppliedTanggalSkrining(nextFilter);
-        fetchData(nextFilter);
+        fetchData(nextFilter, { page: 1 });
     };
 
     const buildMessageCandidateParams = () => {
@@ -1095,6 +1115,11 @@ export default function DataPelamarPage({
 
                 <DataTable
                     data={dataPelamar}
+                    loading={listLoading}
+                    serverMeta={listMeta}
+                    onServerQueryChange={(query) =>
+                        fetchData(appliedTanggalSkrining, query)
+                    }
                     columns={columnsPelamar}
                     rowKey="id"
                     defaultSortKey="token"
@@ -1729,6 +1754,9 @@ function DataTable({
     emptyTitle = "Data tidak ditemukan",
     emptyDescription = "Belum ada data atau kata kunci pencarian tidak cocok.",
     initialEntriesPerPage = 10,
+    loading = false,
+    serverMeta = null,
+    onServerQueryChange = null,
 }) {
     const [search, setSearch] = useState("");
     const [entriesPerPage, setEntriesPerPage] = useState(initialEntriesPerPage);
@@ -1741,7 +1769,30 @@ function DataTable({
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, entriesPerPage, data]);
+    }, [search, entriesPerPage]);
+
+    const serverMode = Boolean(serverMeta && onServerQueryChange);
+    const searchInitialized = useRef(false);
+
+    useEffect(() => {
+        if (serverMode) {
+            setCurrentPage(Number(serverMeta.current_page || 1));
+        }
+    }, [serverMode, serverMeta?.current_page]);
+
+    useEffect(() => {
+        if (!serverMode) return;
+        if (!searchInitialized.current) {
+            searchInitialized.current = true;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            onServerQueryChange({ page: 1, per_page: entriesPerPage, search });
+        }, 350);
+
+        return () => clearTimeout(timer);
+    }, [search, entriesPerPage]);
 
     const getColumnValue = (item, column) => {
         if (!column) return "";
@@ -1770,6 +1821,7 @@ function DataTable({
     }, [columns]);
 
     const filteredData = useMemo(() => {
+        if (serverMode) return data;
         const keyword = search.toLowerCase().trim();
 
         if (!keyword) return data;
@@ -1783,9 +1835,10 @@ function DataTable({
                     .includes(keyword);
             });
         });
-    }, [data, search, searchableColumns]);
+    }, [data, search, searchableColumns, serverMode]);
 
     const sortedData = useMemo(() => {
+        if (serverMode) return filteredData;
         const selectedColumn = sortableColumns.find(
             (column) => column.key === sortConfig.key
         );
@@ -1813,24 +1866,35 @@ function DataTable({
         });
 
         return result;
-    }, [filteredData, sortableColumns, sortConfig]);
+    }, [filteredData, sortableColumns, sortConfig, serverMode]);
 
-    const totalPages = Math.max(
-        1,
-        Math.ceil(sortedData.length / entriesPerPage)
-    );
+    const totalPages = serverMode
+        ? Math.max(1, Number(serverMeta.last_page || 1))
+        : Math.max(1, Math.ceil(sortedData.length / entriesPerPage));
 
     const paginatedData = useMemo(() => {
+        if (serverMode) return sortedData;
         const startIndex = (currentPage - 1) * entriesPerPage;
         const endIndex = startIndex + entriesPerPage;
 
         return sortedData.slice(startIndex, endIndex);
-    }, [sortedData, currentPage, entriesPerPage]);
+    }, [sortedData, currentPage, entriesPerPage, serverMode]);
 
-    const showingFrom =
-        sortedData.length === 0 ? 0 : (currentPage - 1) * entriesPerPage + 1;
+    const showingFrom = serverMode
+        ? Number(serverMeta.from || 0)
+        : sortedData.length === 0 ? 0 : (currentPage - 1) * entriesPerPage + 1;
 
-    const showingTo = Math.min(currentPage * entriesPerPage, sortedData.length);
+    const showingTo = serverMode
+        ? Number(serverMeta.to || 0)
+        : Math.min(currentPage * entriesPerPage, sortedData.length);
+
+    const changePage = (page) => {
+        const nextPage = Math.min(Math.max(page, 1), totalPages);
+        setCurrentPage(nextPage);
+        if (serverMode) {
+            onServerQueryChange({ page: nextPage, per_page: entriesPerPage, search });
+        }
+    };
 
     const pageNumbers = useMemo(() => {
         const pages = [];
@@ -1979,7 +2043,14 @@ function DataTable({
                     </thead>
 
                     <tbody className="divide-y divide-slate-100 bg-white">
-                        {paginatedData.length > 0 ? (
+                        {loading ? (
+                            <tr>
+                                <td colSpan={columns.length} className="px-6 py-16 text-center">
+                                    <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                                    <p className="mt-4 text-sm font-bold text-slate-500">Memuat data pelamar...</p>
+                                </td>
+                            </tr>
+                        ) : paginatedData.length > 0 ? (
                             paginatedData.map((item, index) => (
                                 <tr
                                     key={getRowKey(item, index)}
@@ -2044,7 +2115,7 @@ function DataTable({
 
             <div className="flex flex-col gap-4 border-t border-slate-100 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <p className="text-sm font-bold text-slate-500">
-                    Showing {showingFrom} to {showingTo} of {sortedData.length}{" "}
+                    Showing {showingFrom} to {showingTo} of {serverMode ? Number(serverMeta.total || 0) : sortedData.length}{" "}
                     entries
                     {search && (
                         <span>
@@ -2059,7 +2130,7 @@ function DataTable({
                         type="button"
                         disabled={currentPage === 1}
                         onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
+                            changePage(currentPage - 1)
                         }
                         className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -2070,7 +2141,7 @@ function DataTable({
                         <button
                             key={page}
                             type="button"
-                            onClick={() => setCurrentPage(page)}
+                            onClick={() => changePage(page)}
                             className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                 currentPage === page
                                     ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-teal-100"
@@ -2085,9 +2156,7 @@ function DataTable({
                         type="button"
                         disabled={currentPage === totalPages}
                         onClick={() =>
-                            setCurrentPage((prev) =>
-                                Math.min(prev + 1, totalPages)
-                            )
+                            changePage(currentPage + 1)
                         }
                         className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >

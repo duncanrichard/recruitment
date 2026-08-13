@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\PendidikanController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/pendidikan')
     ->name('admin.master-data.pendidikan.')

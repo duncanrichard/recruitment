@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\RangkaianInterview\InterviewKandidatController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/rangkaian-interview/kandidat')
     ->name('admin.rangkaian-interview.kandidat.')
@@ -67,21 +67,6 @@ Route::prefix('admin/rangkaian-interview/kandidat')
             ->middleware('permission:admin.rangkaian-interview.kandidat.update-tanggal')
             ->whereUuid('jadwalInterviewId')
             ->name('update-tanggal');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Kirim Reminder Interview ke Kandidat
-        |--------------------------------------------------------------------------
-        | Dipakai tombol Reminder / Kirim Reminder Kandidat di React.
-        |
-        | Endpoint:
-        | POST /admin/rangkaian-interview/kandidat/{jadwalInterviewId}/reminder-kandidat
-        |--------------------------------------------------------------------------
-        */
-        Route::post('/{jadwalInterviewId}/reminder-kandidat', 'kirimReminderKandidat')
-            ->middleware('permission:admin.rangkaian-interview.kandidat.reminder-kandidat')
-            ->whereUuid('jadwalInterviewId')
-            ->name('reminder-kandidat');
 
         /*
         |--------------------------------------------------------------------------

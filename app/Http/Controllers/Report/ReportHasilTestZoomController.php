@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Services\CompanyAccessService;
+use App\Services\SpreadsheetValueSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -70,7 +73,8 @@ class ReportHasilTestZoomController extends Controller
         $tanggalAwal = $validated['tanggal_awal'] ?? 'Semua';
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
 
-        $filename = 'report-hasil-test-zoom-' . now()->format('Ymd-His') . '.xls';
+        $rows = app(SpreadsheetValueSanitizer::class)->sanitizeRows($rows);
+        $filename = 'report-hasil-test-zoom-'.now()->format('Ymd-His').'.xls';
 
         return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir) {
             echo '<html>';
@@ -105,7 +109,7 @@ class ReportHasilTestZoomController extends Controller
             echo '<body>';
 
             echo '<div class="title">Report Hasil Test Zoom</div>';
-            echo '<div class="subtitle">Tanggal Kehadiran: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir) . '</div>';
+            echo '<div class="subtitle">Tanggal Kehadiran: '.e($tanggalAwal).' s/d '.e($tanggalAkhir).'</div>';
 
             echo '<table>';
             echo '<thead>';
@@ -113,7 +117,6 @@ class ReportHasilTestZoomController extends Controller
             echo '<th>No</th>';
             echo '<th>Tanggal Kehadiran</th>';
             echo '<th>Jadwal Test Zoom</th>';
-            echo '<th>Token</th>';
             echo '<th>Nama Pelamar</th>';
             echo '<th>Email</th>';
             echo '<th>No HP / WA</th>';
@@ -134,18 +137,17 @@ class ReportHasilTestZoomController extends Controller
 
             foreach ($rows as $index => $row) {
                 echo '<tr>';
-                echo '<td>' . ($index + 1) . '</td>';
-                echo '<td>' . e($row['tanggal_kehadiran']) . '</td>';
-                echo '<td>' . e($row['jadwal']) . '</td>';
-                echo '<td>' . e($row['token']) . '</td>';
-                echo '<td>' . e($row['nama']) . '</td>';
-                echo '<td>' . e($row['email']) . '</td>';
-                echo '<td>' . e($row['no_hp']) . '</td>';
-                echo '<td>' . e($row['status_kehadiran_label']) . '</td>';
-                echo '<td>' . e($row['hasil_test_label']) . '</td>';
-                echo '<td>' . e($row['link_zoom']) . '</td>';
-                echo '<td>' . e($row['created_at']) . '</td>';
-                echo '<td>' . e($row['updated_at']) . '</td>';
+                echo '<td>'.($index + 1).'</td>';
+                echo '<td>'.e($row['tanggal_kehadiran']).'</td>';
+                echo '<td>'.e($row['jadwal']).'</td>';
+                echo '<td>'.e($row['nama']).'</td>';
+                echo '<td>'.e($row['email']).'</td>';
+                echo '<td>'.e($row['no_hp']).'</td>';
+                echo '<td>'.e($row['status_kehadiran_label']).'</td>';
+                echo '<td>'.e($row['hasil_test_label']).'</td>';
+                echo '<td>'.e($row['link_zoom']).'</td>';
+                echo '<td>'.e($row['created_at']).'</td>';
+                echo '<td>'.e($row['updated_at']).'</td>';
                 echo '</tr>';
             }
 
@@ -155,7 +157,7 @@ class ReportHasilTestZoomController extends Controller
             echo '</html>';
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'max-age=0',
         ]);
     }
@@ -183,10 +185,11 @@ class ReportHasilTestZoomController extends Controller
                 'drd.nama_panggil',
                 'drd.email',
                 'drd.no_wa',
-                'drd.token',
             ]);
 
-        if (!empty($filters['tanggal_awal'])) {
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'drd.perusahaan_dilamar');
+
+        if (! empty($filters['tanggal_awal'])) {
             $query->whereDate(
                 'dh.tanggal_kehadiran',
                 '>=',
@@ -194,7 +197,7 @@ class ReportHasilTestZoomController extends Controller
             );
         }
 
-        if (!empty($filters['tanggal_akhir'])) {
+        if (! empty($filters['tanggal_akhir'])) {
             $query->whereDate(
                 'dh.tanggal_kehadiran',
                 '<=',
@@ -309,7 +312,7 @@ class ReportHasilTestZoomController extends Controller
             ->map(function ($item) {
                 $tanggal = $item['tanggal_kehadiran'] ?? null;
 
-                if (!$tanggal) {
+                if (! $tanggal) {
                     return 'Tidak Diisi';
                 }
 
@@ -337,7 +340,7 @@ class ReportHasilTestZoomController extends Controller
             ->map(function ($item) {
                 $jadwal = $item['jadwal'] ?? null;
 
-                if (!$jadwal) {
+                if (! $jadwal) {
                     return 'Tidak Diisi';
                 }
 
@@ -367,7 +370,7 @@ class ReportHasilTestZoomController extends Controller
                 $kehadiran = $item['status_kehadiran_label'] ?: 'Belum Ada Kehadiran';
                 $hasil = $item['hasil_test_label'] ?: 'Belum Ada Hasil';
 
-                return $kehadiran . ' - ' . $hasil;
+                return $kehadiran.' - '.$hasil;
             })
             ->countBy()
             ->sortDesc()
@@ -388,7 +391,7 @@ class ReportHasilTestZoomController extends Controller
             ->map(function ($item) {
                 $email = trim((string) ($item['email'] ?? ''));
 
-                if ($email === '' || $email === '-' || !str_contains($email, '@')) {
+                if ($email === '' || $email === '-' || ! str_contains($email, '@')) {
                     return 'Tidak Diisi';
                 }
 
@@ -455,7 +458,6 @@ class ReportHasilTestZoomController extends Controller
             'id' => $item->id,
             'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
             'jadwal_test_zoom_id' => $item->jadwal_test_zoom_id,
-            'token' => $item->token,
             'tanggal_kehadiran' => $item->tanggal_kehadiran,
             'jadwal' => $item->jadwal ? date('Y-m-d H:i:s', strtotime($item->jadwal)) : null,
             'nama' => $item->nama_lengkap ?: '-',

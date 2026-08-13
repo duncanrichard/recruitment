@@ -15,6 +15,10 @@ import {
 
 export default function AdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return window.localStorage.getItem("admin.sidebar.collapsed") === "true";
+    });
     const [activeMenu, setActiveMenu] = useState(defaultMenuKey);
 
     const [detailPelamarId, setDetailPelamarId] = useState(null);
@@ -51,6 +55,13 @@ export default function AdminLayout() {
     const ActiveComponent = activeMenuData.component;
 
     const closeSidebar = () => setSidebarOpen(false);
+
+    useEffect(() => {
+        window.localStorage.setItem(
+            "admin.sidebar.collapsed",
+            String(sidebarCollapsed)
+        );
+    }, [sidebarCollapsed]);
 
     const resetDetails = () => {
         setDetailPelamarId(null);
@@ -344,11 +355,16 @@ export default function AdminLayout() {
             <div className="flex h-screen overflow-hidden">
                 <AdminSidebar
                     sidebarOpen={sidebarOpen}
+                    collapsed={sidebarCollapsed}
                     activeMenu={activeMenu}
                     openMenus={openMenus}
                     onCloseSidebar={closeSidebar}
                     onMenuClick={handleMenuClick}
                     onSubMenuClick={handleSubMenuClick}
+                    onToggleCollapsed={() =>
+                        setSidebarCollapsed((collapsed) => !collapsed)
+                    }
+                    onExpand={() => setSidebarCollapsed(false)}
                 />
 
                 <section className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
@@ -468,10 +484,10 @@ function getAlertStyle(type) {
         success: {
             icon: "✓",
             badgeText: "Success",
-            topBar: "bg-teal-600",
-            badge: "border-teal-100 bg-teal-50 text-teal-700",
-            iconBox: "bg-teal-600 text-white shadow-teal-100",
-            button: "bg-teal-600 hover:bg-teal-700 shadow-teal-100",
+            topBar: "bg-indigo-600",
+            badge: "border-indigo-100 bg-indigo-50 text-indigo-700",
+            iconBox: "bg-indigo-600 text-white shadow-indigo-100",
+            button: "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100",
         },
         error: {
             icon: "!",

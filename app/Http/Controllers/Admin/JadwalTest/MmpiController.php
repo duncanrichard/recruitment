@@ -9,8 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -65,11 +63,11 @@ class MmpiController extends Controller
 
         $this->applyCompanyScopeToDrdJoin($query, 'drd');
 
-        if (!empty($validated['tanggal_mulai'])) {
+        if (! empty($validated['tanggal_mulai'])) {
             $query->whereDate('jtm.tanggal', '>=', $validated['tanggal_mulai']);
         }
 
-        if (!empty($validated['tanggal_selesai'])) {
+        if (! empty($validated['tanggal_selesai'])) {
             $query->whereDate('jtm.tanggal', '<=', $validated['tanggal_selesai']);
         }
 
@@ -89,9 +87,9 @@ class MmpiController extends Controller
                 'jtz.jadwal_mulai as jadwal_zoom_mulai',
                 'jtz.jadwal_selesai as jadwal_zoom_selesai',
 
-                DB::raw($pelamarColumns['nama'] . ' as nama'),
-                DB::raw($pelamarColumns['email'] . ' as email'),
-                DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
+                DB::raw($pelamarColumns['nama'].' as nama'),
+                DB::raw($pelamarColumns['email'].' as email'),
+                DB::raw($pelamarColumns['no_hp'].' as no_hp'),
             ])
             ->orderByDesc('jtm.tanggal')
             ->orderByDesc('jtm.created_at')
@@ -174,9 +172,9 @@ class MmpiController extends Controller
                 'jtz.jadwal_mulai as jadwal_zoom_mulai',
                 'jtz.jadwal_selesai as jadwal_zoom_selesai',
 
-                DB::raw($pelamarColumns['nama'] . ' as nama'),
-                DB::raw($pelamarColumns['email'] . ' as email'),
-                DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
+                DB::raw($pelamarColumns['nama'].' as nama'),
+                DB::raw($pelamarColumns['email'].' as email'),
+                DB::raw($pelamarColumns['no_hp'].' as no_hp'),
             ])
             ->orderBy($pelamarColumns['nama_order'])
             ->get()
@@ -289,11 +287,12 @@ class MmpiController extends Controller
                     ])
                     ->first();
 
-                if (!$daftarHadir) {
+                if (! $daftarHadir) {
                     $skipped[] = [
                         'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
                         'reason' => 'Data daftar hadir Zoom atau jadwal Zoom sudah dihapus.',
                     ];
+
                     continue;
                 }
 
@@ -305,6 +304,7 @@ class MmpiController extends Controller
                         'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
                         'reason' => 'Kandidat belum hadir dan lolos test Zoom.',
                     ];
+
                     continue;
                 }
 
@@ -313,6 +313,7 @@ class MmpiController extends Controller
                         'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
                         'reason' => 'Data kandidat tidak sesuai dengan daftar hadir Zoom.',
                     ];
+
                     continue;
                 }
 
@@ -326,6 +327,7 @@ class MmpiController extends Controller
                         'daftar_hadir_test_zoom_id' => $item['daftar_hadir_test_zoom_id'],
                         'reason' => 'Kandidat sudah mendapatkan jadwal test MMPI.',
                     ];
+
                     continue;
                 }
 
@@ -372,7 +374,6 @@ class MmpiController extends Controller
         ]);
     }
 
-
     private function applyCompanyScopeToDrdJoin($query, string $pelamarAlias = 'drd'): void
     {
         $allowedPerusahaanIds = $this->currentUserPerusahaanIds();
@@ -380,10 +381,11 @@ class MmpiController extends Controller
         if (is_array($allowedPerusahaanIds)) {
             if (empty($allowedPerusahaanIds)) {
                 $query->whereRaw('1 = 0');
+
                 return;
             }
 
-            $query->whereIn($pelamarAlias . '.perusahaan_dilamar', $allowedPerusahaanIds);
+            $query->whereIn($pelamarAlias.'.perusahaan_dilamar', $allowedPerusahaanIds);
         }
     }
 
@@ -424,7 +426,7 @@ class MmpiController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -452,7 +454,7 @@ class MmpiController extends Controller
          * Fallback kalau masih ada sistem lama:
          * users.perusahaan_id
          */
-        if (empty($ids) && !empty($user->perusahaan_id)) {
+        if (empty($ids) && ! empty($user->perusahaan_id)) {
             $ids[] = (string) $user->perusahaan_id;
         }
 
@@ -521,7 +523,7 @@ class MmpiController extends Controller
 
         return [
             'nama' => $namaColumn ? "drd.{$namaColumn}" : "'-'",
-            'nama_order' => $namaColumn ? "drd.{$namaColumn}" : "drd.id",
+            'nama_order' => $namaColumn ? "drd.{$namaColumn}" : 'drd.id',
             'email' => $emailColumn ? "drd.{$emailColumn}" : "'-'",
             'no_hp' => $noHpColumn ? "drd.{$noHpColumn}" : "'-'",
         ];

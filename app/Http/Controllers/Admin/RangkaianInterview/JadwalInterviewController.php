@@ -17,7 +17,7 @@ class JadwalInterviewController extends Controller
 
     private function normalizeDateTime(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -26,7 +26,7 @@ class JadwalInterviewController extends Controller
 
     private function formatDateTimeForJson($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 

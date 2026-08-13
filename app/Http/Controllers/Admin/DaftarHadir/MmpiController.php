@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\DaftarHadir;
 use App\Http\Controllers\Controller;
 use App\Models\DaftarHadirTestMmpi;
 use App\Models\JadwalTestMmpi;
+use App\Rules\MalwareFreeFile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -47,15 +48,15 @@ class MmpiController extends Controller
 
         $this->applyCompanyScopeToPelamarJoin($query, 'drd');
 
-        if (!empty($validated['tanggal_mulai'])) {
+        if (! empty($validated['tanggal_mulai'])) {
             $query->whereDate('jmm.tanggal', '>=', $validated['tanggal_mulai']);
         }
 
-        if (!empty($validated['tanggal_selesai'])) {
+        if (! empty($validated['tanggal_selesai'])) {
             $query->whereDate('jmm.tanggal', '<=', $validated['tanggal_selesai']);
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $keyword = trim($validated['search']);
 
             $query->where(function ($q) use ($keyword) {
@@ -167,13 +168,13 @@ class MmpiController extends Controller
             $query->whereRaw("LOWER(REPLACE(REPLACE(COALESCE(dhm.hasil_test, ''), ' ', '_'), '-', '_')) IN ('gagal', 'tidak_lolos', 'tidaklolos')");
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $keyword = trim($validated['search']);
 
             $query->where(function ($q) use ($keyword, $pelamarColumns) {
-                $q->whereRaw($pelamarColumns['nama'] . ' ILIKE ?', ["%{$keyword}%"])
-                    ->orWhereRaw($pelamarColumns['email'] . ' ILIKE ?', ["%{$keyword}%"])
-                    ->orWhereRaw($pelamarColumns['no_hp'] . ' ILIKE ?', ["%{$keyword}%"])
+                $q->whereRaw($pelamarColumns['nama'].' ILIKE ?', ["%{$keyword}%"])
+                    ->orWhereRaw($pelamarColumns['email'].' ILIKE ?', ["%{$keyword}%"])
+                    ->orWhereRaw($pelamarColumns['no_hp'].' ILIKE ?', ["%{$keyword}%"])
                     ->orWhereRaw("COALESCE(dp.nama_perusahaan, '') ILIKE ?", ["%{$keyword}%"])
                     ->orWhereRaw("COALESCE(dp.kode, '') ILIKE ?", ["%{$keyword}%"]);
             });
@@ -190,15 +191,15 @@ class MmpiController extends Controller
             'drd.perusahaan_dilamar as perusahaan_id',
             'dp.kode as perusahaan_kode',
             'dp.nama_perusahaan as perusahaan_nama',
-            DB::raw($pelamarColumns['nama'] . ' as nama'),
-            DB::raw($pelamarColumns['email'] . ' as email'),
-            DB::raw($pelamarColumns['no_hp'] . ' as no_hp'),
+            DB::raw($pelamarColumns['nama'].' as nama'),
+            DB::raw($pelamarColumns['email'].' as email'),
+            DB::raw($pelamarColumns['no_hp'].' as no_hp'),
         ];
 
         if (Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
             $selects[] = 'dhm.file_hasil_test_mmpi';
         } else {
-            $selects[] = DB::raw("NULL as file_hasil_test_mmpi");
+            $selects[] = DB::raw('NULL as file_hasil_test_mmpi');
         }
 
         $items = $query
@@ -227,7 +228,7 @@ class MmpiController extends Controller
                     'perusahaan_id' => $item->perusahaan_id,
                     'perusahaan_kode' => $item->perusahaan_kode,
                     'perusahaan_nama' => $item->perusahaan_nama ?: '-',
-                    'perusahaan_label' => trim(($item->perusahaan_kode ? $item->perusahaan_kode . ' - ' : '') . ($item->perusahaan_nama ?: '-')),
+                    'perusahaan_label' => trim(($item->perusahaan_kode ? $item->perusahaan_kode.' - ' : '').($item->perusahaan_nama ?: '-')),
                     'nama' => $item->nama ?: '-',
                     'email' => $item->email ?: '-',
                     'no_hp' => $item->no_hp ?: '-',
@@ -262,6 +263,7 @@ class MmpiController extends Controller
                 'file',
                 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
                 'max:5120',
+                new MalwareFreeFile,
             ],
         ], [
             'hasil_test.required' => 'Hasil test wajib dipilih.',
@@ -271,7 +273,7 @@ class MmpiController extends Controller
             'file_hasil_test_mmpi.max' => 'Ukuran file maksimal 5 MB.',
         ]);
 
-        if (!Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
+        if (! Schema::hasColumn('daftar_hadir_test_mmpi', 'file_hasil_test_mmpi')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom file_hasil_test_mmpi belum tersedia. Jalankan migration terlebih dahulu.',
@@ -284,7 +286,7 @@ class MmpiController extends Controller
             ->where('jadwal_test_mmpi_id', $jadwal->id)
             ->first();
 
-        if (!$daftarHadir) {
+        if (! $daftarHadir) {
             return response()->json([
                 'success' => false,
                 'message' => 'Status kehadiran belum diisi. Silakan isi kehadiran terlebih dahulu.',
@@ -311,11 +313,11 @@ class MmpiController extends Controller
             $folderNamaKandidat = $this->sanitizeFolderName($namaKandidat ?: 'tanpa nama');
             $extension = $request->file('file_hasil_test_mmpi')->getClientOriginalExtension();
 
-            $fileName = 'hasil-test-mmpi-' .
-                now()->format('Ymd-His') .
-                '-' .
-                Str::random(8) .
-                '.' .
+            $fileName = 'hasil-test-mmpi-'.
+                now()->format('Ymd-His').
+                '-'.
+                Str::random(8).
+                '.'.
                 $extension;
 
             $storedPath = $request->file('file_hasil_test_mmpi')->storeAs(
@@ -324,7 +326,7 @@ class MmpiController extends Controller
                 'public'
             );
 
-            $fileUrl = '/storage/' . $storedPath;
+            $fileUrl = '/storage/'.$storedPath;
         }
 
         $daftarHadir->update([
@@ -373,7 +375,7 @@ class MmpiController extends Controller
             'updated_at' => now(),
         ];
 
-        if (!$daftarHadir) {
+        if (! $daftarHadir) {
             $payload['created_at'] = now();
         }
 
@@ -457,7 +459,6 @@ class MmpiController extends Controller
             });
     }
 
-
     private function findScopedJadwalMmpiOrFail(string $id): JadwalTestMmpi
     {
         $query = JadwalTestMmpi::query();
@@ -498,7 +499,7 @@ class MmpiController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -520,7 +521,7 @@ class MmpiController extends Controller
             $ids = [];
         }
 
-        if (empty($ids) && !empty($user->perusahaan_id)) {
+        if (empty($ids) && ! empty($user->perusahaan_id)) {
             $ids[] = (string) $user->perusahaan_id;
         }
 
@@ -592,7 +593,7 @@ class MmpiController extends Controller
             'nama_pelamar',
         ]);
 
-        if (!$namaColumn) {
+        if (! $namaColumn) {
             return 'tanpa nama';
         }
 
@@ -632,7 +633,7 @@ class MmpiController extends Controller
 
     private function normalizeFileUrl(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -642,11 +643,11 @@ class MmpiController extends Controller
             return null;
         }
 
-        if (!str_starts_with($value, 'http://') &&
-            !str_starts_with($value, 'https://') &&
-            !str_starts_with($value, '/storage/')
+        if (! str_starts_with($value, 'http://') &&
+            ! str_starts_with($value, 'https://') &&
+            ! str_starts_with($value, '/storage/')
         ) {
-            return '/storage/' . ltrim($value, '/');
+            return '/storage/'.ltrim($value, '/');
         }
 
         if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
@@ -660,25 +661,25 @@ class MmpiController extends Controller
 
     private function convertPublicUrlToStoragePath(?string $url): ?string
     {
-        if (!$url) {
+        if (! $url) {
             return null;
         }
 
         $url = $this->normalizeFileUrl($url);
 
-        if (!$url) {
+        if (! $url) {
             return null;
         }
 
         $path = parse_url($url, PHP_URL_PATH);
 
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
         $storagePrefix = '/storage/';
 
-        if (!str_starts_with($path, $storagePrefix)) {
+        if (! str_starts_with($path, $storagePrefix)) {
             return null;
         }
 
@@ -745,7 +746,7 @@ class MmpiController extends Controller
 
     private function formatTanggalIndonesia(?string $value): string
     {
-        if (!$value) {
+        if (! $value) {
             return '-';
         }
 

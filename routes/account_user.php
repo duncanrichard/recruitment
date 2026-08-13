@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\Account\UserController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/account/user')
     ->name('admin.account.user.')

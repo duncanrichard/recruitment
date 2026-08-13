@@ -6,40 +6,48 @@ use Carbon\Carbon;
 use Google\Client;
 use Google\Service\Calendar;
 use Google\Service\Calendar\ConferenceData;
+use Google\Service\Calendar\ConferenceSolutionKey;
 use Google\Service\Calendar\CreateConferenceRequest;
 use Google\Service\Calendar\Event;
 use Google\Service\Calendar\EventAttendee;
 use Google\Service\Calendar\EventDateTime;
-use Google\Service\Calendar\ConferenceSolutionKey;
 
 class GoogleCalendarService
 {
     private Calendar $calendar;
+
     private string $calendarId;
+
     private string $timezone;
 
     public function __construct()
     {
-        $this->calendarId = env('GOOGLE_CALENDAR_ID', 'primary');
-        $this->timezone = env('APP_TIMEZONE', 'Asia/Jakarta');
+        $this->calendarId = (string) config('services.google_calendar.calendar_id', 'primary');
+        $this->timezone = (string) config('services.google_calendar.timezone', 'Asia/Jakarta');
 
-        $client = new Client();
+        $client = new Client;
         $client->setApplicationName('Recruitment Interview Calendar');
         $client->setScopes([
             Calendar::CALENDAR,
         ]);
 
-        $credentialsPath = base_path(env('GOOGLE_CALENDAR_CREDENTIALS'));
+        $credentials = config('services.google_calendar.credentials');
 
-        if (!file_exists($credentialsPath)) {
-            throw new \RuntimeException('File credential Google Calendar tidak ditemukan: ' . $credentialsPath);
+        if (! is_string($credentials) || trim($credentials) === '') {
+            throw new \RuntimeException('GOOGLE_CALENDAR_CREDENTIALS belum diatur.');
+        }
+
+        $credentialsPath = base_path($credentials);
+
+        if (! file_exists($credentialsPath)) {
+            throw new \RuntimeException('File credential Google Calendar tidak ditemukan: '.$credentialsPath);
         }
 
         $client->setAuthConfig($credentialsPath);
 
-        $impersonateEmail = env('GOOGLE_CALENDAR_IMPERSONATE_EMAIL');
+        $impersonateEmail = config('services.google_calendar.impersonate_email');
 
-        if (!empty($impersonateEmail)) {
+        if (! empty($impersonateEmail)) {
             $client->setSubject($impersonateEmail);
         }
 
@@ -83,7 +91,7 @@ class GoogleCalendarService
 
     public function deleteEvent(?string $eventId): array
     {
-        if (!$eventId) {
+        if (! $eventId) {
             return [
                 'success' => true,
                 'message' => 'Tidak ada event Google Calendar yang perlu dihapus.',
@@ -107,11 +115,11 @@ class GoogleCalendarService
     private function buildEvent(array $payload): Event
     {
         $start = Carbon::parse($payload['start'], $this->timezone);
-        $durationMinutes = (int) ($payload['duration_minutes'] ?? env('GOOGLE_CALENDAR_EVENT_DURATION_MINUTES', 60));
+        $durationMinutes = (int) ($payload['duration_minutes'] ?? config('services.google_calendar.event_duration_minutes', 60));
         $end = (clone $start)->addMinutes($durationMinutes);
 
         $attendees = collect($payload['attendees'] ?? [])
-            ->filter(fn ($item) => !empty($item['email']))
+            ->filter(fn ($item) => ! empty($item['email']))
             ->unique('email')
             ->map(function ($item) {
                 return new EventAttendee([
@@ -138,11 +146,11 @@ class GoogleCalendarService
             'attendees' => $attendees,
         ]);
 
-        $conferenceData = new ConferenceData();
-        $conferenceRequest = new CreateConferenceRequest();
-        $conferenceRequest->setRequestId('interview-' . uniqid());
+        $conferenceData = new ConferenceData;
+        $conferenceRequest = new CreateConferenceRequest;
+        $conferenceRequest->setRequestId('interview-'.uniqid());
 
-        $conferenceSolutionKey = new ConferenceSolutionKey();
+        $conferenceSolutionKey = new ConferenceSolutionKey;
         $conferenceSolutionKey->setType('hangoutsMeet');
 
         $conferenceRequest->setConferenceSolutionKey($conferenceSolutionKey);

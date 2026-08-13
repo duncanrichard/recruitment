@@ -64,23 +64,23 @@ class PermintaanKandidatRecruitmentController extends Controller
 
         $query = PermintaanKandidatRecruitment::query();
 
-        if (!empty($validated['tanggal_mulai'])) {
+        if (! empty($validated['tanggal_mulai'])) {
             $query->whereDate('tanggal_permintaan', '>=', $validated['tanggal_mulai']);
         }
 
-        if (!empty($validated['tanggal_selesai'])) {
+        if (! empty($validated['tanggal_selesai'])) {
             $query->whereDate('tanggal_permintaan', '<=', $validated['tanggal_selesai']);
         }
 
-        if (!empty($validated['status_permintaan'])) {
+        if (! empty($validated['status_permintaan'])) {
             $query->where('status_permintaan', $validated['status_permintaan']);
         }
 
-        if (!empty($validated['urgent_permintaan'])) {
+        if (! empty($validated['urgent_permintaan'])) {
             $query->where('urgent_permintaan', $validated['urgent_permintaan']);
         }
 
-        if (!empty($validated['search'])) {
+        if (! empty($validated['search'])) {
             $keyword = trim($validated['search']);
 
             $query->where(function ($q) use ($keyword) {

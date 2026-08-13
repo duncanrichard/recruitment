@@ -81,7 +81,7 @@ class UserController extends Controller
                         'id' => $item->id,
                         'kode' => $item->kode,
                         'nama_perusahaan' => $item->nama_perusahaan,
-                        'label' => trim(($item->kode ? $item->kode . ' - ' : '') . $item->nama_perusahaan),
+                        'label' => trim(($item->kode ? $item->kode.' - ' : '').$item->nama_perusahaan),
                     ];
                 });
 
@@ -438,7 +438,7 @@ class UserController extends Controller
                     'id' => $item->id,
                     'kode' => $item->kode,
                     'nama_perusahaan' => $item->nama_perusahaan,
-                    'label' => trim(($item->kode ? $item->kode . ' - ' : '') . $item->nama_perusahaan),
+                    'label' => trim(($item->kode ? $item->kode.' - ' : '').$item->nama_perusahaan),
                 ];
             })->values(),
 

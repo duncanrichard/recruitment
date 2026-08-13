@@ -249,11 +249,11 @@ export default function AdminHeader({
 
                         <div className="min-w-0">
                             {activeMenuData?.parentLabel ? (
-                                <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
+                                <div className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">
                                     {activeMenuData.parentLabel}
                                 </div>
                             ) : (
-                                <div className="text-xs font-black uppercase tracking-[0.18em] text-teal-700">
+                                <div className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">
                                     Sistem Rekrutmen
                                 </div>
                             )}
@@ -275,7 +275,7 @@ export default function AdminHeader({
                             <button
                                 type="button"
                                 onClick={onHeaderAction}
-                                className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:-translate-y-0.5 hover:bg-teal-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
+                                className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
                             >
                                 <span className="hidden sm:inline">
                                     {activeMenuData.action.label}
@@ -291,9 +291,9 @@ export default function AdminHeader({
                                 onClick={() =>
                                     setProfileMenuOpen((prev) => !prev)
                                 }
-                                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-teal-50 hover:shadow-lg hover:shadow-teal-100"
+                                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 hover:shadow-lg hover:shadow-indigo-100"
                             >
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-sm font-black text-white shadow-md shadow-teal-100">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black text-white shadow-md shadow-indigo-100">
                                     {getInitials(userName)}
                                 </div>
 
@@ -324,9 +324,9 @@ export default function AdminHeader({
 
                             {profileMenuOpen && (
                                 <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
-                                    <div className="border-b border-slate-100 bg-gradient-to-br from-teal-50 to-cyan-50 p-4">
+                                    <div className="border-b border-slate-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-base font-black text-white shadow-lg shadow-teal-100">
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-base font-black text-white shadow-lg shadow-indigo-100">
                                                 {getInitials(userName)}
                                             </div>
 
@@ -345,9 +345,9 @@ export default function AdminHeader({
                                         <button
                                             type="button"
                                             onClick={openProfileModal}
-                                            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
+                                            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
                                         >
-                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
                                                 👤
                                             </span>
                                             <span>Lihat Profil</span>
@@ -412,7 +412,7 @@ export default function AdminHeader({
             {profileModalOpen && (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
                     <div className="w-full max-w-xl overflow-hidden rounded-[2rem] bg-white shadow-2xl">
-                        <div className="bg-gradient-to-br from-teal-600 to-cyan-600 px-6 py-6 text-white">
+                        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 px-6 py-6 text-white">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-4">
                                     <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white/20 text-xl font-black shadow-lg backdrop-blur">
@@ -445,7 +445,7 @@ export default function AdminHeader({
 
                         <div className="space-y-4 p-6">
                             {profileLoading && (
-                                <div className="rounded-3xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm font-black text-cyan-700">
+                                <div className="rounded-3xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-black text-violet-700">
                                     Memuat data profil...
                                 </div>
                             )}
@@ -464,7 +464,7 @@ export default function AdminHeader({
                                         {userPerusahaan.map((item, index) => (
                                             <span
                                                 key={item?.id || index}
-                                                className="inline-flex rounded-2xl bg-teal-50 px-3 py-2 text-xs font-black text-teal-700"
+                                                className="inline-flex rounded-2xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700"
                                             >
                                                 {getPerusahaanLabel(item)}
                                             </span>

@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
 use App\Models\JadwalOfferingLetter;
+use App\Services\CompanyAccessService;
+use App\Services\SpreadsheetValueSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportOfferingLetterController extends Controller
@@ -77,7 +80,8 @@ class ReportOfferingLetterController extends Controller
         $tanggalAwal = $validated['tanggal_awal'] ?? 'Semua';
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
 
-        $filename = 'report-offering-letter-' . now()->format('Ymd-His') . '.xls';
+        $rows = app(SpreadsheetValueSanitizer::class)->sanitizeRows($rows);
+        $filename = 'report-offering-letter-'.now()->format('Ymd-His').'.xls';
 
         return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir) {
             echo '<html>';
@@ -112,7 +116,7 @@ class ReportOfferingLetterController extends Controller
             echo '<body>';
 
             echo '<div class="title">Report Offering Letter</div>';
-            echo '<div class="subtitle">Tanggal Offering Letter: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir) . '</div>';
+            echo '<div class="subtitle">Tanggal Offering Letter: '.e($tanggalAwal).' s/d '.e($tanggalAkhir).'</div>';
 
             echo '<table>';
             echo '<thead>';
@@ -144,21 +148,21 @@ class ReportOfferingLetterController extends Controller
 
             foreach ($rows as $index => $row) {
                 echo '<tr>';
-                echo '<td>' . ($index + 1) . '</td>';
-                echo '<td>' . e($row['nama_kandidat']) . '</td>';
-                echo '<td>' . e($row['email']) . '</td>';
-                echo '<td>' . e($row['no_wa']) . '</td>';
-                echo '<td>' . e($row['posisi_dilamar']) . '</td>';
-                echo '<td>' . e($row['tanggal_ol']) . '</td>';
-                echo '<td>' . e($row['jam_ol']) . '</td>';
-                echo '<td>' . e($row['metode']) . '</td>';
-                echo '<td>' . e($row['link']) . '</td>';
-                echo '<td>' . e($row['pic']) . '</td>';
-                echo '<td>' . e($row['status_jadwal_label']) . '</td>';
-                echo '<td>' . e($row['review_management']) . '</td>';
-                echo '<td>' . e($row['catatan']) . '</td>';
-                echo '<td>' . e($row['created_at']) . '</td>';
-                echo '<td>' . e($row['updated_at']) . '</td>';
+                echo '<td>'.($index + 1).'</td>';
+                echo '<td>'.e($row['nama_kandidat']).'</td>';
+                echo '<td>'.e($row['email']).'</td>';
+                echo '<td>'.e($row['no_wa']).'</td>';
+                echo '<td>'.e($row['posisi_dilamar']).'</td>';
+                echo '<td>'.e($row['tanggal_ol']).'</td>';
+                echo '<td>'.e($row['jam_ol']).'</td>';
+                echo '<td>'.e($row['metode']).'</td>';
+                echo '<td>'.e($row['link']).'</td>';
+                echo '<td>'.e($row['pic']).'</td>';
+                echo '<td>'.e($row['status_jadwal_label']).'</td>';
+                echo '<td>'.e($row['review_management']).'</td>';
+                echo '<td>'.e($row['catatan']).'</td>';
+                echo '<td>'.e($row['created_at']).'</td>';
+                echo '<td>'.e($row['updated_at']).'</td>';
                 echo '</tr>';
             }
 
@@ -168,7 +172,7 @@ class ReportOfferingLetterController extends Controller
             echo '</html>';
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'max-age=0',
         ]);
     }
@@ -180,7 +184,21 @@ class ReportOfferingLetterController extends Controller
                 'hasilReviewManagement.hasilInterview.kandidat',
             ]);
 
-        if (!empty($filters['tanggal_awal'])) {
+        $allowedCompanyIds = app(CompanyAccessService::class)
+            ->allowedCompanyIds(Auth::user());
+
+        if ($allowedCompanyIds !== null) {
+            if ($allowedCompanyIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereHas(
+                    'hasilReviewManagement.hasilInterview.kandidat',
+                    fn ($query) => $query->whereIn('perusahaan_dilamar', $allowedCompanyIds)
+                );
+            }
+        }
+
+        if (! empty($filters['tanggal_awal'])) {
             $query->whereDate(
                 'tanggal_ol',
                 '>=',
@@ -188,7 +206,7 @@ class ReportOfferingLetterController extends Controller
             );
         }
 
-        if (!empty($filters['tanggal_akhir'])) {
+        if (! empty($filters['tanggal_akhir'])) {
             $query->whereDate(
                 'tanggal_ol',
                 '<=',
@@ -271,23 +289,23 @@ class ReportOfferingLetterController extends Controller
 
     private function getPosisiDilamar($kandidat): string
     {
-        if (!$kandidat) {
+        if (! $kandidat) {
             return '-';
         }
 
-        if (!empty($kandidat->posisi_dilamar)) {
+        if (! empty($kandidat->posisi_dilamar)) {
             return $kandidat->posisi_dilamar;
         }
 
-        if (!empty($kandidat->posisi_yang_dilamar)) {
+        if (! empty($kandidat->posisi_yang_dilamar)) {
             return (string) $kandidat->posisi_yang_dilamar;
         }
 
-        if (!empty($kandidat->posisi?->nama_posisi)) {
+        if (! empty($kandidat->posisi?->nama_posisi)) {
             return $kandidat->posisi->nama_posisi;
         }
 
-        if (!empty($kandidat->posisi?->posisi)) {
+        if (! empty($kandidat->posisi?->posisi)) {
             return $kandidat->posisi->posisi;
         }
 

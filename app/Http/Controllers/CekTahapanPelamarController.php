@@ -3,16 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataRiwayatDiri;
-use App\Models\JadwalTestZoom;
 use App\Models\JadwalInterviewKandidat;
+use App\Models\JadwalTestZoom;
+use App\Rules\MalwareFreeFile;
+use App\Services\RecruitmentAuditService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CekTahapanPelamarController extends Controller
 {
@@ -47,7 +51,7 @@ class CekTahapanPelamarController extends Controller
     public function show(string $token)
     {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->firstOrFail();
 
         return view('pages.pendaftaran.index', [
@@ -61,10 +65,10 @@ class CekTahapanPelamarController extends Controller
     public function tahapanByToken(string $token): JsonResponse
     {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -97,10 +101,10 @@ class CekTahapanPelamarController extends Controller
         string $jadwalTest
     ): JsonResponse {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -126,7 +130,7 @@ class CekTahapanPelamarController extends Controller
             ->where('data_riwayat_diri_id', $pelamar->id)
             ->first();
 
-        if (!$jadwal) {
+        if (! $jadwal) {
             return response()->json([
                 'success' => false,
                 'message' => 'Jadwal test Zoom tidak ditemukan.',
@@ -134,7 +138,7 @@ class CekTahapanPelamarController extends Controller
             ], 404);
         }
 
-        if (!$this->canAccessJadwalTestZoom($pelamar)) {
+        if (! $this->canAccessJadwalTestZoom($pelamar)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tahapan Test Zoom belum dapat dilanjutkan. Lengkapi terlebih dahulu seluruh data pendaftaran sampai tahap Kesiapan Bekerja.',
@@ -152,7 +156,7 @@ class CekTahapanPelamarController extends Controller
 
         $jadwalCarbon = $this->parseDateTime($jadwal->jadwal);
 
-        if (!$jadwalCarbon) {
+        if (! $jadwalCarbon) {
             return response()->json([
                 'success' => false,
                 'message' => 'Format jadwal test Zoom tidak valid.',
@@ -160,7 +164,7 @@ class CekTahapanPelamarController extends Controller
             ], 422);
         }
 
-        if (!$jadwalCarbon->isToday()) {
+        if (! $jadwalCarbon->isToday()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kehadiran hanya dapat diisi pada tanggal jadwal test Zoom.',
@@ -173,9 +177,9 @@ class CekTahapanPelamarController extends Controller
             $daftarHadir->status_kehadiran ?? null
         );
 
-        if (!empty($kehadiranLama)) {
+        if (! empty($kehadiranLama)) {
             $pelamarTerbaru = $this->pelamarQuery()
-                ->where('token', $token)
+                ->withValidToken($token)
                 ->first();
 
             return response()->json([
@@ -190,7 +194,7 @@ class CekTahapanPelamarController extends Controller
         });
 
         $pelamarTerbaru = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -216,10 +220,10 @@ class CekTahapanPelamarController extends Controller
         string $jadwalTestMmpi
     ): JsonResponse {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -240,7 +244,7 @@ class CekTahapanPelamarController extends Controller
             'kehadiran.in' => 'Pilihan kehadiran harus Hadir atau Tidak Hadir.',
         ]);
 
-        if (!Schema::hasTable('jadwal_test_mmpi')) {
+        if (! Schema::hasTable('jadwal_test_mmpi')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tabel jadwal test MMPI tidak ditemukan.',
@@ -258,7 +262,7 @@ class CekTahapanPelamarController extends Controller
 
         $jadwalMmpi = $query->first();
 
-        if (!$jadwalMmpi) {
+        if (! $jadwalMmpi) {
             return response()->json([
                 'success' => false,
                 'message' => 'Jadwal test MMPI tidak ditemukan.',
@@ -276,7 +280,7 @@ class CekTahapanPelamarController extends Controller
 
         $jadwalCarbon = $this->parseDateTime($jadwalMmpi->tanggal);
 
-        if (!$jadwalCarbon) {
+        if (! $jadwalCarbon) {
             return response()->json([
                 'success' => false,
                 'message' => 'Format jadwal test MMPI tidak valid.',
@@ -284,7 +288,7 @@ class CekTahapanPelamarController extends Controller
             ], 422);
         }
 
-        if (!$jadwalCarbon->isToday()) {
+        if (! $jadwalCarbon->isToday()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kehadiran Test MMPI hanya dapat diisi pada tanggal jadwal test.',
@@ -297,9 +301,9 @@ class CekTahapanPelamarController extends Controller
             $daftarHadirMmpi->status_kehadiran ?? null
         );
 
-        if (!empty($kehadiranLama)) {
+        if (! empty($kehadiranLama)) {
             $pelamarTerbaru = $this->pelamarQuery()
-                ->where('token', $token)
+                ->withValidToken($token)
                 ->first();
 
             return response()->json([
@@ -314,7 +318,7 @@ class CekTahapanPelamarController extends Controller
         });
 
         $pelamarTerbaru = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -334,7 +338,6 @@ class CekTahapanPelamarController extends Controller
         return $this->updateKehadiranJadwalTestMmpi($request, $token, $jadwalTestMmpi);
     }
 
-
     public function uploadDokumenInterview(
         Request $request,
         string $token,
@@ -349,7 +352,7 @@ class CekTahapanPelamarController extends Controller
          | mengirim nama field berbeda.
          |--------------------------------------------------------------------------
          */
-        if (!$request->hasFile('file_cv')) {
+        if (! $request->hasFile('file_cv')) {
             foreach (['cv', 'fileCv', 'cv_file'] as $alias) {
                 if ($request->hasFile($alias)) {
                     $request->files->set('file_cv', $request->file($alias));
@@ -358,7 +361,7 @@ class CekTahapanPelamarController extends Controller
             }
         }
 
-        if (!$request->hasFile('file_foto')) {
+        if (! $request->hasFile('file_foto')) {
             foreach (['foto', 'fileFoto', 'foto_file'] as $alias) {
                 if ($request->hasFile($alias)) {
                     $request->files->set('file_foto', $request->file($alias));
@@ -372,45 +375,51 @@ class CekTahapanPelamarController extends Controller
                 'nullable',
                 'file',
                 'mimes:pdf,doc,docx',
+                'extensions:pdf,doc,docx',
                 'max:5120',
+                new MalwareFreeFile,
             ],
             'file_foto' => [
                 'nullable',
                 'file',
                 'mimes:jpg,jpeg,png,webp',
+                'extensions:jpg,jpeg,png,webp',
                 'max:3072',
+                new MalwareFreeFile,
             ],
         ], [
             'file_cv.file' => 'File CV tidak valid.',
             'file_cv.mimes' => 'File CV harus berupa PDF, DOC, atau DOCX.',
+            'file_cv.extensions' => 'Ekstensi file CV harus PDF, DOC, atau DOCX.',
             'file_cv.max' => 'Ukuran file CV maksimal 5 MB.',
             'file_foto.file' => 'File foto tidak valid.',
             'file_foto.mimes' => 'File foto harus berupa JPG, JPEG, PNG, atau WEBP.',
+            'file_foto.extensions' => 'Ekstensi file foto harus JPG, JPEG, PNG, atau WEBP.',
             'file_foto.max' => 'Ukuran file foto maksimal 3 MB.',
         ]);
 
-        if (!$request->hasFile('file_cv') && !$request->hasFile('file_foto')) {
+        if (! $request->hasFile('file_cv') && ! $request->hasFile('file_foto')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pilih minimal satu file CV atau Foto untuk diupload.',
             ], 422);
         }
 
-        if (!Schema::hasTable('jadwal_interview_kandidat')) {
+        if (! Schema::hasTable('jadwal_interview_kandidat')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tabel jadwal_interview_kandidat tidak ditemukan.',
             ], 500);
         }
 
-        if (!Schema::hasColumn('jadwal_interview_kandidat', 'file_cv')) {
+        if (! Schema::hasColumn('jadwal_interview_kandidat', 'file_cv')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom file_cv belum tersedia. Jalankan migration terlebih dahulu.',
             ], 500);
         }
 
-        if (!Schema::hasColumn('jadwal_interview_kandidat', 'file_foto')) {
+        if (! Schema::hasColumn('jadwal_interview_kandidat', 'file_foto')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kolom file_foto belum tersedia. Jalankan migration terlebih dahulu.',
@@ -418,10 +427,10 @@ class CekTahapanPelamarController extends Controller
         }
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -449,7 +458,7 @@ class CekTahapanPelamarController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
-        if (!$jadwal) {
+        if (! $jadwal) {
             return response()->json([
                 'success' => false,
                 'message' => 'Jadwal interview kandidat tidak ditemukan untuk token ini.',
@@ -459,6 +468,8 @@ class CekTahapanPelamarController extends Controller
 
         $disk = $this->uploadDiskName();
         $payload = [];
+        $oldPaths = [];
+        $newPaths = [];
 
         $folderNama = $this->sanitizeFolderName($pelamar->nama_lengkap ?: 'tanpa nama');
         $folder = "interview/{$folderNama}/dokumen";
@@ -467,16 +478,16 @@ class CekTahapanPelamarController extends Controller
             $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_cv ?? null);
 
             if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
-                Storage::disk($disk)->delete($oldPath);
+                $oldPaths[] = $oldPath;
             }
 
             $extension = strtolower($request->file('file_cv')->getClientOriginalExtension());
 
-            $fileName = 'cv-interview-' .
-                now()->format('Ymd-His') .
-                '-' .
-                Str::random(8) .
-                '.' .
+            $fileName = 'cv-interview-'.
+                now()->format('Ymd-His').
+                '-'.
+                Str::random(8).
+                '.'.
                 $extension;
 
             $storedPath = $request->file('file_cv')->storeAs(
@@ -485,7 +496,9 @@ class CekTahapanPelamarController extends Controller
                 $disk
             );
 
-            if (!$storedPath) {
+            if (! $storedPath) {
+                Storage::disk($disk)->delete($newPaths);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'File CV gagal disimpan ke storage.',
@@ -497,22 +510,23 @@ class CekTahapanPelamarController extends Controller
              | Contoh: interview/nama/dokumen/cv-interview-xxx.pdf
              */
             $payload['file_cv'] = $storedPath;
+            $newPaths[] = $storedPath;
         }
 
         if ($request->hasFile('file_foto')) {
             $oldPath = $this->convertPublicUrlToStoragePath($jadwal->file_foto ?? null);
 
             if ($oldPath && Storage::disk($disk)->exists($oldPath)) {
-                Storage::disk($disk)->delete($oldPath);
+                $oldPaths[] = $oldPath;
             }
 
             $extension = strtolower($request->file('file_foto')->getClientOriginalExtension());
 
-            $fileName = 'foto-interview-' .
-                now()->format('Ymd-His') .
-                '-' .
-                Str::random(8) .
-                '.' .
+            $fileName = 'foto-interview-'.
+                now()->format('Ymd-His').
+                '-'.
+                Str::random(8).
+                '.'.
                 $extension;
 
             $storedPath = $request->file('file_foto')->storeAs(
@@ -521,7 +535,9 @@ class CekTahapanPelamarController extends Controller
                 $disk
             );
 
-            if (!$storedPath) {
+            if (! $storedPath) {
+                Storage::disk($disk)->delete($newPaths);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'File foto gagal disimpan ke storage.',
@@ -532,6 +548,7 @@ class CekTahapanPelamarController extends Controller
              | Simpan path ke database, bukan URL.
              */
             $payload['file_foto'] = $storedPath;
+            $newPaths[] = $storedPath;
         }
 
         if (empty($payload)) {
@@ -541,19 +558,28 @@ class CekTahapanPelamarController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($jadwal, $payload) {
-            /*
-             | forceFill dipakai agar tetap tersimpan walaupun model belum sempat
-             | menambahkan file_cv dan file_foto ke $fillable.
-             */
-            $jadwal->forceFill($payload);
-            $jadwal->save();
-        });
+        try {
+            DB::transaction(function () use ($jadwal, $payload) {
+                /*
+                 | forceFill dipakai agar tetap tersimpan walaupun model belum sempat
+                 | menambahkan file_cv dan file_foto ke $fillable.
+                 */
+                $jadwal->forceFill($payload);
+                $jadwal->save();
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk($disk)->delete($newPaths);
+
+            throw $exception;
+        }
+
+        // Dokumen lama baru dihapus setelah path baru berhasil tersimpan di database.
+        Storage::disk($disk)->delete(array_values(array_unique($oldPaths)));
 
         $jadwal->refresh();
 
         $pelamarTerbaru = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -577,7 +603,7 @@ class CekTahapanPelamarController extends Controller
 
     private function buildTahapanPelamar(?DataRiwayatDiri $pelamar): array
     {
-        if (!$pelamar) {
+        if (! $pelamar) {
             return [
                 'status' => 'Data Tidak Ditemukan',
                 'keterangan' => 'Data pelamar tidak ditemukan.',
@@ -659,14 +685,14 @@ class CekTahapanPelamarController extends Controller
 
         $isInterviewReschedule = $statusKehadiranInterview === 'reschedule';
 
-        $punyaJadwalTest = !empty($jadwalTestData);
-        $punyaHasilTest = !empty($hasilTest);
-        $punyaJadwalTestMmpi = !empty($jadwalTestMmpiData);
-        $punyaHasilTestMmpi = !empty($hasilTestMmpi);
-        $punyaJadwalInterview = !empty($jadwalInterviewData);
-        $punyaHasilInterview = !empty($hasilInterview);
-        $punyaReviewManagementRow = !empty($jadwalInterviewData['hasil_review_management_id'] ?? null);
-        $punyaJadwalOfferingLetter = !empty($jadwalOfferingLetterData);
+        $punyaJadwalTest = ! empty($jadwalTestData);
+        $punyaHasilTest = ! empty($hasilTest);
+        $punyaJadwalTestMmpi = ! empty($jadwalTestMmpiData);
+        $punyaHasilTestMmpi = ! empty($hasilTestMmpi);
+        $punyaJadwalInterview = ! empty($jadwalInterviewData);
+        $punyaHasilInterview = ! empty($hasilInterview);
+        $punyaReviewManagementRow = ! empty($jadwalInterviewData['hasil_review_management_id'] ?? null);
+        $punyaJadwalOfferingLetter = ! empty($jadwalOfferingLetterData);
 
         $hasilInterviewGagal = $hasilInterview === 'tidak_lolos_interview';
         $hasilInterviewLanjutReview = in_array($hasilInterview, ['lolos_interview', 'dipertimbangkan'], true);
@@ -694,7 +720,7 @@ class CekTahapanPelamarController extends Controller
             $jadwalTestPayload = array_merge($jadwalTestData, [
                 'boleh_akses_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom,
                 'bolehAksesJadwalTestZoom' => $bolehLanjutJadwalTestZoom,
-                'disabled' => !$bolehLanjutJadwalTestZoom,
+                'disabled' => ! $bolehLanjutJadwalTestZoom,
                 'disabled_reason' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
                 'disabledReason' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
             ]);
@@ -790,15 +816,15 @@ class CekTahapanPelamarController extends Controller
                     'catatanInterview' => $jadwalInterviewData['catatan'] ?? null,
                 ];
             } elseif ($hasilInterviewLanjutReview) {
-                $statusInterview = $reviewProses || (!$reviewDiterima && !$reviewGagal)
+                $statusInterview = $reviewProses || (! $reviewDiterima && ! $reviewGagal)
                     ? 'Review Management'
                     : ($reviewDiterima ? 'Lolos Interview' : 'Gagal Interview');
 
-                $keteranganInterview = $reviewProses || (!$reviewDiterima && !$reviewGagal)
+                $keteranganInterview = $reviewProses || (! $reviewDiterima && ! $reviewGagal)
                     ? 'Hasil interview sudah tersedia dan sedang diproses ke tahap Review Management.'
                     : ($reviewDiterima ? self::PESAN_LOLOS_SELEKSI : self::PESAN_TIDAK_LOLOS_SELEKSI);
 
-                $saranInterview = $reviewProses || (!$reviewDiterima && !$reviewGagal)
+                $saranInterview = $reviewProses || (! $reviewDiterima && ! $reviewGagal)
                     ? 'Silakan pantau halaman ini secara berkala untuk melihat hasil Review Management.'
                     : null;
 
@@ -935,7 +961,7 @@ class CekTahapanPelamarController extends Controller
         $jadwalTestPayload = $jadwalTestData ? array_merge($jadwalTestData, [
             'boleh_akses_jadwal_test_zoom' => $bolehLanjutJadwalTestZoom,
             'bolehAksesJadwalTestZoom' => $bolehLanjutJadwalTestZoom,
-            'disabled' => !$bolehLanjutJadwalTestZoom,
+            'disabled' => ! $bolehLanjutJadwalTestZoom,
             'disabled_reason' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
             'disabledReason' => $bolehLanjutJadwalTestZoom ? null : $pesanBelumLengkap,
         ]) : null;
@@ -1096,38 +1122,37 @@ class CekTahapanPelamarController extends Controller
                 'key' => 'riwayat_keluarga',
                 'label' => 'Riwayat Keluarga',
                 'order' => 2,
-                'completed' =>
-                    $this->hasFilledValue($pelamar->riwayatKeluarga ?? null, [
-                        'nama_ayah_kandung',
-                        'pekerjaan_ayah_kandung',
-                        'nama_ibu_kandung',
-                        'pekerjaan_ibu_kandung',
-                        'nama_ayah',
-                        'nik_ayah',
-                        'tempat_lahir_ayah',
-                        'tanggal_lahir_ayah',
-                        'pekerjaan_ayah',
-                        'no_hp_ayah',
-                        'alamat_ayah',
-                        'nama_ibu',
-                        'nik_ibu',
-                        'tempat_lahir_ibu',
-                        'tanggal_lahir_ibu',
-                        'pekerjaan_ibu',
-                        'no_hp_ibu',
-                        'alamat_ibu',
-                        'nama_suami_istri',
-                        'pekerjaan_suami_istri',
-                        'tlpn_suami_istri',
-                        'nama_bapak_mertua',
-                        'pekerjaan_bapak_mertua',
-                        'nama_ibu_mertua',
-                        'pekerjaan_ibu_mertua',
-                        'hubungan_kerabat_instansi',
-                        'kerabat_bekerja_diinstansi',
-                        'kontak_darurat',
-                        'tlpn_darurat',
-                    ]) ||
+                'completed' => $this->hasFilledValue($pelamar->riwayatKeluarga ?? null, [
+                    'nama_ayah_kandung',
+                    'pekerjaan_ayah_kandung',
+                    'nama_ibu_kandung',
+                    'pekerjaan_ibu_kandung',
+                    'nama_ayah',
+                    'nik_ayah',
+                    'tempat_lahir_ayah',
+                    'tanggal_lahir_ayah',
+                    'pekerjaan_ayah',
+                    'no_hp_ayah',
+                    'alamat_ayah',
+                    'nama_ibu',
+                    'nik_ibu',
+                    'tempat_lahir_ibu',
+                    'tanggal_lahir_ibu',
+                    'pekerjaan_ibu',
+                    'no_hp_ibu',
+                    'alamat_ibu',
+                    'nama_suami_istri',
+                    'pekerjaan_suami_istri',
+                    'tlpn_suami_istri',
+                    'nama_bapak_mertua',
+                    'pekerjaan_bapak_mertua',
+                    'nama_ibu_mertua',
+                    'pekerjaan_ibu_mertua',
+                    'hubungan_kerabat_instansi',
+                    'kerabat_bekerja_diinstansi',
+                    'kontak_darurat',
+                    'tlpn_darurat',
+                ]) ||
                     $this->collectionHasFilledValue($pelamar->saudaraKandung ?? null, [
                         'nama_saudara_kandung',
                         'jenis_kelamin',
@@ -1149,28 +1174,27 @@ class CekTahapanPelamarController extends Controller
                 'key' => 'riwayat_kesehatan',
                 'label' => 'Riwayat Kesehatan',
                 'order' => 3,
-                'completed' =>
-                    $this->hasFilledValue($pelamar->riwayatKesehatan ?? null, [
-                        'buta_warna',
-                        'opsi_kacamata_id',
-                        'alat_bantu_dengar',
-                        'menulis_dengan_tangan',
-                        'sering_gemetar',
-                        'tangan_sering_berkeringat',
-                        'penyakit_menular',
-                        'program_kehamilan',
-                        'punya_alergi',
-                        'nama_alergi',
-                        'punya_penyakit_genetik',
-                        'nama_penyakit',
-                        'riwayat_kronis',
-                        'pengobatan_psikolog',
-                        'kapan_dilakukan',
-                        'pernah_kecelakaan',
-                        'bagian_tubuh_kecelakaan',
-                        'pernah_operasi',
-                        'diagnosa_dokter',
-                    ]) ||
+                'completed' => $this->hasFilledValue($pelamar->riwayatKesehatan ?? null, [
+                    'buta_warna',
+                    'opsi_kacamata_id',
+                    'alat_bantu_dengar',
+                    'menulis_dengan_tangan',
+                    'sering_gemetar',
+                    'tangan_sering_berkeringat',
+                    'penyakit_menular',
+                    'program_kehamilan',
+                    'punya_alergi',
+                    'nama_alergi',
+                    'punya_penyakit_genetik',
+                    'nama_penyakit',
+                    'riwayat_kronis',
+                    'pengobatan_psikolog',
+                    'kapan_dilakukan',
+                    'pernah_kecelakaan',
+                    'bagian_tubuh_kecelakaan',
+                    'pernah_operasi',
+                    'diagnosa_dokter',
+                ]) ||
                     $this->hasFilledValue($pelamar, [
                         'gol_darah',
                         'tinggi_badan',
@@ -1233,7 +1257,7 @@ class CekTahapanPelamarController extends Controller
         $lastCompletedLabel = '-';
 
         foreach ($steps as $step) {
-            if (!empty($step['completed']) && (int) $step['order'] > $highestCompletedOrder) {
+            if (! empty($step['completed']) && (int) $step['order'] > $highestCompletedOrder) {
                 $highestCompletedOrder = (int) $step['order'];
                 $lastCompletedLabel = $step['label'];
             }
@@ -1245,6 +1269,7 @@ class CekTahapanPelamarController extends Controller
             ->map(function ($step) use ($highestCompletedOrder) {
                 $step['completed'] = (int) $step['order'] <= $highestCompletedOrder;
                 $step['percentage'] = round(((int) $step['order'] / 5) * 100);
+
                 return $step;
             })
             ->values()
@@ -1261,7 +1286,7 @@ class CekTahapanPelamarController extends Controller
 
     private function collectionHasFilledValue($collection, array $fields): bool
     {
-        if (!$collection) {
+        if (! $collection) {
             return false;
         }
 
@@ -1274,64 +1299,64 @@ class CekTahapanPelamarController extends Controller
         return false;
     }
 
-   private function hasFilledValue($target, array $fields): bool
-{
-    if ($target === null) {
-        return false;
-    }
-
-    /*
-     * Relasi hasMany menghasilkan Collection.
-     * Periksa setiap item di dalam Collection.
-     */
-    if (
-        $target instanceof \Illuminate\Database\Eloquent\Collection ||
-        $target instanceof \Illuminate\Support\Collection
-    ) {
-        if ($target->isEmpty()) {
+    private function hasFilledValue($target, array $fields): bool
+    {
+        if ($target === null) {
             return false;
         }
 
-        foreach ($target as $row) {
-            if ($this->hasFilledValue($row, $fields)) {
+        /*
+         * Relasi hasMany menghasilkan Collection.
+         * Periksa setiap item di dalam Collection.
+         */
+        if (
+            $target instanceof \Illuminate\Database\Eloquent\Collection ||
+            $target instanceof Collection
+        ) {
+            if ($target->isEmpty()) {
+                return false;
+            }
+
+            foreach ($target as $row) {
+                if ($this->hasFilledValue($row, $fields)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /*
+         * Mendukung array yang berisi banyak record.
+         */
+        if (is_array($target) && array_is_list($target)) {
+            foreach ($target as $row) {
+                if ($this->hasFilledValue($row, $fields)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach ($fields as $field) {
+            $value = null;
+
+            if ($target instanceof Model) {
+                $value = $target->getAttribute($field);
+            } elseif (is_array($target)) {
+                $value = $target[$field] ?? null;
+            } elseif (is_object($target)) {
+                $value = data_get($target, $field);
+            }
+
+            if ($this->isFilledValue($value)) {
                 return true;
             }
         }
 
         return false;
     }
-
-    /*
-     * Mendukung array yang berisi banyak record.
-     */
-    if (is_array($target) && array_is_list($target)) {
-        foreach ($target as $row) {
-            if ($this->hasFilledValue($row, $fields)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    foreach ($fields as $field) {
-        $value = null;
-
-        if ($target instanceof \Illuminate\Database\Eloquent\Model) {
-            $value = $target->getAttribute($field);
-        } elseif (is_array($target)) {
-            $value = $target[$field] ?? null;
-        } elseif (is_object($target)) {
-            $value = data_get($target, $field);
-        }
-
-        if ($this->isFilledValue($value)) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
     private function isFilledValue($value): bool
     {
@@ -1371,13 +1396,12 @@ class CekTahapanPelamarController extends Controller
             return true;
         }
 
-        return !empty($value);
+        return ! empty($value);
     }
-
 
     private function formatJadwalInterview(?DataRiwayatDiri $pelamar): ?array
     {
-        if (!$pelamar || !Schema::hasTable('jadwal_interview') || !Schema::hasTable('jadwal_interview_kandidat')) {
+        if (! $pelamar || ! Schema::hasTable('jadwal_interview') || ! Schema::hasTable('jadwal_interview_kandidat')) {
             return null;
         }
 
@@ -1481,13 +1505,13 @@ class CekTahapanPelamarController extends Controller
             ->orderByDesc('jik.created_at')
             ->first();
 
-        if (!$jadwalInterview || empty($jadwalInterview->jadwal_interview)) {
+        if (! $jadwalInterview || empty($jadwalInterview->jadwal_interview)) {
             return null;
         }
 
         $jadwal = $this->parseDateTime($jadwalInterview->jadwal_interview);
 
-        if (!$jadwal) {
+        if (! $jadwal) {
             return null;
         }
 
@@ -1501,7 +1525,7 @@ class CekTahapanPelamarController extends Controller
 
         $jadwalOfferingLetter = null;
 
-        if (!empty($jadwalInterview->jadwal_offering_letter_id)) {
+        if (! empty($jadwalInterview->jadwal_offering_letter_id)) {
             $tanggalOl = $this->parseDateTime($jadwalInterview->tanggal_ol ?? null);
 
             $jadwalOfferingLetter = [
@@ -1560,8 +1584,8 @@ class CekTahapanPelamarController extends Controller
             'statusKehadiranInterview' => $kehadiran,
             'konfirmasi_kehadiran' => $kehadiran,
             'konfirmasiKehadiran' => $kehadiran,
-            'sudah_mengisi_kehadiran' => !empty($kehadiran),
-            'sudahMengisiKehadiran' => !empty($kehadiran),
+            'sudah_mengisi_kehadiran' => ! empty($kehadiran),
+            'sudahMengisiKehadiran' => ! empty($kehadiran),
             'hasil_interview_raw' => $jadwalInterview->hasil_interview ?? null,
             'hasilInterviewRaw' => $jadwalInterview->hasil_interview ?? null,
             'hasil_interview_label' => $jadwalInterview->hasil_interview ?? null,
@@ -1570,8 +1594,8 @@ class CekTahapanPelamarController extends Controller
             'hasilInterview' => $hasilInterview,
             'status_hasil_interview' => $hasilInterview,
             'statusHasilInterview' => $hasilInterview,
-            'sudah_ada_hasil_interview' => !empty($hasilInterview),
-            'sudahAdaHasilInterview' => !empty($hasilInterview),
+            'sudah_ada_hasil_interview' => ! empty($hasilInterview),
+            'sudahAdaHasilInterview' => ! empty($hasilInterview),
             'catatan' => $catatan,
             'catatan_interview' => $catatan,
             'catatanInterview' => $catatan,
@@ -1606,7 +1630,7 @@ class CekTahapanPelamarController extends Controller
 
     private function formatJadwalTestMmpi(?DataRiwayatDiri $pelamar): ?array
     {
-        if (!$pelamar || !Schema::hasTable('jadwal_test_mmpi')) {
+        if (! $pelamar || ! Schema::hasTable('jadwal_test_mmpi')) {
             return null;
         }
 
@@ -1654,13 +1678,13 @@ class CekTahapanPelamarController extends Controller
             ->orderByDesc('jtm.created_at')
             ->first();
 
-        if (!$jadwalMmpi || empty($jadwalMmpi->tanggal)) {
+        if (! $jadwalMmpi || empty($jadwalMmpi->tanggal)) {
             return null;
         }
 
         $tanggal = $this->parseDateTime($jadwalMmpi->tanggal);
 
-        if (!$tanggal) {
+        if (! $tanggal) {
             return null;
         }
 
@@ -1690,8 +1714,8 @@ class CekTahapanPelamarController extends Controller
             'statusKehadiran' => $kehadiranMmpi,
             'konfirmasi_kehadiran' => $kehadiranMmpi,
             'konfirmasiKehadiran' => $kehadiranMmpi,
-            'sudah_mengisi_kehadiran' => !empty($kehadiranMmpi),
-            'sudahMengisiKehadiran' => !empty($kehadiranMmpi),
+            'sudah_mengisi_kehadiran' => ! empty($kehadiranMmpi),
+            'sudahMengisiKehadiran' => ! empty($kehadiranMmpi),
 
             'hasil_test' => $hasilTestMmpi,
             'hasilTest' => $hasilTestMmpi,
@@ -1707,13 +1731,13 @@ class CekTahapanPelamarController extends Controller
 
     private function formatJadwalTest($jadwalTest): ?array
     {
-        if (!$jadwalTest || empty($jadwalTest->jadwal)) {
+        if (! $jadwalTest || empty($jadwalTest->jadwal)) {
             return null;
         }
 
         $jadwal = $this->parseDateTime($jadwalTest->jadwal);
 
-        if (!$jadwal) {
+        if (! $jadwal) {
             return null;
         }
 
@@ -1734,7 +1758,7 @@ class CekTahapanPelamarController extends Controller
             $linkZoom = $jadwalTest->link_zoom ?: null;
         }
 
-        $bolehBukaLinkZoom = $kehadiran === 'hadir' && !empty($linkZoom);
+        $bolehBukaLinkZoom = $kehadiran === 'hadir' && ! empty($linkZoom);
 
         return [
             'id' => $jadwalTest->id ?? null,
@@ -1754,11 +1778,11 @@ class CekTahapanPelamarController extends Controller
             'status_hasil_test' => $hasilTest,
             'statusHasilTest' => $hasilTest,
 
-            'sudah_mengisi_kehadiran' => !empty($kehadiran),
-            'sudahMengisiKehadiran' => !empty($kehadiran),
+            'sudah_mengisi_kehadiran' => ! empty($kehadiran),
+            'sudahMengisiKehadiran' => ! empty($kehadiran),
 
-            'sudah_ada_hasil_test' => !empty($hasilTest),
-            'sudahAdaHasilTest' => !empty($hasilTest),
+            'sudah_ada_hasil_test' => ! empty($hasilTest),
+            'sudahAdaHasilTest' => ! empty($hasilTest),
 
             'link_zoom' => $bolehBukaLinkZoom ? $linkZoom : null,
             'linkZoom' => $bolehBukaLinkZoom ? $linkZoom : null,
@@ -1774,10 +1798,9 @@ class CekTahapanPelamarController extends Controller
         ];
     }
 
-
     private function getDaftarHadirByJadwalMmpi($jadwalMmpi)
     {
-        if (!$jadwalMmpi || !Schema::hasTable('daftar_hadir_test_mmpi')) {
+        if (! $jadwalMmpi || ! Schema::hasTable('daftar_hadir_test_mmpi')) {
             return null;
         }
 
@@ -1792,7 +1815,7 @@ class CekTahapanPelamarController extends Controller
         } else {
             $query->where('data_riwayat_diri_id', $jadwalMmpi->data_riwayat_diri_id);
 
-            if (Schema::hasColumn('daftar_hadir_test_mmpi', 'tanggal_kehadiran') && !empty($jadwalMmpi->tanggal)) {
+            if (Schema::hasColumn('daftar_hadir_test_mmpi', 'tanggal_kehadiran') && ! empty($jadwalMmpi->tanggal)) {
                 $tanggal = $this->parseDateTime($jadwalMmpi->tanggal);
 
                 if ($tanggal) {
@@ -1806,7 +1829,7 @@ class CekTahapanPelamarController extends Controller
 
     private function saveDaftarHadirTestMmpi($jadwalMmpi, string $kehadiran): void
     {
-        if (!Schema::hasTable('daftar_hadir_test_mmpi')) {
+        if (! Schema::hasTable('daftar_hadir_test_mmpi')) {
             throw new \RuntimeException('Tabel daftar_hadir_test_mmpi tidak ditemukan.');
         }
 
@@ -1838,7 +1861,7 @@ class CekTahapanPelamarController extends Controller
             return;
         }
 
-        $data['id'] = (string) \Illuminate\Support\Str::uuid();
+        $data['id'] = (string) Str::uuid();
         $data['created_at'] = $now;
 
         DB::table('daftar_hadir_test_mmpi')->insert($data);
@@ -1846,7 +1869,7 @@ class CekTahapanPelamarController extends Controller
 
     private function getDaftarHadirByJadwal($jadwalTest)
     {
-        if (!$jadwalTest || !Schema::hasTable('daftar_hadir_test_zoom')) {
+        if (! $jadwalTest || ! Schema::hasTable('daftar_hadir_test_zoom')) {
             return null;
         }
 
@@ -1858,7 +1881,7 @@ class CekTahapanPelamarController extends Controller
         } else {
             $query->where('data_riwayat_diri_id', $jadwalTest->data_riwayat_diri_id);
 
-            if (Schema::hasColumn('daftar_hadir_test_zoom', 'tanggal_kehadiran') && !empty($jadwalTest->jadwal)) {
+            if (Schema::hasColumn('daftar_hadir_test_zoom', 'tanggal_kehadiran') && ! empty($jadwalTest->jadwal)) {
                 $jadwal = $this->parseDateTime($jadwalTest->jadwal);
 
                 if ($jadwal) {
@@ -1872,7 +1895,7 @@ class CekTahapanPelamarController extends Controller
 
     private function saveDaftarHadirTestZoom(JadwalTestZoom $jadwalTest, string $kehadiran): void
     {
-        if (!Schema::hasTable('daftar_hadir_test_zoom')) {
+        if (! Schema::hasTable('daftar_hadir_test_zoom')) {
             throw new \RuntimeException('Tabel daftar_hadir_test_zoom tidak ditemukan.');
         }
 
@@ -1904,7 +1927,7 @@ class CekTahapanPelamarController extends Controller
             return;
         }
 
-        $data['id'] = (string) \Illuminate\Support\Str::uuid();
+        $data['id'] = (string) Str::uuid();
         $data['created_at'] = $now;
 
         DB::table('daftar_hadir_test_zoom')->insert($data);
@@ -1912,7 +1935,7 @@ class CekTahapanPelamarController extends Controller
 
     private function parseDateTime($value): ?Carbon
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -2138,7 +2161,7 @@ class CekTahapanPelamarController extends Controller
          * Collection. Normalisasi terlebih dahulu agar akses properti seperti
          * nama_perusahaan tidak dilakukan langsung pada Collection.
          */
-        if ($model instanceof \Illuminate\Support\Collection) {
+        if ($model instanceof Collection) {
             $model = $model->first();
         }
 
@@ -2150,7 +2173,7 @@ class CekTahapanPelamarController extends Controller
             foreach ($columns as $column) {
                 $value = null;
 
-                if ($model instanceof \Illuminate\Database\Eloquent\Model) {
+                if ($model instanceof Model) {
                     $value = $model->getAttribute($column);
                 } elseif (is_object($model)) {
                     $value = data_get($model, $column);
@@ -2182,7 +2205,7 @@ class CekTahapanPelamarController extends Controller
 
     private function normalizeFileUrl(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -2202,6 +2225,13 @@ class CekTahapanPelamarController extends Controller
 
         $path = ltrim($value, '/');
         $disk = $this->uploadDiskName();
+
+        app(RecruitmentAuditService::class)->record(
+            'candidate_document',
+            hash('sha256', $path),
+            'download_url_generated',
+            ['disk' => $disk]
+        );
 
         /*
          | Untuk MinIO/private bucket, temporaryUrl lebih aman.
@@ -2225,7 +2255,7 @@ class CekTahapanPelamarController extends Controller
 
     private function convertPublicUrlToStoragePath(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -2240,9 +2270,9 @@ class CekTahapanPelamarController extends Controller
          | interview/nama/dokumen/file.pdf
          */
         if (
-            !str_starts_with($value, 'http://') &&
-            !str_starts_with($value, 'https://') &&
-            !str_starts_with($value, '/storage/')
+            ! str_starts_with($value, 'http://') &&
+            ! str_starts_with($value, 'https://') &&
+            ! str_starts_with($value, '/storage/')
         ) {
             return ltrim($value, '/');
         }
@@ -2260,7 +2290,7 @@ class CekTahapanPelamarController extends Controller
          */
         $path = parse_url($value, PHP_URL_PATH);
 
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
@@ -2274,8 +2304,8 @@ class CekTahapanPelamarController extends Controller
          */
         $bucket = config('filesystems.disks.s3.bucket');
 
-        if ($bucket && str_starts_with($path, '/' . $bucket . '/')) {
-            return ltrim(substr($path, strlen('/' . $bucket . '/')), '/');
+        if ($bucket && str_starts_with($path, '/'.$bucket.'/')) {
+            return ltrim(substr($path, strlen('/'.$bucket.'/')), '/');
         }
 
         return ltrim($path, '/');
@@ -2295,5 +2325,4 @@ class CekTahapanPelamarController extends Controller
 
         return $value !== '' ? $value : 'tanpa-nama';
     }
-
 }

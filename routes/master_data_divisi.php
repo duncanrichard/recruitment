@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\DivisiController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/divisi')
     ->name('admin.master-data.divisi.')

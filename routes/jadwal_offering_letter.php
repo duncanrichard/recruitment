@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\JadwalOfferingLetterController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/jadwal-ol')
     ->name('admin.jadwal-ol.')

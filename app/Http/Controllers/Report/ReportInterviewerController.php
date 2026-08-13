@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Services\CompanyAccessService;
+use App\Services\SpreadsheetValueSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -71,7 +74,8 @@ class ReportInterviewerController extends Controller
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
         $interviewer = $validated['interviewer'] ?? 'Semua';
 
-        $filename = 'report-interviewer-' . now()->format('Ymd-His') . '.xls';
+        $rows = app(SpreadsheetValueSanitizer::class)->sanitizeRows($rows);
+        $filename = 'report-interviewer-'.now()->format('Ymd-His').'.xls';
 
         return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir, $interviewer) {
             echo '<html>';
@@ -107,9 +111,9 @@ class ReportInterviewerController extends Controller
 
             echo '<div class="title">Report Interviewer</div>';
             echo '<div class="subtitle">';
-            echo 'Tanggal Interview: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir);
+            echo 'Tanggal Interview: '.e($tanggalAwal).' s/d '.e($tanggalAkhir);
             echo '<br>';
-            echo 'Interviewer: ' . e($interviewer);
+            echo 'Interviewer: '.e($interviewer);
             echo '</div>';
 
             echo '<table>';
@@ -141,20 +145,20 @@ class ReportInterviewerController extends Controller
 
             foreach ($rows as $index => $row) {
                 echo '<tr>';
-                echo '<td>' . ($index + 1) . '</td>';
-                echo '<td>' . e($row['nama']) . '</td>';
-                echo '<td>' . e($row['no_wa']) . '</td>';
-                echo '<td>' . e($row['total_jadwal']) . '</td>';
-                echo '<td>' . e($row['total_kandidat']) . '</td>';
-                echo '<td>' . e($row['hadir']) . '</td>';
-                echo '<td>' . e($row['tidak_hadir']) . '</td>';
-                echo '<td>' . e($row['tidak_respon']) . '</td>';
-                echo '<td>' . e($row['reschedule']) . '</td>';
-                echo '<td>' . e($row['lolos_interview']) . '</td>';
-                echo '<td>' . e($row['tidak_lolos_interview']) . '</td>';
-                echo '<td>' . e($row['dipertimbangkan']) . '</td>';
-                echo '<td>' . e($row['belum_hasil']) . '</td>';
-                echo '<td>' . e($row['interview_terakhir']) . '</td>';
+                echo '<td>'.($index + 1).'</td>';
+                echo '<td>'.e($row['nama']).'</td>';
+                echo '<td>'.e($row['no_wa']).'</td>';
+                echo '<td>'.e($row['total_jadwal']).'</td>';
+                echo '<td>'.e($row['total_kandidat']).'</td>';
+                echo '<td>'.e($row['hadir']).'</td>';
+                echo '<td>'.e($row['tidak_hadir']).'</td>';
+                echo '<td>'.e($row['tidak_respon']).'</td>';
+                echo '<td>'.e($row['reschedule']).'</td>';
+                echo '<td>'.e($row['lolos_interview']).'</td>';
+                echo '<td>'.e($row['tidak_lolos_interview']).'</td>';
+                echo '<td>'.e($row['dipertimbangkan']).'</td>';
+                echo '<td>'.e($row['belum_hasil']).'</td>';
+                echo '<td>'.e($row['interview_terakhir']).'</td>';
                 echo '</tr>';
             }
 
@@ -164,7 +168,7 @@ class ReportInterviewerController extends Controller
             echo '</html>';
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'max-age=0',
         ]);
     }
@@ -187,9 +191,12 @@ class ReportInterviewerController extends Controller
                     $join->whereNull('jik.deleted_at');
                 }
             })
+            ->leftJoin('data_riwayat_diri as drd', 'drd.id', '=', 'jik.data_riwayat_diri_id')
             ->whereNull('i.deleted_at');
 
-        if (!empty($filters['tanggal_awal'])) {
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'drd.perusahaan_dilamar');
+
+        if (! empty($filters['tanggal_awal'])) {
             $query->whereDate(
                 'ji.jadwal_interview',
                 '>=',
@@ -197,7 +204,7 @@ class ReportInterviewerController extends Controller
             );
         }
 
-        if (!empty($filters['tanggal_akhir'])) {
+        if (! empty($filters['tanggal_akhir'])) {
             $query->whereDate(
                 'ji.jadwal_interview',
                 '<=',
@@ -205,12 +212,12 @@ class ReportInterviewerController extends Controller
             );
         }
 
-        if (!empty($filters['interviewer'])) {
+        if (! empty($filters['interviewer'])) {
             $keyword = $filters['interviewer'];
 
             $query->where(function ($q) use ($keyword) {
-                $q->where('i.nama', 'like', '%' . $keyword . '%')
-                    ->orWhere('i.no_wa', 'like', '%' . $keyword . '%');
+                $q->where('i.nama', 'like', '%'.$keyword.'%')
+                    ->orWhere('i.no_wa', 'like', '%'.$keyword.'%');
             });
         }
 

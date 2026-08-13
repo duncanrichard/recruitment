@@ -2,20 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Agama;
+use App\Models\DataKesiapanBekerja;
+use App\Models\DataPerusahaan;
 use App\Models\DataRiwayatDiri;
 use App\Models\DataRiwayatKeluarga;
 use App\Models\DataRiwayatKesehatan;
 use App\Models\DataRiwayatPekerjaan;
-use App\Models\DataKesiapanBekerja;
 use App\Models\DataSaudaraIpar;
 use App\Models\DataSaudaraKandung;
+use App\Models\Kewarganegaraan;
 use App\Models\OpsiKacamata;
+use App\Models\Posisi;
 use App\Models\SosialMedia;
+use App\Models\SumberInformasi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class PendaftaranController extends Controller
@@ -59,7 +64,7 @@ class PendaftaranController extends Controller
     public function show(string $token)
     {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->firstOrFail();
 
         return view('pages.pendaftaran.index', [
@@ -72,10 +77,10 @@ class PendaftaranController extends Controller
     public function findByToken(string $token): JsonResponse
     {
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -89,10 +94,9 @@ class PendaftaranController extends Controller
         ]);
     }
 
-
-public function masterPendidikan(): JsonResponse
+    public function masterPendidikan(): JsonResponse
     {
-        if (!Schema::hasTable('pendidikan')) {
+        if (! Schema::hasTable('pendidikan')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tabel pendidikan tidak ditemukan.',
@@ -118,7 +122,7 @@ public function masterPendidikan(): JsonResponse
 
     public function masterStatusPernikahan(): JsonResponse
     {
-        if (!Schema::hasTable('status_pernikahan')) {
+        if (! Schema::hasTable('status_pernikahan')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tabel status_pernikahan tidak ditemukan.',
@@ -154,7 +158,7 @@ public function masterPendidikan(): JsonResponse
 
                 'agama' => $this->getMasterOptions(
                     $this->tablesFor([
-                        \App\Models\Agama::class,
+                        Agama::class,
                     ], [
                         'agama',
                         'data_agama',
@@ -174,7 +178,7 @@ public function masterPendidikan(): JsonResponse
 
                 'kewarganegaraan' => $this->getMasterOptions(
                     $this->tablesFor([
-                        \App\Models\Kewarganegaraan::class,
+                        Kewarganegaraan::class,
                     ], [
                         'kewarganegaraan',
                         'data_kewarganegaraan',
@@ -205,10 +209,10 @@ public function masterPendidikan(): JsonResponse
     public function updateDataDiriByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -341,7 +345,7 @@ public function masterPendidikan(): JsonResponse
 
         $pendidikanId = $this->findPendidikanId($validated['pendidikan'] ?? null);
 
-        if (!$pendidikanId) {
+        if (! $pendidikanId) {
             return $this->masterError(
                 'pendidikan',
                 'Pendidikan yang dipilih tidak ditemukan di tabel pendidikan. Pastikan dropdown pendidikan mengambil data dari tabel pendidikan dan mengirim id UUID.'
@@ -349,7 +353,7 @@ public function masterPendidikan(): JsonResponse
         }
 
         $agamaId = $this->findMasterId(
-            $this->tablesFor([\App\Models\Agama::class], [
+            $this->tablesFor([Agama::class], [
                 'agama',
                 'data_agama',
                 'master_data_agama',
@@ -360,7 +364,7 @@ public function masterPendidikan(): JsonResponse
             $validated['agama'] ?? null
         );
 
-        if (!$agamaId) {
+        if (! $agamaId) {
             return $this->masterError(
                 'agama',
                 'Agama yang dipilih tidak ditemukan di master agama.'
@@ -377,7 +381,7 @@ public function masterPendidikan(): JsonResponse
         if ($statusPernikahanValue) {
             $statusPernikahanId = $this->findStatusPernikahanId($statusPernikahanValue);
 
-            if (!$statusPernikahanId) {
+            if (! $statusPernikahanId) {
                 return $this->masterError(
                     'status_pernikahan_id',
                     'Status pernikahan yang dipilih tidak ditemukan di tabel status_pernikahan. Pastikan dropdown status pernikahan mengambil data dari tabel status_pernikahan dan mengirim id UUID.'
@@ -387,9 +391,9 @@ public function masterPendidikan(): JsonResponse
 
         $kewarganegaraanId = null;
 
-        if (!empty($validated['kewarganegaraan'])) {
+        if (! empty($validated['kewarganegaraan'])) {
             $kewarganegaraanId = $this->findMasterId(
-                $this->tablesFor([\App\Models\Kewarganegaraan::class], [
+                $this->tablesFor([Kewarganegaraan::class], [
                     'kewarganegaraan',
                     'data_kewarganegaraan',
                     'master_data_kewarganegaraan',
@@ -402,9 +406,9 @@ public function masterPendidikan(): JsonResponse
 
         $sumberInformasiId = null;
 
-        if (!empty($validated['sumber_informasi'])) {
+        if (! empty($validated['sumber_informasi'])) {
             $sumberInformasiId = $this->findMasterId(
-                $this->tablesFor([\App\Models\SumberInformasi::class], [
+                $this->tablesFor([SumberInformasi::class], [
                     'sumber_informasi',
                     'data_sumber_informasi',
                     'master_data_sumber_informasi',
@@ -416,9 +420,9 @@ public function masterPendidikan(): JsonResponse
 
         $posisiId = null;
 
-        if (!empty($validated['posisi_dilamar'])) {
+        if (! empty($validated['posisi_dilamar'])) {
             $posisiId = $this->findMasterId(
-                $this->tablesFor([\App\Models\Posisi::class], [
+                $this->tablesFor([Posisi::class], [
                     'posisi',
                     'data_posisi',
                     'master_data_posisi',
@@ -439,9 +443,9 @@ public function masterPendidikan(): JsonResponse
 
         $perusahaanId = null;
 
-        if (!empty($validated['perusahaan_dilamar'])) {
+        if (! empty($validated['perusahaan_dilamar'])) {
             $perusahaanId = $this->findMasterId(
-                $this->tablesFor([\App\Models\DataPerusahaan::class], [
+                $this->tablesFor([DataPerusahaan::class], [
                     'data_perusahaan',
                     'perusahaan',
                     'master_data_perusahaan',
@@ -535,7 +539,7 @@ public function masterPendidikan(): JsonResponse
         });
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -548,10 +552,10 @@ public function masterPendidikan(): JsonResponse
     public function updateRiwayatKeluargaByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -657,8 +661,8 @@ public function masterPendidikan(): JsonResponse
                 ->where('data_riwayat_diri_id', $pelamar->id)
                 ->first();
 
-            if (!$riwayatKeluarga) {
-                $riwayatKeluarga = new DataRiwayatKeluarga();
+            if (! $riwayatKeluarga) {
+                $riwayatKeluarga = new DataRiwayatKeluarga;
                 $riwayatKeluarga->data_riwayat_diri_id = $pelamar->id;
             }
 
@@ -721,7 +725,7 @@ public function masterPendidikan(): JsonResponse
             }
 
             if (
-                !Schema::hasColumn($table, 'pekerjaan_suami_istri') &&
+                ! Schema::hasColumn($table, 'pekerjaan_suami_istri') &&
                 Schema::hasColumn($table, 'pekerjaan_sumi_istri')
             ) {
                 $data['pekerjaan_sumi_istri'] = $validated['pekerjaan_suami_istri'] ?? null;
@@ -748,7 +752,7 @@ public function masterPendidikan(): JsonResponse
         });
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -761,10 +765,10 @@ public function masterPendidikan(): JsonResponse
     public function updateRiwayatKesehatanByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -838,12 +842,12 @@ public function masterPendidikan(): JsonResponse
             'diagnosa_dokter' => ['nullable', 'string'],
         ]);
 
-        if (!empty($validated['opsi_kacamata_id'])) {
+        if (! empty($validated['opsi_kacamata_id'])) {
             $opsiKacamataExists = OpsiKacamata::query()
                 ->where('id', $validated['opsi_kacamata_id'])
                 ->exists();
 
-            if (!$opsiKacamataExists) {
+            if (! $opsiKacamataExists) {
                 return $this->masterError(
                     'opsi_kacamata_id',
                     'Opsi kacamata yang dipilih tidak ditemukan.'
@@ -856,8 +860,8 @@ public function masterPendidikan(): JsonResponse
                 ->where('data_riwayat_diri_id', $pelamar->id)
                 ->first();
 
-            if (!$riwayatKesehatan) {
-                $riwayatKesehatan = new DataRiwayatKesehatan();
+            if (! $riwayatKesehatan) {
+                $riwayatKesehatan = new DataRiwayatKesehatan;
                 $riwayatKesehatan->data_riwayat_diri_id = $pelamar->id;
             }
 
@@ -912,7 +916,7 @@ public function masterPendidikan(): JsonResponse
         });
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -921,13 +925,14 @@ public function masterPendidikan(): JsonResponse
             'data' => $this->appendPelamarExtraData($pelamar),
         ]);
     }
+
     public function updateRiwayatPekerjaanByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -972,16 +977,16 @@ public function masterPendidikan(): JsonResponse
             $rawPekerjaan = json_last_error() === JSON_ERROR_NONE ? $decoded : [];
         }
 
-        if (!is_array($rawPekerjaan)) {
+        if (! is_array($rawPekerjaan)) {
             $rawPekerjaan = [];
         }
 
-        if (!empty($rawPekerjaan)) {
+        if (! empty($rawPekerjaan)) {
             $isAssoc = array_keys($rawPekerjaan) !== range(0, count($rawPekerjaan) - 1);
             $rawRows = $isAssoc ? [$rawPekerjaan] : $rawPekerjaan;
 
             foreach ($rawRows as $index => $row) {
-                if (!is_array($row)) {
+                if (! is_array($row)) {
                     continue;
                 }
 
@@ -1012,7 +1017,7 @@ public function masterPendidikan(): JsonResponse
         ksort($itemsByIndex);
         $rawPekerjaan = array_values($itemsByIndex);
 
-        if (count($rawPekerjaan) === 0 && !$statusBelumBekerja) {
+        if (count($rawPekerjaan) === 0 && ! $statusBelumBekerja) {
             $legacyItem = [
                 'id' => $request->input('riwayat_pekerjaan_id') ?: $request->input('pekerjaan_id'),
                 'nama_perusahaan' => $request->input('nama_perusahaan'),
@@ -1149,7 +1154,7 @@ public function masterPendidikan(): JsonResponse
                     ->where('data_riwayat_diri_id', $pelamar->id)
                     ->delete();
 
-                $riwayatPekerjaan = new DataRiwayatPekerjaan();
+                $riwayatPekerjaan = new DataRiwayatPekerjaan;
                 $riwayatPekerjaan->data_riwayat_diri_id = $pelamar->id;
                 $table = $riwayatPekerjaan->getTable();
 
@@ -1182,9 +1187,9 @@ public function masterPendidikan(): JsonResponse
 
                 $riwayatPekerjaan = ($id && $existingRows->has($id))
                     ? $existingRows->get($id)
-                    : new DataRiwayatPekerjaan();
+                    : new DataRiwayatPekerjaan;
 
-                if (!$riwayatPekerjaan->exists) {
+                if (! $riwayatPekerjaan->exists) {
                     $riwayatPekerjaan->data_riwayat_diri_id = $pelamar->id;
                 }
 
@@ -1245,7 +1250,7 @@ public function masterPendidikan(): JsonResponse
         });
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -1258,10 +1263,10 @@ public function masterPendidikan(): JsonResponse
     public function updateKesiapanBekerjaByToken(Request $request, string $token): JsonResponse
     {
         $pelamar = DataRiwayatDiri::query()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -1331,7 +1336,7 @@ public function masterPendidikan(): JsonResponse
                 )
         );
 
-        if ($backgroundBersedia && !$referensiKerja) {
+        if ($backgroundBersedia && ! $referensiKerja) {
             $referensiKerja = 'Ya';
         }
 
@@ -1421,8 +1426,8 @@ public function masterPendidikan(): JsonResponse
                 ->where('data_riwayat_diri_id', $pelamar->id)
                 ->first();
 
-            if (!$kesiapanBekerja) {
-                $kesiapanBekerja = new DataKesiapanBekerja();
+            if (! $kesiapanBekerja) {
+                $kesiapanBekerja = new DataKesiapanBekerja;
                 $kesiapanBekerja->data_riwayat_diri_id = $pelamar->id;
             }
 
@@ -1475,8 +1480,8 @@ public function masterPendidikan(): JsonResponse
                     ->where('data_riwayat_diri_id', $pelamar->id)
                     ->first();
 
-                if (!$riwayatPekerjaan) {
-                    $riwayatPekerjaan = new DataRiwayatPekerjaan();
+                if (! $riwayatPekerjaan) {
+                    $riwayatPekerjaan = new DataRiwayatPekerjaan;
                     $riwayatPekerjaan->data_riwayat_diri_id = $pelamar->id;
                 }
 
@@ -1508,7 +1513,7 @@ public function masterPendidikan(): JsonResponse
                     $referensiData['nama_refrensi'] = $nilaiReferensiKerjaAdalahTidak
                         ? null
                         : (
-                            !empty($validated['nama_refrensi'])
+                            ! empty($validated['nama_refrensi'])
                                 ? $validated['nama_refrensi']
                                 : $riwayatPekerjaan->nama_refrensi
                         );
@@ -1518,7 +1523,7 @@ public function masterPendidikan(): JsonResponse
                     $referensiData['telp_refrensi'] = $nilaiReferensiKerjaAdalahTidak
                         ? null
                         : (
-                            !empty($validated['telp_refrensi'])
+                            ! empty($validated['telp_refrensi'])
                                 ? $validated['telp_refrensi']
                                 : $riwayatPekerjaan->telp_refrensi
                         );
@@ -1534,7 +1539,7 @@ public function masterPendidikan(): JsonResponse
                     })
                     ->toArray();
 
-                if (!empty($referensiData)) {
+                if (! empty($referensiData)) {
                     $riwayatPekerjaan->forceFill($referensiData);
                     $riwayatPekerjaan->save();
                 }
@@ -1542,7 +1547,7 @@ public function masterPendidikan(): JsonResponse
         });
 
         $pelamar = $this->pelamarQuery()
-            ->where('token', $token)
+            ->withValidToken($token)
             ->first();
 
         return response()->json([
@@ -1604,14 +1609,14 @@ public function masterPendidikan(): JsonResponse
 
     private function syncSosialMedia(DataRiwayatDiri $pelamar, array $items = []): void
     {
-        if (!Schema::hasTable('sosial_media')) {
+        if (! Schema::hasTable('sosial_media')) {
             return;
         }
 
         if (
-            !Schema::hasColumn('sosial_media', 'data_riwayat_diri_id') ||
-            !Schema::hasColumn('sosial_media', 'platform') ||
-            !Schema::hasColumn('sosial_media', 'nama_account')
+            ! Schema::hasColumn('sosial_media', 'data_riwayat_diri_id') ||
+            ! Schema::hasColumn('sosial_media', 'platform') ||
+            ! Schema::hasColumn('sosial_media', 'nama_account')
         ) {
             return;
         }
@@ -1636,7 +1641,7 @@ public function masterPendidikan(): JsonResponse
                 return $item['platform'] !== '' && $item['nama_account'] !== '';
             })
             ->unique(function ($item) {
-                return strtolower($item['platform']) . '|' . strtolower($item['nama_account']);
+                return strtolower($item['platform']).'|'.strtolower($item['nama_account']);
             })
             ->values();
 
@@ -1650,23 +1655,23 @@ public function masterPendidikan(): JsonResponse
         foreach ($normalizedItems as $index => $item) {
             $row = null;
 
-            if (!empty($item['id']) && Schema::hasColumn('sosial_media', 'id')) {
+            if (! empty($item['id']) && Schema::hasColumn('sosial_media', 'id')) {
                 $row = SosialMedia::query()
                     ->where('id', $item['id'])
                     ->where('data_riwayat_diri_id', $pelamar->id)
                     ->first();
             }
 
-            if (!$row && isset($activeRows[$index])) {
+            if (! $row && isset($activeRows[$index])) {
                 $candidateRow = $activeRows[$index];
 
-                if (!in_array($candidateRow->id, $keptIds, true)) {
+                if (! in_array($candidateRow->id, $keptIds, true)) {
                     $row = $candidateRow;
                 }
             }
 
-            if (!$row) {
-                $row = new SosialMedia();
+            if (! $row) {
+                $row = new SosialMedia;
                 $row->data_riwayat_diri_id = $pelamar->id;
             }
 
@@ -1690,7 +1695,7 @@ public function masterPendidikan(): JsonResponse
         DataRiwayatKeluarga $riwayatKeluarga,
         array $items = []
     ): void {
-        if (!Schema::hasTable('data_saudara_kandung')) {
+        if (! Schema::hasTable('data_saudara_kandung')) {
             return;
         }
 
@@ -1726,23 +1731,23 @@ public function masterPendidikan(): JsonResponse
         foreach ($normalizedItems as $index => $item) {
             $row = null;
 
-            if (!empty($item['id'])) {
+            if (! empty($item['id'])) {
                 $row = DataSaudaraKandung::query()
                     ->where('id', $item['id'])
                     ->where('data_riwayat_diri_id', $pelamar->id)
                     ->first();
             }
 
-            if (!$row && isset($activeRows[$index])) {
+            if (! $row && isset($activeRows[$index])) {
                 $candidateRow = $activeRows[$index];
 
-                if (!in_array($candidateRow->id, $keptIds, true)) {
+                if (! in_array($candidateRow->id, $keptIds, true)) {
                     $row = $candidateRow;
                 }
             }
 
-            if (!$row) {
-                $row = new DataSaudaraKandung();
+            if (! $row) {
+                $row = new DataSaudaraKandung;
                 $row->data_riwayat_diri_id = $pelamar->id;
                 $row->data_riwayat_keluarga_id = $riwayatKeluarga->id;
             }
@@ -1783,7 +1788,7 @@ public function masterPendidikan(): JsonResponse
         DataRiwayatKeluarga $riwayatKeluarga,
         array $items = []
     ): void {
-        if (!Schema::hasTable('data_saudara_ipar')) {
+        if (! Schema::hasTable('data_saudara_ipar')) {
             return;
         }
 
@@ -1819,23 +1824,23 @@ public function masterPendidikan(): JsonResponse
         foreach ($normalizedItems as $index => $item) {
             $row = null;
 
-            if (!empty($item['id'])) {
+            if (! empty($item['id'])) {
                 $row = DataSaudaraIpar::query()
                     ->where('id', $item['id'])
                     ->where('data_riwayat_diri_id', $pelamar->id)
                     ->first();
             }
 
-            if (!$row && isset($activeRows[$index])) {
+            if (! $row && isset($activeRows[$index])) {
                 $candidateRow = $activeRows[$index];
 
-                if (!in_array($candidateRow->id, $keptIds, true)) {
+                if (! in_array($candidateRow->id, $keptIds, true)) {
                     $row = $candidateRow;
                 }
             }
 
-            if (!$row) {
-                $row = new DataSaudaraIpar();
+            if (! $row) {
+                $row = new DataSaudaraIpar;
                 $row->data_riwayat_diri_id = $pelamar->id;
                 $row->data_riwayat_keluarga_id = $riwayatKeluarga->id;
             }
@@ -1871,10 +1876,9 @@ public function masterPendidikan(): JsonResponse
             ->delete();
     }
 
-
-private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
+    private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
     {
-        if (!$pelamar) {
+        if (! $pelamar) {
             return null;
         }
 
@@ -1936,7 +1940,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
             if (
                 empty($pelamar->hubungan_kerabat_instansi) &&
-                !empty($keluarga->kerabat_bekerja_diinstansi)
+                ! empty($keluarga->kerabat_bekerja_diinstansi)
             ) {
                 $pelamar->setAttribute(
                     'hubungan_kerabat_instansi',
@@ -1946,7 +1950,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
             if (
                 empty($pelamar->kontak_darurat) &&
-                !empty($keluarga->tlpn_darurat)
+                ! empty($keluarga->tlpn_darurat)
             ) {
                 $pelamar->setAttribute('kontak_darurat', [[
                     'nama' => '',
@@ -2002,7 +2006,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         $kesehatan = $pelamar->riwayatKesehatan;
 
-        if (!$kesehatan) {
+        if (! $kesehatan) {
             return $pelamar;
         }
 
@@ -2074,6 +2078,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         return $pelamar;
     }
+
     private function appendRiwayatPekerjaanData(DataRiwayatDiri $pelamar): DataRiwayatDiri
     {
         $pekerjaanRows = DataRiwayatPekerjaan::query()
@@ -2083,6 +2088,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         if ($pekerjaanRows->isEmpty()) {
             $pelamar->setAttribute('riwayat_pekerjaan', []);
+
             return $pelamar;
         }
 
@@ -2184,7 +2190,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function normalizeDateForFrontend($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -2195,10 +2201,9 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         }
     }
 
-
     private function appendKesiapanBekerjaData(DataRiwayatDiri $pelamar): DataRiwayatDiri
     {
-        if (!Schema::hasTable('data_kesiapan_bekerja')) {
+        if (! Schema::hasTable('data_kesiapan_bekerja')) {
             return $pelamar;
         }
 
@@ -2206,7 +2211,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
             ->where('data_riwayat_diri_id', $pelamar->id)
             ->first();
 
-        if (!$kesiapan) {
+        if (! $kesiapan) {
             return $pelamar;
         }
 
@@ -2279,10 +2284,10 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         try {
             $row = DB::selectOne(
-                "SELECT pg_get_constraintdef(oid) AS definition
+                'SELECT pg_get_constraintdef(oid) AS definition
                  FROM pg_constraint
                  WHERE conname = ?
-                 LIMIT 1",
+                 LIMIT 1',
                 ['data_riwayat_diri_str_aktif_check']
             );
 
@@ -2373,9 +2378,9 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         ?string $whereValue = null
     ): array {
         if (
-            !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, 'id') ||
-            !Schema::hasColumn($table, $labelColumn)
+            ! Schema::hasTable($table) ||
+            ! Schema::hasColumn($table, 'id') ||
+            ! Schema::hasColumn($table, $labelColumn)
         ) {
             return [];
         }
@@ -2417,36 +2422,36 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         ?string $kecamatanId,
         ?string $kelurahanId
     ): ?JsonResponse {
-        if ($provinsiId && !$this->wilayahIdExists('provinsi', $provinsiId)) {
+        if ($provinsiId && ! $this->wilayahIdExists('provinsi', $provinsiId)) {
             return $this->masterError('provinsi_id', 'Provinsi yang dipilih tidak ditemukan.');
         }
 
         if ($kabupatenId) {
-            if (!$provinsiId) {
+            if (! $provinsiId) {
                 return $this->masterError('kabupaten_id', 'Pilih provinsi terlebih dahulu.');
             }
 
-            if (!$this->wilayahIdExists('kabupaten', $kabupatenId, 'provinsi_id', $provinsiId)) {
+            if (! $this->wilayahIdExists('kabupaten', $kabupatenId, 'provinsi_id', $provinsiId)) {
                 return $this->masterError('kabupaten_id', 'Kabupaten / Kota yang dipilih tidak sesuai dengan provinsi.');
             }
         }
 
         if ($kecamatanId) {
-            if (!$kabupatenId) {
+            if (! $kabupatenId) {
                 return $this->masterError('kecamatan_id', 'Pilih kabupaten / kota terlebih dahulu.');
             }
 
-            if (!$this->wilayahIdExists('kecamatan', $kecamatanId, 'kabupaten_id', $kabupatenId)) {
+            if (! $this->wilayahIdExists('kecamatan', $kecamatanId, 'kabupaten_id', $kabupatenId)) {
                 return $this->masterError('kecamatan_id', 'Kecamatan yang dipilih tidak sesuai dengan kabupaten / kota.');
             }
         }
 
         if ($kelurahanId) {
-            if (!$kecamatanId) {
+            if (! $kecamatanId) {
                 return $this->masterError('kelurahan_id', 'Pilih kecamatan terlebih dahulu.');
             }
 
-            if (!$this->wilayahIdExists('kelurahan', $kelurahanId, 'kecamatan_id', $kecamatanId)) {
+            if (! $this->wilayahIdExists('kelurahan', $kelurahanId, 'kecamatan_id', $kecamatanId)) {
                 return $this->masterError('kelurahan_id', 'Kelurahan / Desa yang dipilih tidak sesuai dengan kecamatan.');
             }
         }
@@ -2461,8 +2466,8 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         ?string $parentValue = null
     ): bool {
         if (
-            !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, 'id')
+            ! Schema::hasTable($table) ||
+            ! Schema::hasColumn($table, 'id')
         ) {
             return false;
         }
@@ -2482,7 +2487,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function appendWilayahLabels(?DataRiwayatDiri $pelamar): ?DataRiwayatDiri
     {
-        if (!$pelamar) {
+        if (! $pelamar) {
             return null;
         }
 
@@ -2518,7 +2523,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function getWilayahName(string $table, ?string $id): ?string
     {
-        if (!$id) {
+        if (! $id) {
             return null;
         }
 
@@ -2536,9 +2541,9 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         $realTable = $tableMap[$table] ?? $table;
 
         if (
-            !Schema::hasTable($realTable) ||
-            !Schema::hasColumn($realTable, 'id') ||
-            !Schema::hasColumn($realTable, 'nama')
+            ! Schema::hasTable($realTable) ||
+            ! Schema::hasColumn($realTable, 'id') ||
+            ! Schema::hasColumn($realTable, 'nama')
         ) {
             return null;
         }
@@ -2579,12 +2584,12 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
     private function getMasterOptions(array $tables, array $labelColumns): array
     {
         foreach ($tables as $table) {
-            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                 continue;
             }
 
             foreach ($labelColumns as $labelColumn) {
-                if (!Schema::hasColumn($table, $labelColumn)) {
+                if (! Schema::hasColumn($table, $labelColumn)) {
                     continue;
                 }
 
@@ -2654,13 +2659,13 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function getPosisiOptions(): array
     {
-        foreach ($this->tablesFor([\App\Models\Posisi::class], [
+        foreach ($this->tablesFor([Posisi::class], [
             'posisi',
             'data_posisi',
             'master_data_posisi',
             'master_posisi',
         ]) as $table) {
-            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                 continue;
             }
 
@@ -2681,7 +2686,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
                 }
             }
 
-            if (!$labelColumn) {
+            if (! $labelColumn) {
                 continue;
             }
 
@@ -2780,16 +2785,16 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         ?string $value,
         array $aliases = []
     ): ?string {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
         $value = trim($value);
 
         if (
-            !Schema::hasTable($table) ||
-            !Schema::hasColumn($table, 'id') ||
-            !Schema::hasColumn($table, $labelColumn)
+            ! Schema::hasTable($table) ||
+            ! Schema::hasColumn($table, 'id') ||
+            ! Schema::hasColumn($table, $labelColumn)
         ) {
             return null;
         }
@@ -2838,7 +2843,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function masterValueCandidates(?string $value, array $aliases = []): array
     {
-        if (!$value) {
+        if (! $value) {
             return [];
         }
 
@@ -2858,20 +2863,20 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
     private function isPosisiWajibStr(?string $posisiId): bool
     {
-        if (!$posisiId || !Str::isUuid($posisiId)) {
+        if (! $posisiId || ! Str::isUuid($posisiId)) {
             return false;
         }
 
-        foreach ($this->tablesFor([\App\Models\Posisi::class], [
+        foreach ($this->tablesFor([Posisi::class], [
             'posisi',
             'data_posisi',
             'master_data_posisi',
             'master_posisi',
         ]) as $table) {
             if (
-                !Schema::hasTable($table) ||
-                !Schema::hasColumn($table, 'id') ||
-                !Schema::hasColumn($table, 'str_aktif')
+                ! Schema::hasTable($table) ||
+                ! Schema::hasColumn($table, 'id') ||
+                ! Schema::hasColumn($table, 'str_aktif')
             ) {
                 continue;
             }
@@ -2900,7 +2905,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
 
         if ($value !== '') {
             $posisiId = $this->findMasterId(
-                $this->tablesFor([\App\Models\Posisi::class], [
+                $this->tablesFor([Posisi::class], [
                     'posisi',
                     'data_posisi',
                     'master_data_posisi',
@@ -2930,19 +2935,18 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         return $fallbackId ? (string) $fallbackId : null;
     }
 
-
     private function resolvePosisiDilamarIdForKesiapan(?string $value = null, ?DataRiwayatDiri $pelamar = null): ?string
     {
         $value = trim((string) ($value ?: ''));
 
         if ($value !== '') {
-            foreach ($this->tablesFor([\App\Models\Posisi::class], [
+            foreach ($this->tablesFor([Posisi::class], [
                 'posisi',
                 'data_posisi',
                 'master_data_posisi',
                 'master_posisi',
             ]) as $table) {
-                if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+                if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                     continue;
                 }
 
@@ -2959,7 +2963,7 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
             }
 
             $posisiId = $this->findMasterId(
-                $this->tablesFor([\App\Models\Posisi::class], [
+                $this->tablesFor([Posisi::class], [
                     'posisi',
                     'data_posisi',
                     'master_data_posisi',
@@ -2994,25 +2998,24 @@ private function appendPelamarExtraData(?DataRiwayatDiri $pelamar): ?DataRiwayat
         return $fallbackId ? (string) $fallbackId : null;
     }
 
-    
     private function resolvePosisiDilamarForKesiapan(?string $value = null, ?DataRiwayatDiri $pelamar = null): ?string
     {
         return $this->resolvePosisiDilamarIdForKesiapan($value, $pelamar);
     }
 
-private function getPosisiLabelById(?string $posisiId): ?string
+    private function getPosisiLabelById(?string $posisiId): ?string
     {
-        if (!$posisiId) {
+        if (! $posisiId) {
             return null;
         }
 
-        foreach ($this->tablesFor([\App\Models\Posisi::class], [
+        foreach ($this->tablesFor([Posisi::class], [
             'posisi',
             'data_posisi',
             'master_data_posisi',
             'master_posisi',
         ]) as $table) {
-            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                 continue;
             }
 
@@ -3025,7 +3028,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
                 'nama_jabatan',
                 'nama',
             ] as $column) {
-                if (!Schema::hasColumn($table, $column)) {
+                if (! Schema::hasColumn($table, $column)) {
                     continue;
                 }
 
@@ -3046,7 +3049,6 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
         return null;
     }
-
 
     private function normalizeKesiapanText($value): ?string
     {
@@ -3129,12 +3131,12 @@ private function getPosisiLabelById(?string $posisiId): ?string
             $parts = explode('.', $value);
             $lastPart = end($parts);
 
-            if (!(strlen($lastPart) <= 2 && count($parts) === 2)) {
+            if (! (strlen($lastPart) <= 2 && count($parts) === 2)) {
                 $value = str_replace('.', '', $value);
             }
         }
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return null;
         }
 
@@ -3167,20 +3169,20 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
     private function yearToDate(?string $year): ?string
     {
-        if (!$year || !preg_match('/^\d{4}$/', $year)) {
+        if (! $year || ! preg_match('/^\d{4}$/', $year)) {
             return null;
         }
 
-        return $year . '-01-01';
+        return $year.'-01-01';
     }
 
     private function calculateLamaBekerjaFromYear(?string $tahunMulai, ?string $tahunSelesai): ?string
     {
         if (
-            !$tahunMulai ||
-            !$tahunSelesai ||
-            !preg_match('/^\d{4}$/', $tahunMulai) ||
-            !preg_match('/^\d{4}$/', $tahunSelesai)
+            ! $tahunMulai ||
+            ! $tahunSelesai ||
+            ! preg_match('/^\d{4}$/', $tahunMulai) ||
+            ! preg_match('/^\d{4}$/', $tahunSelesai)
         ) {
             return null;
         }
@@ -3195,14 +3197,14 @@ private function getPosisiLabelById(?string $posisiId): ?string
         return (string) ($selesai - $mulai);
     }
 
-        private function normalizeYearToDate(?string $value): ?string
+    private function normalizeYearToDate(?string $value): ?string
     {
         return $this->normalizeRiwayatPekerjaanDate($value);
     }
 
     private function normalizeRiwayatPekerjaanDate($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -3221,11 +3223,11 @@ private function getPosisiLabelById(?string $posisiId): ?string
         }
 
         if (preg_match('/^\d{4}-\d{2}$/', $value)) {
-            return $value . '-01';
+            return $value.'-01';
         }
 
         if (preg_match('/\b(19|20)\d{2}\b/', $value, $matches)) {
-            return $matches[0] . '-01-01';
+            return $matches[0].'-01-01';
         }
 
         return null;
@@ -3239,7 +3241,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
         $cleanValue = preg_replace('/[^0-9.]/', '', (string) $value);
 
-        if ($cleanValue === '' || !is_numeric($cleanValue)) {
+        if ($cleanValue === '' || ! is_numeric($cleanValue)) {
             return null;
         }
 
@@ -3255,7 +3257,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
     private function dateToYear($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -3287,7 +3289,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
         foreach ($modelClasses as $modelClass) {
             if (class_exists($modelClass)) {
                 try {
-                    $tables[] = (new $modelClass())->getTable();
+                    $tables[] = (new $modelClass)->getTable();
                 } catch (\Throwable $error) {
                     //
                 }
@@ -3302,6 +3304,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
         foreach ($columns as $column) {
             if (Schema::hasColumn($table, $column)) {
                 $data[$column] = $value;
+
                 return;
             }
         }
@@ -3309,7 +3312,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
     private function findMasterId(array $tables, array $columns, ?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -3317,7 +3320,7 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
         if (Str::isUuid($value)) {
             foreach ($tables as $table) {
-                if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+                if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                     continue;
                 }
 
@@ -3340,12 +3343,12 @@ private function getPosisiLabelById(?string $posisiId): ?string
         $candidateKey = $this->normalizeForMasterSearch($value);
 
         foreach ($tables as $table) {
-            if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'id')) {
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'id')) {
                 continue;
             }
 
             foreach ($columns as $column) {
-                if (!Schema::hasColumn($table, $column)) {
+                if (! Schema::hasColumn($table, $column)) {
                     continue;
                 }
 
@@ -3371,5 +3374,4 @@ private function getPosisiLabelById(?string $posisiId): ?string
 
         return null;
     }
-
 }

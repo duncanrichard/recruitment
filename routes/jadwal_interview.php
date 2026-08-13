@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\RangkaianInterview\JadwalInterviewController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/rangkaian-interview/jadwal-interview')
     ->name('admin.rangkaian-interview.jadwal-interview.')

@@ -148,6 +148,7 @@ class PermissionSeeder extends Seeder
                     'destroy' => 'Delete',
                     'detail' => 'Detail',
                     'send-message' => 'Send Message',
+                    'download-document' => 'Download Document',
                 ],
             ],
 
@@ -308,6 +309,42 @@ class PermissionSeeder extends Seeder
                     'destroy' => 'Delete',
                 ],
             ],
+            [
+                'group' => 'Report',
+                'label' => 'Data Pelamar',
+                'key' => 'admin.report.data-pelamar',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
+            [
+                'group' => 'Report',
+                'label' => 'Hasil Test Zoom',
+                'key' => 'admin.report.hasil-test-zoom',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
+            [
+                'group' => 'Report',
+                'label' => 'Hasil Test MMPI',
+                'key' => 'admin.report.hasil-test-mmpi',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
+            [
+                'group' => 'Report',
+                'label' => 'Interview Kandidat',
+                'key' => 'admin.report.interview-kandidat',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
+            [
+                'group' => 'Report',
+                'label' => 'Offering Letter',
+                'key' => 'admin.report.offering-letter',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
+            [
+                'group' => 'Report',
+                'label' => 'Interviewer',
+                'key' => 'admin.report.interviewer',
+                'actions' => ['list' => 'View', 'export' => 'Export'],
+            ],
 
             /*
             |--------------------------------------------------------------------------
@@ -348,12 +385,32 @@ class PermissionSeeder extends Seeder
                     'setting' => 'Setting',
                 ],
             ],
+            [
+                'group' => 'System',
+                'label' => 'Integration Alerts',
+                'key' => 'admin.integration-alert',
+                'actions' => [
+                    'list' => 'View',
+                    'retry' => 'Retry',
+                    'acknowledge' => 'Acknowledge',
+                ],
+            ],
+            [
+                'group' => 'System',
+                'label' => 'Recruitment Audit',
+                'key' => 'admin.recruitment-audit',
+                'actions' => [
+                    'list' => 'View',
+                    'detail' => 'Detail',
+                    'export' => 'Export',
+                ],
+            ],
         ];
 
         foreach ($modules as $module) {
             foreach ($module['actions'] as $actionKey => $actionLabel) {
                 Permission::firstOrCreate([
-                    'name' => $module['key'] . '.' . $actionKey,
+                    'name' => $module['key'].'.'.$actionKey,
                     'guard_name' => $guardName,
                 ]);
             }

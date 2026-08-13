@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CandidateDocumentController;
 use App\Http\Controllers\Admin\DataPelamarController;
 use Illuminate\Support\Facades\Route;
 
@@ -78,6 +79,12 @@ Route::prefix('admin')
             ->middleware('permission:admin.data-pelamar.detail')
             ->whereUuid('id')
             ->name('data-pelamar.detail');
+
+        Route::get('/data-pelamar/{candidate}/documents/{type}', [CandidateDocumentController::class, 'show'])
+            ->middleware('permission:admin.data-pelamar.download-document')
+            ->whereUuid('candidate')
+            ->whereIn('type', ['cv', 'foto'])
+            ->name('data-pelamar.documents.show');
 
         Route::get('/data-pelamar/{id}/detail-data', [DataPelamarController::class, 'detailData'])
             ->middleware('permission:admin.data-pelamar.detail')

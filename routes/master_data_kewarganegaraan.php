@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\KewarganegaraanController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/kewarganegaraan')
     ->name('admin.master-data.kewarganegaraan.')

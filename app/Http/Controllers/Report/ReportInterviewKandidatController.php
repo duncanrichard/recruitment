@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
+use App\Services\CompanyAccessService;
+use App\Services\SpreadsheetValueSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -79,7 +82,8 @@ class ReportInterviewKandidatController extends Controller
 
         $tanggalAwal = $validated['tanggal_awal'] ?? 'Semua';
         $tanggalAkhir = $validated['tanggal_akhir'] ?? 'Semua';
-        $filename = 'report-interview-kandidat-' . now()->format('Ymd-His') . '.xls';
+        $rows = app(SpreadsheetValueSanitizer::class)->sanitizeRows($rows);
+        $filename = 'report-interview-kandidat-'.now()->format('Ymd-His').'.xls';
 
         return response()->streamDownload(function () use ($rows, $tanggalAwal, $tanggalAkhir) {
             echo '<html>';
@@ -114,7 +118,7 @@ class ReportInterviewKandidatController extends Controller
             echo '<body>';
 
             echo '<div class="title">Report Interview Kandidat</div>';
-            echo '<div class="subtitle">Tanggal Interview: ' . e($tanggalAwal) . ' s/d ' . e($tanggalAkhir) . '</div>';
+            echo '<div class="subtitle">Tanggal Interview: '.e($tanggalAwal).' s/d '.e($tanggalAkhir).'</div>';
 
             echo '<table>';
             echo '<thead>';
@@ -145,20 +149,20 @@ class ReportInterviewKandidatController extends Controller
 
             foreach ($rows as $index => $row) {
                 echo '<tr>';
-                echo '<td>' . ($index + 1) . '</td>';
-                echo '<td>' . e($row['judul_interview']) . '</td>';
-                echo '<td>' . e($row['jadwal_interview']) . '</td>';
-                echo '<td>' . e($row['interviewer']) . '</td>';
-                echo '<td>' . e($row['nama_lengkap']) . '</td>';
-                echo '<td>' . e($row['nama_panggil']) . '</td>';
-                echo '<td>' . e($row['email']) . '</td>';
-                echo '<td>' . e($row['no_wa']) . '</td>';
-                echo '<td>' . e($row['posisi_dilamar']) . '</td>';
-                echo '<td>' . e($row['status_kehadiran_label']) . '</td>';
-                echo '<td>' . e($row['hasil_interview_label']) . '</td>';
-                echo '<td>' . e($row['catatan']) . '</td>';
-                echo '<td>' . e($row['created_at']) . '</td>';
-                echo '<td>' . e($row['updated_at']) . '</td>';
+                echo '<td>'.($index + 1).'</td>';
+                echo '<td>'.e($row['judul_interview']).'</td>';
+                echo '<td>'.e($row['jadwal_interview']).'</td>';
+                echo '<td>'.e($row['interviewer']).'</td>';
+                echo '<td>'.e($row['nama_lengkap']).'</td>';
+                echo '<td>'.e($row['nama_panggil']).'</td>';
+                echo '<td>'.e($row['email']).'</td>';
+                echo '<td>'.e($row['no_wa']).'</td>';
+                echo '<td>'.e($row['posisi_dilamar']).'</td>';
+                echo '<td>'.e($row['status_kehadiran_label']).'</td>';
+                echo '<td>'.e($row['hasil_interview_label']).'</td>';
+                echo '<td>'.e($row['catatan']).'</td>';
+                echo '<td>'.e($row['created_at']).'</td>';
+                echo '<td>'.e($row['updated_at']).'</td>';
                 echo '</tr>';
             }
 
@@ -168,7 +172,7 @@ class ReportInterviewKandidatController extends Controller
             echo '</html>';
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'max-age=0',
         ]);
     }
@@ -181,6 +185,8 @@ class ReportInterviewKandidatController extends Controller
         $query = DB::table('jadwal_interview_kandidat as jik')
             ->join('jadwal_interview as ji', 'ji.id', '=', 'jik.jadwal_interview_id')
             ->join('data_riwayat_diri as drd', 'drd.id', '=', 'jik.data_riwayat_diri_id');
+
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'drd.perusahaan_dilamar');
 
         if (Schema::hasTable('posisi') && Schema::hasColumn('data_riwayat_diri', 'posisi_yang_dilamar')) {
             $query->leftJoin('posisi as p', 'p.id', '=', 'drd.posisi_yang_dilamar');
@@ -215,13 +221,12 @@ class ReportInterviewKandidatController extends Controller
             'drd.nama_panggil',
             'drd.email',
             'drd.no_wa',
-            'drd.token',
 
-            DB::raw($posisiExpression . ' as posisi_dilamar'),
-            DB::raw($interviewerExpression . ' as interviewer'),
+            DB::raw($posisiExpression.' as posisi_dilamar'),
+            DB::raw($interviewerExpression.' as interviewer'),
         ]);
 
-        if (!empty($filters['tanggal_awal'])) {
+        if (! empty($filters['tanggal_awal'])) {
             $query->whereDate(
                 'ji.jadwal_interview',
                 '>=',
@@ -229,7 +234,7 @@ class ReportInterviewKandidatController extends Controller
             );
         }
 
-        if (!empty($filters['tanggal_akhir'])) {
+        if (! empty($filters['tanggal_akhir'])) {
             $query->whereDate(
                 'ji.jadwal_interview',
                 '<=',
@@ -419,7 +424,6 @@ class ReportInterviewKandidatController extends Controller
             'id' => $item->id,
             'jadwal_interview_id' => $item->jadwal_interview_id,
             'data_riwayat_diri_id' => $item->data_riwayat_diri_id,
-            'token' => $item->token,
 
             'judul_interview' => $item->judul_interview ?: '-',
             'jadwal_interview' => $item->jadwal_interview ? date('Y-m-d H:i:s', strtotime($item->jadwal_interview)) : null,
@@ -505,7 +509,7 @@ class ReportInterviewKandidatController extends Controller
 
     private function firstExistingColumn(string $table, array $columns): ?string
     {
-        if (!Schema::hasTable($table)) {
+        if (! Schema::hasTable($table)) {
             return null;
         }
 

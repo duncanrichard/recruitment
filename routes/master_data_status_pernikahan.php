@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\MasterData\StatusPernikahanController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/master-data/status-pernikahan')
     ->name('admin.master-data.status-pernikahan.')

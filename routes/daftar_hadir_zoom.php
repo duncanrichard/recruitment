@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DaftarHadir\ZoomController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin/daftar-hadir/zoom')
     ->name('admin.daftar-hadir.zoom.')

@@ -32,7 +32,7 @@ class JadwalInterviewKandidat extends Model
     protected static function booted(): void
     {
         static::saved(function (JadwalInterviewKandidat $model) {
-            if (!$model->wasChanged('hasil_interview')) {
+            if (! $model->wasChanged('hasil_interview')) {
                 return;
             }
 

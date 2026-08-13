@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\CekTahapanPelamarController;
+use App\Http\Controllers\PendaftaranController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -41,6 +41,7 @@ Route::get('/pendaftaran/api/wilayah/villages/{district_code}', [PendaftaranCont
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'findByToken'])
+    ->middleware('throttle:candidate-read')
     ->name('pendaftaran.api.token');
 
 /*
@@ -49,9 +50,11 @@ Route::get('/pendaftaran/api/token/{token}', [PendaftaranController::class, 'fin
 |--------------------------------------------------------------------------
 */
 Route::get('/pendaftaran/api/token/{token}/tahapan', [CekTahapanPelamarController::class, 'tahapanByToken'])
+    ->middleware('throttle:candidate-read')
     ->name('pendaftaran.api.token.tahapan');
 
 Route::get('/pendaftaran/api/token/{token}/cek-tahapan', [CekTahapanPelamarController::class, 'cekTahapanByToken'])
+    ->middleware('throttle:candidate-read')
     ->name('pendaftaran.api.token.cek-tahapan');
 
 Route::patch(
@@ -59,6 +62,7 @@ Route::patch(
     [CekTahapanPelamarController::class, 'updateKehadiranJadwalTest']
 )
     ->whereUuid('jadwalTest')
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.jadwal-test.kehadiran');
 
 Route::patch(
@@ -66,6 +70,7 @@ Route::patch(
     [CekTahapanPelamarController::class, 'updateKehadiranJadwalTestMmpi']
 )
     ->whereUuid('jadwalTestMmpi')
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.jadwal-test-mmpi.kehadiran');
 
 /*
@@ -81,6 +86,7 @@ Route::post(
     [CekTahapanPelamarController::class, 'uploadDokumenInterview']
 )
     ->whereUuid('jadwalInterviewKandidat')
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.jadwal-interview.dokumen.upload');
 
 Route::get(
@@ -100,6 +106,7 @@ Route::get(
 |--------------------------------------------------------------------------
 */
 Route::patch('/pendaftaran/api/token/{token}/data-diri', [PendaftaranController::class, 'updateDataDiriByToken'])
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.data-diri.update');
 
 Route::get('/pendaftaran/api/token/{token}/data-diri', function (string $token) {
@@ -112,6 +119,7 @@ Route::get('/pendaftaran/api/token/{token}/data-diri', function (string $token) 
 |--------------------------------------------------------------------------
 */
 Route::patch('/pendaftaran/api/token/{token}/riwayat-keluarga', [PendaftaranController::class, 'updateRiwayatKeluargaByToken'])
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.riwayat-keluarga.update');
 
 Route::get('/pendaftaran/api/token/{token}/riwayat-keluarga', function (string $token) {
@@ -124,6 +132,7 @@ Route::get('/pendaftaran/api/token/{token}/riwayat-keluarga', function (string $
 |--------------------------------------------------------------------------
 */
 Route::patch('/pendaftaran/api/token/{token}/riwayat-kesehatan', [PendaftaranController::class, 'updateRiwayatKesehatanByToken'])
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.riwayat-kesehatan.update');
 
 Route::get('/pendaftaran/api/token/{token}/riwayat-kesehatan', function (string $token) {
@@ -136,6 +145,7 @@ Route::get('/pendaftaran/api/token/{token}/riwayat-kesehatan', function (string 
 |--------------------------------------------------------------------------
 */
 Route::patch('/pendaftaran/api/token/{token}/riwayat-pekerjaan', [PendaftaranController::class, 'updateRiwayatPekerjaanByToken'])
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.riwayat-pekerjaan.update');
 
 Route::get('/pendaftaran/api/token/{token}/riwayat-pekerjaan', function (string $token) {
@@ -148,6 +158,7 @@ Route::get('/pendaftaran/api/token/{token}/riwayat-pekerjaan', function (string 
 |--------------------------------------------------------------------------
 */
 Route::patch('/pendaftaran/api/token/{token}/kesiapan-bekerja', [PendaftaranController::class, 'updateKesiapanBekerjaByToken'])
+    ->middleware('throttle:candidate-write')
     ->name('pendaftaran.api.token.kesiapan-bekerja.update');
 
 Route::get('/pendaftaran/api/token/{token}/kesiapan-bekerja', function (string $token) {

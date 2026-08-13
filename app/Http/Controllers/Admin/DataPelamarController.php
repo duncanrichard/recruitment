@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendFonnteBatch;
 use App\Models\Agama;
 use App\Models\DataPerusahaan;
 use App\Models\DataRiwayatDiri;
 use App\Models\Kewarganegaraan;
 use App\Models\Pendidikan;
 use App\Models\Posisi;
-use App\Models\SumberInformasi;
 use App\Models\StatusPernikahan;
+use App\Models\SumberInformasi;
+use App\Services\RecruitmentAuditService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -22,7 +24,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -310,6 +311,9 @@ class DataPelamarController extends Controller
             'tanggal_skrining_mulai' => ['nullable', 'date'],
             'tanggal_skrining_selesai' => ['nullable', 'date', 'after_or_equal:tanggal_skrining_mulai'],
             'perusahaan_dilamar' => $perusahaanRules,
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', Rule::in([5, 10, 25, 50, 100])],
+            'search' => ['nullable', 'string', 'max:150'],
         ], [
             'perusahaan_dilamar.uuid' => 'Perusahaan tidak valid.',
             'perusahaan_dilamar.exists' => 'Perusahaan tidak ditemukan.',
@@ -319,21 +323,36 @@ class DataPelamarController extends Controller
         $query = $this->scopedPelamarQuery()
             ->with($this->safeRelations());
 
-        if (!empty($validated['perusahaan_dilamar'])) {
+        if (! empty($validated['search'])) {
+            $search = trim($validated['search']);
+            $query->where(function ($query) use ($search) {
+                $query->where('nama_lengkap', 'like', "%{$search}%")
+                    ->orWhere('nama_panggil', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('no_wa', 'like', "%{$search}%")
+                    ->orWhereHas('posisi', fn ($relation) => $relation->where('nama_posisi', 'like', "%{$search}%"))
+                    ->orWhereHas('perusahaan', fn ($relation) => $relation->where('nama_perusahaan', 'like', "%{$search}%"))
+                    ->orWhereHas('sumberInformasi', fn ($relation) => $relation->where('informasi', 'like', "%{$search}%"));
+            });
+        }
+
+        if (! empty($validated['perusahaan_dilamar'])) {
             $query->where('perusahaan_dilamar', $validated['perusahaan_dilamar']);
         }
 
-        if (!empty($validated['tanggal_skrining_mulai'])) {
+        if (! empty($validated['tanggal_skrining_mulai'])) {
             $query->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai']);
         }
 
-        if (!empty($validated['tanggal_skrining_selesai'])) {
+        if (! empty($validated['tanggal_skrining_selesai'])) {
             $query->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai']);
         }
 
-        $data = $query
-            ->latest()
-            ->get()
+        $paginator = $query
+            ->latest('created_at')
+            ->paginate((int) ($validated['per_page'] ?? 10));
+
+        $data = $paginator->getCollection()
             ->map(function ($item) {
                 return $this->appendExtraData($item);
             });
@@ -347,9 +366,16 @@ class DataPelamarController extends Controller
                 'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'] ?? null,
             ],
             'data' => $data,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
         ]);
     }
-
 
     public function kirimPesanSkrining(Request $request): JsonResponse
     {
@@ -372,7 +398,7 @@ class DataPelamarController extends Controller
             ->whereDate('tanggal_skrining', '>=', $validated['tanggal_skrining_mulai'])
             ->whereDate('tanggal_skrining', '<=', $validated['tanggal_skrining_selesai']);
 
-        if (!empty($validated['perusahaan_dilamar'])) {
+        if (! empty($validated['perusahaan_dilamar'])) {
             $query->where('perusahaan_dilamar', $validated['perusahaan_dilamar']);
         }
 
@@ -408,7 +434,7 @@ class DataPelamarController extends Controller
             $urlPendaftaran = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
             $perusahaan = $pelamar->perusahaan;
 
-            if (!$target) {
+            if (! $target) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -421,7 +447,7 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            if (!$urlPendaftaran) {
+            if (! $urlPendaftaran) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -435,7 +461,7 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            if (!$perusahaan) {
+            if (! $perusahaan) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -452,7 +478,7 @@ class DataPelamarController extends Controller
             $tokenApiWa = $this->normalizeTokenApiWa($perusahaan->token_api_wa ?? null);
             $nomerPerusahaan = $this->normalizeWhatsappNumber($perusahaan->no_wa ?? null);
 
-            if (!$nomerPerusahaan) {
+            if (! $nomerPerusahaan) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -467,7 +493,7 @@ class DataPelamarController extends Controller
                 continue;
             }
 
-            if (!$tokenApiWa) {
+            if (! $tokenApiWa) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -485,7 +511,7 @@ class DataPelamarController extends Controller
 
             $companyValidationKey = (string) ($perusahaan->id ?? $tokenApiWa);
 
-            if (!isset($validatedCompanies[$companyValidationKey])) {
+            if (! isset($validatedCompanies[$companyValidationKey])) {
                 $validatedCompanies[$companyValidationKey] = $this->checkFonnteCredentialForSending(
                     $nomerPerusahaan,
                     $tokenApiWa
@@ -494,7 +520,7 @@ class DataPelamarController extends Controller
 
             $validasiWa = $validatedCompanies[$companyValidationKey];
 
-            if (!$validasiWa['success']) {
+            if (! $validasiWa['success']) {
                 $skipped[] = [
                     'id' => $this->pelamarKey($pelamar),
                     'nama_lengkap' => $pelamar->nama_lengkap,
@@ -514,7 +540,7 @@ class DataPelamarController extends Controller
 
             $groupKey = (string) ($perusahaan->id ?? $tokenApiWa);
 
-            if (!isset($groupedMessages[$groupKey])) {
+            if (! isset($groupedMessages[$groupKey])) {
                 $groupedMessages[$groupKey] = [
                     'perusahaan_id' => $perusahaan->id ?? null,
                     'perusahaan' => $perusahaan->nama_perusahaan ?? $pelamar->perusahaan_label,
@@ -556,98 +582,63 @@ class DataPelamarController extends Controller
 
         $responses = [];
         $totalDikirim = 0;
-        $totalGagalProvider = 0;
         $targets = [];
 
         foreach ($groupedMessages as $group) {
-            try {
-                $response = Http::asForm()
-                    ->withoutVerifying()
-                    ->withHeaders([
-                        'Authorization' => $group['token_api_wa'],
-                    ])
-                    ->timeout(120)
-                    ->post('https://api.fonnte.com/send', [
-                        'data' => json_encode($group['messages']),
-                        'countryCode' => '62',
-                        'typing' => 'false',
-                        'preview' => 'true',
-                    ]);
+            $countMessages = count($group['messages']);
+            $idempotencyKey = hash('sha256', json_encode([
+                'company_id' => $group['perusahaan_id'],
+                'messages' => $group['messages'],
+            ], JSON_THROW_ON_ERROR));
 
-                $json = $response->json();
-                $fonnteStatus = $json['status'] ?? $json['Status'] ?? false;
-                $isSuccess = $response->successful() && (bool) $fonnteStatus;
-                $countMessages = count($group['messages']);
+            DB::table('integration_deliveries')->insertOrIgnore([
+                'id' => (string) Str::uuid(),
+                'idempotency_key' => $idempotencyKey,
+                'provider' => 'fonnte',
+                'company_id' => $group['perusahaan_id'],
+                'status' => 'queued',
+                'attempts' => 0,
+                'item_count' => $countMessages,
+                'payload' => json_encode([
+                    'company_id' => $group['perusahaan_id'],
+                    'messages' => $group['messages'],
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-                if ($isSuccess) {
-                    $totalDikirim += $countMessages;
-                } else {
-                    $totalGagalProvider += $countMessages;
-                }
+            SendFonnteBatch::dispatch(
+                (string) $group['perusahaan_id'],
+                $group['messages'],
+                $idempotencyKey
+            );
 
-                $targets = array_merge(
-                    $targets,
-                    collect($group['messages'])->pluck('target')->values()->all()
-                );
+            $totalDikirim += $countMessages;
+            $groupTargets = collect($group['messages'])->pluck('target')->values();
+            $targets = array_merge($targets, $groupTargets->all());
 
-                $responses[] = [
-                    'success' => $isSuccess,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values(),
-                    'fonnte_http_code' => $response->status(),
-                    'fonnte_response' => $json ?: $response->body(),
-                    'message' => $isSuccess
-                        ? 'Pesan berhasil dikirim ke antrean Fonnte untuk perusahaan ini.'
-                        : ($json['reason'] ?? $json['detail'] ?? $json['message'] ?? 'Pesan gagal dikirim melalui Fonnte untuk perusahaan ini.'),
-                ];
-            } catch (\Throwable $e) {
-                $countMessages = count($group['messages']);
-                $totalGagalProvider += $countMessages;
-
-                Log::error('Gagal mengirim pesan Fonnte skrining per perusahaan', [
-                    'message' => $e->getMessage(),
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
-                    'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
-                ]);
-
-                $responses[] = [
-                    'success' => false,
-                    'perusahaan_id' => $group['perusahaan_id'],
-                    'perusahaan' => $group['perusahaan'],
-                    'nomer_perusahaan' => $group['nomer_perusahaan'],
-                    'fonnte_device' => $group['fonnte_device'] ?? null,
-                    'fonnte_device_status' => $group['fonnte_device_status'] ?? null,
-                    'total_data' => $countMessages,
-                    'targets' => collect($group['messages'])->pluck('target')->values(),
-                    'message' => 'Terjadi kesalahan saat mengirim pesan Fonnte untuk perusahaan ini: ' . $e->getMessage(),
-                ];
-            }
+            $responses[] = [
+                'success' => true,
+                'status' => 'queued',
+                'delivery_id' => $idempotencyKey,
+                'perusahaan_id' => $group['perusahaan_id'],
+                'perusahaan' => $group['perusahaan'],
+                'total_data' => $countMessages,
+                'targets' => $groupTargets,
+                'message' => 'Pesan masuk antrean pengiriman Fonnte.',
+            ];
         }
-
-        $isAllSuccess = $totalDikirim > 0 && $totalGagalProvider === 0;
-        $isPartialSuccess = $totalDikirim > 0 && $totalGagalProvider > 0;
 
         return response()->json([
             'success' => $totalDikirim > 0,
-            'message' => $isAllSuccess
-                ? 'Pesan WhatsApp berhasil dikirim sesuai perusahaan masing-masing.'
-                : ($isPartialSuccess
-                    ? 'Sebagian pesan WhatsApp berhasil dikirim, sebagian gagal. Cek detail response per perusahaan.'
-                    : 'Pesan WhatsApp gagal dikirim. Cek detail response per perusahaan.'),
+            'message' => 'Pesan WhatsApp masuk antrean pengiriman.',
             'tanggal_skrining_mulai' => $validated['tanggal_skrining_mulai'],
             'tanggal_skrining_selesai' => $validated['tanggal_skrining_selesai'],
             'total_pelamar' => $pelamars->count(),
             'total_data' => $pelamars->count(),
             'total_dikirim' => $totalDikirim,
             'total_dilewati' => count($skipped),
-            'total_gagal_provider' => $totalGagalProvider,
+            'total_gagal_provider' => 0,
             'total_perusahaan' => count($groupedMessages),
             'skipped' => $skipped,
             'targets' => array_values(array_unique($targets)),
@@ -695,7 +686,6 @@ class DataPelamarController extends Controller
             'data' => $data,
         ]);
     }
-
 
     public function sumberInformasiList(): JsonResponse
     {
@@ -798,7 +788,6 @@ class DataPelamarController extends Controller
         ]);
     }
 
-
     public function detail(string $id)
     {
         return view('pages.admin.data-pelamar.detail', [
@@ -818,7 +807,6 @@ class DataPelamarController extends Controller
             'data' => $data,
         ]);
     }
-
 
     public function showByToken(string $token)
     {
@@ -843,7 +831,7 @@ class DataPelamarController extends Controller
             ->where('token', $token)
             ->first();
 
-        if (!$pelamar) {
+        if (! $pelamar) {
             return response()->json([
                 'success' => false,
                 'message' => 'Token pelamar tidak ditemukan.',
@@ -866,7 +854,7 @@ class DataPelamarController extends Controller
 
         $validated = $this->validatePelamar($request, true);
 
-        if (!$request->has('str_aktif')) {
+        if (! $request->has('str_aktif')) {
             unset($validated['str_aktif']);
         }
 
@@ -881,7 +869,6 @@ class DataPelamarController extends Controller
             'data' => $freshData,
         ]);
     }
-
 
     public function destroy(string $id): JsonResponse
     {
@@ -901,7 +888,6 @@ class DataPelamarController extends Controller
             ], 409);
         }
     }
-
 
     private function validatePelamar(Request $request, bool $isUpdate = false): array
     {
@@ -1031,15 +1017,14 @@ class DataPelamarController extends Controller
         ]);
     }
 
-
     private function makePendaftaranUrl(?string $token): ?string
     {
-        if (!$token) {
+        if (! $token) {
             return null;
         }
 
-        if (!empty($this->publicBaseUrl)) {
-            return rtrim($this->publicBaseUrl, '/') . '/pendaftaran/' . $token;
+        if (! empty($this->publicBaseUrl)) {
+            return rtrim($this->publicBaseUrl, '/').'/pendaftaran/'.$token;
         }
 
         return route('pendaftaran.show', [
@@ -1192,7 +1177,7 @@ class DataPelamarController extends Controller
 
     private function targetHasAnyFilledField($target, array $fields): bool
     {
-        if (!$target) {
+        if (! $target) {
             return false;
         }
 
@@ -1297,17 +1282,17 @@ class DataPelamarController extends Controller
             return true;
         }
 
-        return !empty($value);
+        return ! empty($value);
     }
 
     private function relationValue($relation, array $columns): ?string
     {
-        if (!$relation) {
+        if (! $relation) {
             return null;
         }
 
         foreach ($columns as $column) {
-            if (!empty($relation->{$column})) {
+            if (! empty($relation->{$column})) {
                 return (string) $relation->{$column};
             }
         }
@@ -1330,14 +1315,14 @@ class DataPelamarController extends Controller
         $url = $pelamar->pendaftaran_url ?: $this->makePendaftaranUrl($pelamar->token ?? null);
 
         $message = $template ?: "Halo {nama},\n\n"
-            . "Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n"
-            . "Mohon untuk selalu mengecek dan melengkapi data diri Anda melalui link pendaftaran berikut.\n"
-            . "Klik/buka link ini:\n"
-            . "{url_pendaftaran}\n\n"
-            . "Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n"
-            . "Jika ada kendala, silakan hubungi WA ini.\n\n"
-            . "Terima kasih.\n"
-            . "Tim Rekrutmen {perusahaan}";
+            ."Terima kasih sudah mengikuti proses skrining kandidat untuk posisi {posisi} di {perusahaan}.\n"
+            ."Mohon untuk selalu mengecek dan melengkapi data diri Anda melalui link pendaftaran berikut.\n"
+            ."Klik/buka link ini:\n"
+            ."{url_pendaftaran}\n\n"
+            ."Pastikan data diri, riwayat keluarga, riwayat kesehatan, riwayat pekerjaan, dan kesiapan bekerja sudah diisi dengan benar dan lengkap.\n\n"
+            ."Jika ada kendala, silakan hubungi WA ini.\n\n"
+            ."Terima kasih.\n"
+            .'Tim Rekrutmen {perusahaan}';
 
         return strtr($message, [
             '{nama}' => $nama,
@@ -1356,14 +1341,14 @@ class DataPelamarController extends Controller
 
     private function checkFonnteCredentialForSending(?string $nomerPerusahaan, ?string $tokenApiWa): array
     {
-        if (!$nomerPerusahaan) {
+        if (! $nomerPerusahaan) {
             return [
                 'success' => false,
                 'message' => 'Nomor WhatsApp perusahaan kosong atau tidak valid.',
             ];
         }
 
-        if (!$tokenApiWa) {
+        if (! $tokenApiWa) {
             return [
                 'success' => false,
                 'message' => 'Token API WA perusahaan kosong.',
@@ -1371,7 +1356,7 @@ class DataPelamarController extends Controller
         }
 
         try {
-            $response = Http::withoutVerifying()
+            $response = Http::withOptions(['verify' => (bool) config('services.http.verify_tls', true)])
                 ->withHeaders([
                     'Authorization' => $tokenApiWa,
                 ])
@@ -1380,7 +1365,7 @@ class DataPelamarController extends Controller
 
             $json = $response->json();
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 return [
                     'success' => false,
                     'message' => 'Gagal memvalidasi token API WA perusahaan ke Fonnte.',
@@ -1388,7 +1373,7 @@ class DataPelamarController extends Controller
                 ];
             }
 
-            if (!($json['status'] ?? false)) {
+            if (! ($json['status'] ?? false)) {
                 return [
                     'success' => false,
                     'message' => $json['reason']
@@ -1400,7 +1385,7 @@ class DataPelamarController extends Controller
 
             $deviceNumber = $this->normalizeWhatsappNumber($json['device'] ?? null);
 
-            if (!$deviceNumber) {
+            if (! $deviceNumber) {
                 return [
                     'success' => false,
                     'message' => 'Nomor device pada token API WA tidak ditemukan.',
@@ -1411,7 +1396,7 @@ class DataPelamarController extends Controller
             if ($deviceNumber !== $nomerPerusahaan) {
                 return [
                     'success' => false,
-                    'message' => 'Token API WA tidak sesuai dengan nomor perusahaan. Token ini terdaftar untuk nomor ' . ($json['device'] ?? '-') . '.',
+                    'message' => 'Token API WA tidak sesuai dengan nomor perusahaan. Token ini terdaftar untuk nomor '.($json['device'] ?? '-').'.',
                     'device_number' => $deviceNumber,
                     'device_status' => $json['device_status'] ?? null,
                     'fonnte_response' => $json,
@@ -1438,11 +1423,10 @@ class DataPelamarController extends Controller
         } catch (\Throwable $e) {
             return [
                 'success' => false,
-                'message' => 'Gagal memvalidasi token API WA perusahaan: ' . $e->getMessage(),
+                'message' => 'Gagal memvalidasi token API WA perusahaan: '.$e->getMessage(),
             ];
         }
     }
-
 
     private function getDokumenInterview(DataRiwayatDiri $data): array
     {
@@ -1469,7 +1453,7 @@ class DataPelamarController extends Controller
             'adaDokumen' => false,
         ];
 
-        if (!Schema::hasTable('jadwal_interview_kandidat')) {
+        if (! Schema::hasTable('jadwal_interview_kandidat')) {
             return $empty;
         }
 
@@ -1524,13 +1508,18 @@ class DataPelamarController extends Controller
 
         $row = $query->first();
 
-        if (!$row) {
+        if (! $row) {
             return $empty;
         }
 
-        $fileCv = $this->normalizeFileUrl($row->file_cv ?? null);
-        $fileFoto = $this->normalizeFileUrl($row->file_foto ?? null);
-        $hasDocument = !empty($fileCv) || !empty($fileFoto);
+        $candidateId = $this->pelamarKey($data);
+        $fileCv = empty($row->file_cv)
+            ? null
+            : route('admin.data-pelamar.documents.show', ['candidate' => $candidateId, 'type' => 'cv']);
+        $fileFoto = empty($row->file_foto)
+            ? null
+            : route('admin.data-pelamar.documents.show', ['candidate' => $candidateId, 'type' => 'foto']);
+        $hasDocument = ! empty($fileCv) || ! empty($fileFoto);
 
         return [
             'jadwal_interview_kandidat_id' => $row->jadwal_interview_kandidat_id ?? null,
@@ -1579,8 +1568,15 @@ class DataPelamarController extends Controller
         }
 
         if (Str::startsWith($value, 'storage/')) {
-            return url('/' . $value);
+            return url('/'.$value);
         }
+
+        app(RecruitmentAuditService::class)->record(
+            'candidate_document',
+            hash('sha256', ltrim($value, '/')),
+            'download_url_generated',
+            ['disk' => config('filesystems.default')]
+        );
 
         return url(Storage::url(ltrim($value, '/')));
     }
@@ -1598,7 +1594,7 @@ class DataPelamarController extends Controller
 
     private function normalizeWhatsappNumber(?string $number): ?string
     {
-        if (!$number) {
+        if (! $number) {
             return null;
         }
 
@@ -1614,21 +1610,19 @@ class DataPelamarController extends Controller
         }
 
         if (Str::startsWith($number, '0')) {
-            $number = '62' . substr($number, 1);
+            $number = '62'.substr($number, 1);
         }
 
         if (Str::startsWith($number, '8')) {
-            $number = '62' . $number;
+            $number = '62'.$number;
         }
 
-        if (!preg_match('/^62[0-9]{8,15}$/', $number)) {
+        if (! preg_match('/^62[0-9]{8,15}$/', $number)) {
             return null;
         }
 
         return $number;
     }
-
-
 
     private function pelamarKey(DataRiwayatDiri $pelamar): ?string
     {
@@ -1668,7 +1662,7 @@ class DataPelamarController extends Controller
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return [];
         }
 
@@ -1695,7 +1689,7 @@ class DataPelamarController extends Controller
         /**
          * Fallback jika sistem lama masih punya users.perusahaan_id.
          */
-        if (empty($ids) && !empty($user->perusahaan_id)) {
+        if (empty($ids) && ! empty($user->perusahaan_id)) {
             $ids[] = (string) $user->perusahaan_id;
         }
 
