@@ -1,0 +1,258 @@
+{"kind":"deck","id":"pr/curef4","name":"Deck"}
+{"kind":"layout","layoutId":"a1563336-462b-48ec-af01-fc635544ed30","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"f0029cb2-2a9c-43f9-bc35-9a16b4b11820","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/xd83g7","slide":1,"title":"SISTEM REKRUTMEN","textShapes":10}
+{"kind":"shape","id":"sh/jmx07q90","slide":1,"bbox":[0,0,18,720]}
+{"kind":"textbox","id":"sh/4n6h0vql","slide":1,"text":"SISTEM REKRUTMEN","textPreview":"SISTEM REKRUTMEN","textChars":16,"textLines":1,"bbox":[72,70,540,30]}
+{"kind":"textbox","id":"sh/5ofi9gr6","slide":1,"text":"Rekrutmen yang\nterkendali, terukur,\ndan dapat dipercaya","textPreview":"Rekrutmen yang | terkendali, terukur, | dan dapat dipercaya","textChars":55,"textLines":3,"bbox":[72,145,760,260]}
+{"kind":"textbox","id":"sh/uh4zu18j","slide":1,"text":"Platform terintegrasi untuk mengelola pelamar, tahapan seleksi, keputusan, audit, dan insight operasional.","textPreview":"Platform terintegrasi untuk mengelola pelamar, tahapan seleksi, keputusan, audit, dan insight operasional.","textChars":106,"textLines":1,"bbox":[76,440,720,88]}
+{"kind":"shape","id":"sh/vid03694","slide":1,"bbox":[900,112,250,480]}
+{"kind":"textbox","id":"sh/wjmhwbqp","slide":1,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[930,145,190,65]}
+{"kind":"textbox","id":"sh/hkvi5gra","slide":1,"text":"Satu data\npelamar","textPreview":"Satu data | pelamar","textChars":17,"textLines":2,"bbox":[930,220,190,82]}
+{"kind":"textbox","id":"sh/ed8j658n","slide":1,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[930,332,190,55]}
+{"kind":"textbox","id":"sh/feh0fa98","slide":1,"text":"Satu pipeline","textPreview":"Satu pipeline","textChars":13,"textLines":1,"bbox":[930,387,190,45]}
+{"kind":"textbox","id":"sh/3ytsvmx8","slide":1,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[930,455,190,45]}
+{"kind":"textbox","id":"sh/2xkbmhwn","slide":1,"text":"Satu sumber keputusan","textPreview":"Satu sumber keputusan","textChars":21,"textLines":1,"bbox":[930,500,190,62]}
+{"kind":"textbox","id":"sh/p0vaxwfy","slide":1,"text":"Presentasi Sistem • 2026","textPreview":"Presentasi Sistem • 2026","textChars":24,"textLines":1,"bbox":[76,650,400,24]}
+{"kind":"notes","id":"nt/xd83g7","slide":1,"text":""}
+{"kind":"slide","id":"sl/xh2c8c","slide":2,"title":"MENGAPA DIBUAT","textShapes":17}
+{"kind":"textbox","id":"sh/sjml87up","slide":2,"text":"MENGAPA DIBUAT","textPreview":"MENGAPA DIBUAT","textChars":14,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/7id4f2dk","slide":2,"text":"Proses rekrutmen mudah kehilangan kendali saat data tersebar","textPreview":"Proses rekrutmen mudah kehilangan kendali saat data tersebar","textChars":60,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/6h436xcz","slide":2,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[72,245,220,48]}
+{"kind":"textbox","id":"sh/5gb2dcve","slide":2,"text":"Data terpisah","textPreview":"Data terpisah","textChars":13,"textLines":1,"bbox":[72,303,230,45]}
+{"kind":"textbox","id":"sh/kf2l47ut","slide":2,"text":"Pelamar, jadwal, hasil tes, interview, dan offering tersimpan di titik yang berbeda.","textPreview":"Pelamar, jadwal, hasil tes, interview, dan offering tersimpan di titik yang berbeda.","textChars":84,"textLines":1,"bbox":[72,355,238,150]}
+{"kind":"textbox","id":"sh/jetkb2d8","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[354,245,220,48]}
+{"kind":"textbox","id":"sh/idk32xcn","slide":2,"text":"Tahapan tidak konsisten","textPreview":"Tahapan tidak konsisten","textChars":23,"textLines":1,"bbox":[354,303,230,45]}
+{"kind":"textbox","id":"sh/xcb29sv2","slide":2,"text":"Kandidat dapat terlewat, diproses ganda, atau berpindah tahap tanpa validasi yang sama.","textPreview":"Kandidat dapat terlewat, diproses ganda, atau berpindah tahap tanpa validasi yang sama.","textChars":87,"textLines":1,"bbox":[354,355,238,150]}
+{"kind":"textbox","id":"sh/wb2l0nux","slide":2,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[636,245,220,48]}
+{"kind":"textbox","id":"sh/6dwjqx8j","slide":2,"text":"Keputusan lambat","textPreview":"Keputusan lambat","textChars":16,"textLines":1,"bbox":[636,303,230,45]}
+{"kind":"textbox","id":"sh/7e5kz294","slide":2,"text":"HR membutuhkan waktu lebih lama untuk menyusun status kandidat dan menentukan prioritas.","textPreview":"HR membutuhkan waktu lebih lama untuk menyusun status kandidat dan menentukan prioritas.","textChars":88,"textLines":1,"bbox":[636,355,238,150]}
+{"kind":"textbox","id":"sh/8fe1s7qp","slide":2,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[918,245,220,48]}
+{"kind":"textbox","id":"sh/tgn21sra","slide":2,"text":"Risiko akses","textPreview":"Risiko akses","textChars":12,"textLines":1,"bbox":[918,303,230,45]}
+{"kind":"textbox","id":"sh/ypcjmd8n","slide":2,"text":"Tanpa pembatasan perusahaan dan audit, data sensitif lebih sulit dipertanggungjawabkan.","textPreview":"Tanpa pembatasan perusahaan dan audit, data sensitif lebih sulit dipertanggungjawabkan.","textChars":87,"textLines":1,"bbox":[918,355,238,150]}
+{"kind":"textbox","id":"sh/zqlkvi98","slide":2,"text":"Masalah utamanya bukan kekurangan data—melainkan tidak adanya satu alur kerja yang menyatukan data tersebut.","textPreview":"Masalah utamanya bukan kekurangan data—melainkan tidak adanya satu alur kerja yang menyatukan data tersebut.","textChars":108,"textLines":1,"bbox":[72,565,1136,60]}
+{"kind":"shape","id":"sh/kru1onqt","slide":2,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/lsn2xsre","slide":2,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/alcjid8r","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/xh2c8c","slide":2,"text":""}
+{"kind":"slide","id":"sl/rtl25k","slide":3,"title":"TUJUAN SISTEM","textShapes":13}
+{"kind":"textbox","id":"sh/6lkbmhwv","slide":3,"text":"TUJUAN SISTEM","textPreview":"TUJUAN SISTEM","textChars":13,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/tobuhcfm","slide":3,"text":"Mengubah aktivitas administratif menjadi pipeline keputusan","textPreview":"Mengubah aktivitas administratif menjadi pipeline keputusan","textChars":59,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"shape","id":"sh/8n2to7e1","slide":3,"bbox":[72,230,515,320]}
+{"kind":"textbox","id":"sh/vqtcjmxs","slide":3,"text":"Sebelum","textPreview":"Sebelum","textChars":7,"textLines":1,"bbox":[104,258,180,42]}
+{"kind":"shape","id":"sh/upkvqhw7","slide":3,"bbox":[104,330,10,10]}
+{"kind":"textbox","id":"sh/hsvulwfy","slide":3,"text":"Status kandidat dicari secara manual","textPreview":"Status kandidat dicari secara manual","textChars":36,"textLines":1,"bbox":[128,322,396,48]}
+{"kind":"shape","id":"sh/gr2dsred","slide":3,"bbox":[104,390,10,10]}
+{"kind":"textbox","id":"sh/bu9c72x8","slide":3,"text":"Jadwal dan hasil sulit ditelusuri","textPreview":"Jadwal dan hasil sulit ditelusuri","textChars":33,"textLines":1,"bbox":[128,382,396,48]}
+{"kind":"shape","id":"sh/at0bexw3","slide":3,"bbox":[104,450,10,10]}
+{"kind":"textbox","id":"sh/832lg7ad","slide":3,"text":"Laporan terlambat dan rawan berbeda","textPreview":"Laporan terlambat dan rawan berbeda","textChars":35,"textLines":1,"bbox":[128,442,396,48]}
+{"kind":"textbox","id":"sh/94bmpcry","slide":3,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[605,340,70,70]}
+{"kind":"shape","id":"sh/m103ehs7","slide":3,"bbox":[693,230,515,320]}
+{"kind":"textbox","id":"sh/n29knm9s","slide":3,"text":"Dengan sistem","textPreview":"Dengan sistem","textChars":13,"textLines":1,"bbox":[725,258,250,42]}
+{"kind":"shape","id":"sh/w72lkrap","slide":3,"bbox":[725,330,10,10]}
+{"kind":"textbox","id":"sh/h8bmtwra","slide":3,"text":"Satu profil kandidat sepanjang proses","textPreview":"Satu profil kandidat sepanjang proses","textChars":37,"textLines":1,"bbox":[749,322,396,48]}
+{"kind":"shape","id":"sh/u5k3ihsj","slide":3,"bbox":[725,390,10,10]}
+{"kind":"textbox","id":"sh/v6t4rm94","slide":3,"text":"Tahapan tervalidasi dan dapat dipantau","textPreview":"Tahapan tervalidasi dan dapat dipantau","textChars":38,"textLines":1,"bbox":[749,382,396,48]}
+{"kind":"shape","id":"sh/cbyl8na5","slide":3,"bbox":[725,450,10,10]}
+{"kind":"textbox","id":"sh/dcr2hsrq","slide":3,"text":"Insight siap digunakan untuk tindakan","textPreview":"Insight siap digunakan untuk tindakan","textChars":37,"textLines":1,"bbox":[749,442,396,48]}
+{"kind":"shape","id":"sh/tgzapkzi","slide":3,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/sfq9wzyx","slide":3,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/ruhsnuhc","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/rtl25k","slide":3,"text":""}
+{"kind":"slide","id":"sl/bzj1hz","slide":4,"title":"CARA KERJA","textShapes":25}
+{"kind":"textbox","id":"sh/vu1sfql4","slide":4,"text":"CARA KERJA","textPreview":"CARA KERJA","textChars":10,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/wva98v2p","slide":4,"text":"Satu kandidat bergerak melalui alur seleksi yang utuh","textPreview":"Satu kandidat bergerak melalui alur seleksi yang utuh","textChars":53,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/hwjah03a","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[192,325,28,45]}
+{"kind":"shape","id":"sh/m58r21kn","slide":4,"bbox":[42,270,150,150]}
+{"kind":"textbox","id":"sh/7qhsb6ls","slide":4,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[58,286,118,25]}
+{"kind":"textbox","id":"sh/8rq94b2d","slide":4,"text":"Permintaan\nkandidat","textPreview":"Permintaan | kandidat","textChars":19,"textLines":2,"bbox":[54,325,126,65]}
+{"kind":"textbox","id":"sh/9sjadg3y","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[370,325,28,45]}
+{"kind":"shape","id":"sh/y18ry14b","slide":4,"bbox":[220,270,150,150]}
+{"kind":"textbox","id":"sh/z2hs76lw","slide":4,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[236,286,118,25]}
+{"kind":"textbox","id":"sh/zypo7uxc","slide":4,"text":"Data\npelamar","textPreview":"Data | pelamar","textChars":12,"textLines":2,"bbox":[232,325,126,65]}
+{"kind":"textbox","id":"sh/yxgnepgr","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[548,325,28,45]}
+{"kind":"shape","id":"sh/lk7694fi","slide":4,"bbox":[398,270,150,150]}
+{"kind":"textbox","id":"sh/0zy5gzyx","slide":4,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[414,286,118,25]}
+{"kind":"textbox","id":"sh/nm9obux8","slide":4,"text":"Test Zoom","textPreview":"Test Zoom","textChars":9,"textLines":1,"bbox":[410,325,126,65]}
+{"kind":"textbox","id":"sh/ml0nipgn","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[726,325,28,45]}
+{"kind":"shape","id":"sh/9or6d4fe","slide":4,"bbox":[576,270,150,150]}
+{"kind":"textbox","id":"sh/8ni5kzyt","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[592,286,118,25]}
+{"kind":"textbox","id":"sh/3q54zax4","slide":4,"text":"Test MMPI","textPreview":"Test MMPI","textChars":9,"textLines":1,"bbox":[588,325,126,65]}
+{"kind":"textbox","id":"sh/2pwn65gj","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[904,325,28,45]}
+{"kind":"shape","id":"sh/6l4red07","slide":4,"bbox":[754,270,150,150]}
+{"kind":"textbox","id":"sh/7md87ihs","slide":4,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[770,286,118,25]}
+{"kind":"textbox","id":"sh/snm9gnid","slide":4,"text":"Interview","textPreview":"Interview","textChars":9,"textLines":1,"bbox":[766,325,126,65]}
+{"kind":"textbox","id":"sh/tovq9szy","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[1082,325,28,45]}
+{"kind":"shape","id":"sh/ihkrat0v","slide":4,"bbox":[932,270,150,150]}
+{"kind":"textbox","id":"sh/jit83yhg","slide":4,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[948,286,118,25]}
+{"kind":"textbox","id":"sh/kj29c3i1","slide":4,"text":"Review\nmanagement","textPreview":"Review | management","textChars":17,"textLines":2,"bbox":[944,325,126,65]}
+{"kind":"shape","id":"sh/5kvq58zm","slide":4,"bbox":[1110,270,150,150]}
+{"kind":"textbox","id":"sh/atk76t0z","slide":4,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1126,286,118,25]}
+{"kind":"textbox","id":"sh/vet8zyhk","slide":4,"text":"Offering\nletter","textPreview":"Offering | letter","textChars":15,"textLines":2,"bbox":[1122,325,126,65]}
+{"kind":"textbox","id":"sh/d8zulwj2","slide":4,"text":"Setiap tahap memperbarui status kandidat dan menyiapkan konteks untuk keputusan berikutnya.","textPreview":"Setiap tahap memperbarui status kandidat dan menyiapkan konteks untuk keputusan berikutnya.","textChars":91,"textLines":1,"bbox":[160,485,960,60]}
+{"kind":"shape","id":"sh/c7qtcrih","slide":4,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/r6hcjm1w","slide":4,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/q58bahkb","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/bzj1hz","slide":4,"text":""}
+{"kind":"slide","id":"sl/v5mgbr","slide":5,"title":"KAPABILITAS INTI","textShapes":22}
+{"kind":"textbox","id":"sh/pcnih4vq","slide":5,"text":"KAPABILITAS INTI","textPreview":"KAPABILITAS INTI","textChars":16,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/29czm9wz","slide":5,"text":"Fitur dibangun mengikuti pekerjaan nyata tim rekrutmen","textPreview":"Fitur dibangun mengikuti pekerjaan nyata tim rekrutmen","textChars":54,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/3algfedk","slide":5,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[72,225,50,34]}
+{"kind":"textbox","id":"sh/czehsje1","slide":5,"text":"Data & master posisi","textPreview":"Data & master posisi","textChars":20,"textLines":1,"bbox":[134,225,470,34]}
+{"kind":"textbox","id":"sh/d0nilovm","slide":5,"text":"Profil pelamar, perusahaan, posisi, serta spesifikasi kualifikasi manual per posisi.","textPreview":"Profil pelamar, perusahaan, posisi, serta spesifikasi kualifikasi manual per posisi.","textChars":84,"textLines":1,"bbox":[134,264,470,68]}
+{"kind":"textbox","id":"sh/qxwzq9wv","slide":5,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[642,225,50,34]}
+{"kind":"textbox","id":"sh/ry50jedg","slide":5,"text":"Penjadwalan seleksi","textPreview":"Penjadwalan seleksi","textChars":19,"textLines":1,"bbox":[704,225,470,34]}
+{"kind":"textbox","id":"sh/s3ahgfex","slide":5,"text":"Pengelolaan Zoom, MMPI, interview, kehadiran, reschedule, dan dokumen kandidat.","textPreview":"Pengelolaan Zoom, MMPI, interview, kehadiran, reschedule, dan dokumen kandidat.","textChars":79,"textLines":1,"bbox":[704,264,470,68]}
+{"kind":"textbox","id":"sh/t4jy9kvi","slide":5,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[72,351,50,34]}
+{"kind":"textbox","id":"sh/5wzup4ra","slide":5,"text":"Keputusan akhir","textPreview":"Keputusan akhir","textChars":15,"textLines":1,"bbox":[134,351,470,34]}
+{"kind":"textbox","id":"sh/4bqtgzqp","slide":5,"text":"Review management dan offering letter terhubung dengan riwayat tahapan kandidat.","textPreview":"Review management dan offering letter terhubung dengan riwayat tahapan kandidat.","textChars":80,"textLines":1,"bbox":[134,390,470,68]}
+{"kind":"textbox","id":"sh/3ahcnu94","slide":5,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[642,351,50,34]}
+{"kind":"textbox","id":"sh/i98bep8j","slide":5,"text":"Komunikasi terantre","textPreview":"Komunikasi terantre","textChars":19,"textLines":1,"bbox":[704,351,470,34]}
+{"kind":"textbox","id":"sh/d0jut4r6","slide":5,"text":"Pengiriman pesan dipindahkan ke queue agar proses layar tetap cepat dan kegagalan dapat dipantau.","textPreview":"Pengiriman pesan dipindahkan ke queue agar proses layar tetap cepat dan kegagalan dapat dipantau.","textChars":97,"textLines":1,"bbox":[704,390,470,68]}
+{"kind":"textbox","id":"sh/szqtkzq1","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[72,477,50,34]}
+{"kind":"textbox","id":"sh/ryhcru9g","slide":5,"text":"Laporan terkontrol","textPreview":"Laporan terkontrol","textChars":18,"textLines":1,"bbox":[134,477,470,34]}
+{"kind":"textbox","id":"sh/qx8bip8v","slide":5,"text":"Report, export, dan download melalui permission serta audit aktivitas.","textPreview":"Report, export, dan download melalui permission serta audit aktivitas.","textChars":70,"textLines":1,"bbox":[134,516,470,68]}
+{"kind":"textbox","id":"sh/14juxori","slide":5,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[642,477,50,34]}
+{"kind":"textbox","id":"sh/03adojqx","slide":5,"text":"Dashboard insight","textPreview":"Dashboard insight","textChars":17,"textLines":1,"bbox":[704,477,470,34]}
+{"kind":"textbox","id":"sh/k7idkny9","slide":5,"text":"Pipeline, konversi, distribusi perusahaan, tren pelamar, dan action center.","textPreview":"Pipeline, konversi, distribusi perusahaan, tren pelamar, dan action center.","textChars":75,"textLines":1,"bbox":[704,516,470,68]}
+{"kind":"shape","id":"sh/l8retsfe","slide":5,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/y50vidg3","slide":5,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/z69wrixo","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/v5mgbr","slide":5,"text":""}
+{"kind":"slide","id":"sl/2gp6lz","slide":6,"title":"NILAI BAGI PENGGUNA","textShapes":13}
+{"kind":"textbox","id":"sh/nix036hw","slide":6,"text":"NILAI BAGI PENGGUNA","textPreview":"NILAI BAGI PENGGUNA","textChars":19,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/oj61wryh","slide":6,"text":"Setiap peran melihat informasi yang relevan untuk pekerjaannya","textPreview":"Setiap peran melihat informasi yang relevan untuk pekerjaannya","textChars":62,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"shape","id":"sh/9kfi5wz2","slide":6,"bbox":[72,245,342,300]}
+{"kind":"shape","id":"sh/et4jqhgf","slide":6,"bbox":[72,245,342,10]}
+{"kind":"textbox","id":"sh/zux0zmh0","slide":6,"text":"HR / Admin","textPreview":"HR / Admin","textChars":10,"textLines":1,"bbox":[100,285,285,45]}
+{"kind":"textbox","id":"sh/0f61sryl","slide":6,"text":"Mengelola data, jadwal, hasil, komunikasi, dan tindak lanjut kandidat.","textPreview":"Mengelola data, jadwal, hasil, komunikasi, dan tindak lanjut kandidat.","textChars":70,"textLines":1,"bbox":[100,350,285,125]}
+{"kind":"textbox","id":"sh/1gfi1wzq","slide":6,"text":"Kecepatan operasional","textPreview":"Kecepatan operasional","textChars":21,"textLines":1,"bbox":[100,490,285,35]}
+{"kind":"shape","id":"sh/qp4jmh03","slide":6,"bbox":[450,245,342,300]}
+{"kind":"shape","id":"sh/rqd0v2ho","slide":6,"bbox":[450,245,342,10]}
+{"kind":"textbox","id":"sh/va9o72to","slide":6,"text":"Manajemen","textPreview":"Manajemen","textChars":9,"textLines":1,"bbox":[478,285,285,45]}
+{"kind":"textbox","id":"sh/u907exc3","slide":6,"text":"Melihat kesehatan pipeline, konversi, keputusan akhir, dan pekerjaan yang tertunda.","textPreview":"Melihat kesehatan pipeline, konversi, keputusan akhir, dan pekerjaan yang tertunda.","textChars":83,"textLines":1,"bbox":[478,350,285,125]}
+{"kind":"textbox","id":"sh/hcrq9cbe","slide":6,"text":"Kualitas keputusan","textPreview":"Kualitas keputusan","textChars":18,"textLines":1,"bbox":[478,490,285,35]}
+{"kind":"shape","id":"sh/gbipg7u9","slide":6,"bbox":[828,245,342,300]}
+{"kind":"shape","id":"sh/3e98bmtk","slide":6,"bbox":[828,245,342,10]}
+{"kind":"textbox","id":"sh/id07ihcz","slide":6,"text":"Kandidat","textPreview":"Kandidat","textChars":8,"textLines":1,"bbox":[856,285,285,45]}
+{"kind":"textbox","id":"sh/5gbqdcbq","slide":6,"text":"Mengisi data melalui token aman dan mengikuti informasi tahapan secara lebih jelas.","textPreview":"Mengisi data melalui token aman dan mengikuti informasi tahapan secara lebih jelas.","textChars":83,"textLines":1,"bbox":[856,350,285,125]}
+{"kind":"textbox","id":"sh/4fipkru5","slide":6,"text":"Transparansi proses","textPreview":"Transparansi proses","textChars":19,"textLines":1,"bbox":[856,490,285,35]}
+{"kind":"shape","id":"sh/jipozidg","slide":6,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/yhg76dcv","slide":6,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/md4relwj","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/2gp6lz","slide":6,"text":""}
+{"kind":"slide","id":"sl/jduo4p","slide":7,"title":"KEAMANAN & TATA KELOLA","textShapes":22}
+{"kind":"textbox","id":"sh/w7m54nm9","slide":7,"text":"KEAMANAN & TATA KELOLA","textPreview":"KEAMANAN & TATA KELOLA","textChars":22,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/b6dobilo","slide":7,"text":"Kepercayaan dibangun melalui kontrol, bukan asumsi","textPreview":"Kepercayaan dibangun melalui kontrol, bukan asumsi","textChars":50,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/a54n2d4j","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[72,220,38,38]}
+{"kind":"textbox","id":"sh/lwf6hs36","slide":7,"text":"Company scope","textPreview":"Company scope","textChars":13,"textLines":1,"bbox":[127,220,470,34]}
+{"kind":"textbox","id":"sh/kv6p8nml","slide":7,"text":"Akses kandidat dibatasi sesuai perusahaan akun.","textPreview":"Akses kandidat dibatasi sesuai perusahaan akun.","textChars":47,"textLines":1,"bbox":[127,258,470,60]}
+{"kind":"textbox","id":"sh/jadofil0","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[72,350,38,38]}
+{"kind":"textbox","id":"sh/y9476d4f","slide":7,"text":"Permission khusus","textPreview":"Permission khusus","textChars":17,"textLines":1,"bbox":[127,350,470,34]}
+{"kind":"textbox","id":"sh/t0f6ls32","slide":7,"text":"Operasi sensitif seperti report, export, dan download dibatasi.","textPreview":"Operasi sensitif seperti report, export, dan download dibatasi.","textChars":63,"textLines":1,"bbox":[127,388,470,60]}
+{"kind":"textbox","id":"sh/8z6pc72h","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[72,480,38,38]}
+{"kind":"textbox","id":"sh/29wfulkr","slide":7,"text":"Token terlindungi","textPreview":"Token terlindungi","textChars":17,"textLines":1,"bbox":[127,480,470,34]}
+{"kind":"textbox","id":"sh/nu5wnq1c","slide":7,"text":"Token kandidat disimpan terenkripsi dan memiliki masa berlaku.","textPreview":"Token kandidat disimpan terenkripsi dan memiliki masa berlaku.","textChars":62,"textLines":1,"bbox":[127,518,470,60]}
+{"kind":"textbox","id":"sh/ovexwv2x","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[660,220,38,38]}
+{"kind":"textbox","id":"sh/pw7ep0ji","slide":7,"text":"Audit recruitment","textPreview":"Audit recruitment","textChars":17,"textLines":1,"bbox":[715,220,470,34]}
+{"kind":"textbox","id":"sh/axgfylk3","slide":7,"text":"Perubahan data, raw query, download, dan export meninggalkan jejak.","textPreview":"Perubahan data, raw query, download, dan export meninggalkan jejak.","textChars":67,"textLines":1,"bbox":[715,258,470,60]}
+{"kind":"textbox","id":"sh/bypwrq1o","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[660,350,38,38]}
+{"kind":"textbox","id":"sh/czyx0v2t","slide":7,"text":"Workflow validation","textPreview":"Workflow validation","textChars":19,"textLines":1,"bbox":[715,350,470,34]}
+{"kind":"textbox","id":"sh/x07et0je","slide":7,"text":"Perpindahan tahap dicegah jika tidak sesuai urutan proses.","textPreview":"Perpindahan tahap dicegah jika tidak sesuai urutan proses.","textChars":58,"textLines":1,"bbox":[715,388,470,60]}
+{"kind":"textbox","id":"sh/q1cvm1kj","slide":7,"text":"✓","textPreview":"✓","textChars":1,"textLines":1,"bbox":[660,480,38,38]}
+{"kind":"textbox","id":"sh/r2lwf6l4","slide":7,"text":"File protection","textPreview":"File protection","textChars":15,"textLines":1,"bbox":[715,480,470,34]}
+{"kind":"textbox","id":"sh/v61cn21w","slide":7,"text":"Validasi file, endpoint download terkontrol, dan dukungan malware scanning.","textPreview":"Validasi file, endpoint download terkontrol, dan dukungan malware scanning.","textChars":75,"textLines":1,"bbox":[715,518,470,60]}
+{"kind":"shape","id":"sh/u5sbex0b","slide":7,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/h8jupcz2","slide":7,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/w7atg7ih","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/jduo4p","slide":7,"text":""}
+{"kind":"slide","id":"sl/pxbuda","slide":8,"title":"INSIGHT YANG BERNILAI","textShapes":19}
+{"kind":"textbox","id":"sh/gfq9czyl","slide":8,"text":"INSIGHT YANG BERNILAI","textPreview":"INSIGHT YANG BERNILAI","textChars":21,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/feh8juhg","slide":8,"text":"Dashboard mengarahkan perhatian, bukan sekadar menampilkan angka","textPreview":"Dashboard mengarahkan perhatian, bukan sekadar menampilkan angka","textChars":64,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"shape","id":"sh/ed87ap0v","slide":8,"bbox":[72,225,680,360]}
+{"kind":"textbox","id":"sh/tczqhkza","slide":8,"text":"Pipeline recruitment","textPreview":"Pipeline recruitment","textChars":20,"textLines":1,"bbox":[104,255,350,40]}
+{"kind":"textbox","id":"sh/sbqp8zip","slide":8,"text":"Total pelamar","textPreview":"Total pelamar","textChars":13,"textLines":1,"bbox":[104,335,180,28]}
+{"kind":"textbox","id":"sh/7qh8fuh4","slide":8,"text":"—","textPreview":"—","textChars":1,"textLines":1,"bbox":[104,372,180,55]}
+{"kind":"textbox","id":"sh/6p876p0j","slide":8,"text":"Basis kandidat","textPreview":"Basis kandidat","textChars":14,"textLines":1,"bbox":[104,430,180,24]}
+{"kind":"textbox","id":"sh/d83qtoze","slide":8,"text":"Masuk interview","textPreview":"Masuk interview","textChars":15,"textLines":1,"bbox":[310,335,180,28]}
+{"kind":"textbox","id":"sh/c7a9kjyt","slide":8,"text":"—","textPreview":"—","textChars":1,"textLines":1,"bbox":[310,372,180,55]}
+{"kind":"textbox","id":"sh/2hwfi9gv","slide":8,"text":"Progress seleksi","textPreview":"Progress seleksi","textChars":16,"textLines":1,"bbox":[310,430,180,24]}
+{"kind":"textbox","id":"sh/3i5grexg","slide":8,"text":"Kandidat lolos","textPreview":"Kandidat lolos","textChars":14,"textLines":1,"bbox":[516,335,180,28]}
+{"kind":"textbox","id":"sh/4jexkjy1","slide":8,"text":"—","textPreview":"—","textChars":1,"textLines":1,"bbox":[516,372,180,55]}
+{"kind":"textbox","id":"sh/p4nytofm","slide":8,"text":"Conversion rate","textPreview":"Conversion rate","textChars":15,"textLines":1,"bbox":[516,430,180,24]}
+{"kind":"textbox","id":"sh/udcfe9gz","slide":8,"text":"Pertanyaan yang dijawab","textPreview":"Pertanyaan yang dijawab","textChars":23,"textLines":1,"bbox":[810,230,370,38]}
+{"kind":"shape","id":"sh/felgnux4","slide":8,"bbox":[810,300,10,10]}
+{"kind":"textbox","id":"sh/gfexgzyp","slide":8,"text":"Di tahap mana kandidat menumpuk?","textPreview":"Di tahap mana kandidat menumpuk?","textChars":32,"textLines":1,"bbox":[834,292,346,48]}
+{"kind":"shape","id":"sh/hgnyp4fa","slide":8,"bbox":[810,365,10,10]}
+{"kind":"textbox","id":"sh/e9gzqtg3","slide":8,"text":"Berapa kandidat yang mencapai keputusan akhir?","textPreview":"Berapa kandidat yang mencapai keputusan akhir?","textChars":46,"textLines":1,"bbox":[834,357,346,48]}
+{"kind":"shape","id":"sh/zapgzyxo","slide":8,"bbox":[810,430,10,10]}
+{"kind":"textbox","id":"sh/behcbqd0","slide":8,"text":"Apa yang harus ditindaklanjuti hari ini?","textPreview":"Apa yang harus ditindaklanjuti hari ini?","textChars":40,"textLines":1,"bbox":[834,422,346,48]}
+{"kind":"shape","id":"sh/at8vilwf","slide":8,"bbox":[810,495,10,10]}
+{"kind":"textbox","id":"sh/xgjud0v6","slide":8,"text":"Perusahaan mana yang memiliki kebutuhan terbesar?","textPreview":"Perusahaan mana yang memiliki kebutuhan terbesar?","textChars":49,"textLines":1,"bbox":[834,487,346,48]}
+{"kind":"shape","id":"sh/wfqdkvel","slide":8,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/ji1cfadw","slide":8,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/yhsvm5wr","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/pxbuda","slide":8,"text":""}
+{"kind":"slide","id":"sl/hdkik4","slide":9,"title":"KETAHANAN OPERASIONAL","textShapes":24}
+{"kind":"textbox","id":"sh/zudsf2pw","slide":9,"text":"KETAHANAN OPERASIONAL","textPreview":"KETAHANAN OPERASIONAL","textChars":21,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/0vmt87qh","slide":9,"text":"Negative flow diperlakukan sebagai bagian dari desain sistem","textPreview":"Negative flow diperlakukan sebagai bagian dari desain sistem","textChars":60,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/1wfahc72","slide":9,"text":"RISIKO","textPreview":"RISIKO","textChars":6,"textLines":1,"bbox":[90,220,400,30]}
+{"kind":"textbox","id":"sh/qp4r2x8f","slide":9,"text":"RESPONS SISTEM","textPreview":"RESPONS SISTEM","textChars":14,"textLines":1,"bbox":[650,220,470,30]}
+{"kind":"shape","id":"sh/rqdsb2p0","slide":9,"bbox":[72,313,1136,1]}
+{"kind":"textbox","id":"sh/crm947ql","slide":9,"text":"Akses lintas perusahaan","textPreview":"Akses lintas perusahaan","textChars":23,"textLines":1,"bbox":[90,265,470,46]}
+{"kind":"textbox","id":"sh/dsvads76","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,265,40,46]}
+{"kind":"textbox","id":"sh/21kryd83","slide":9,"text":"Ditolak oleh company scope dan policy","textPreview":"Ditolak oleh company scope dan policy","textChars":37,"textLines":1,"bbox":[650,265,500,46]}
+{"kind":"shape","id":"sh/32ts7ipo","slide":9,"bbox":[72,371,1136,1]}
+{"kind":"textbox","id":"sh/jm5wnixs","slide":9,"text":"Tahap dilewati","textPreview":"Tahap dilewati","textChars":14,"textLines":1,"bbox":[90,323,470,46]}
+{"kind":"textbox","id":"sh/i1cfudw7","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,323,40,46]}
+{"kind":"textbox","id":"sh/5onepsfy","slide":9,"text":"Ditolak oleh validasi workflow","textPreview":"Ditolak oleh validasi workflow","textChars":30,"textLines":1,"bbox":[650,323,500,46]}
+{"kind":"shape","id":"sh/4nexwned","slide":9,"bbox":[72,429,1136,1]}
+{"kind":"textbox","id":"sh/rq5wr2xo","slide":9,"text":"Queue gagal / tertunda","textPreview":"Queue gagal / tertunda","textChars":22,"textLines":1,"bbox":[90,381,470,46]}
+{"kind":"textbox","id":"sh/qpwfyxwj","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,381,40,46]}
+{"kind":"textbox","id":"sh/dsnetsfu","slide":9,"text":"Dicatat dan ditampilkan sebagai perhatian","textPreview":"Dicatat dan ditampilkan sebagai perhatian","textChars":41,"textLines":1,"bbox":[650,381,500,46]}
+{"kind":"shape","id":"sh/srex07e9","slide":9,"bbox":[72,487,1136,1]}
+{"kind":"textbox","id":"sh/7u1wfyxk","slide":9,"text":"File berbahaya","textPreview":"File berbahaya","textChars":14,"textLines":1,"bbox":[90,439,470,46]}
+{"kind":"textbox","id":"sh/mtsvmtwz","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,439,40,46]}
+{"kind":"textbox","id":"sh/a1kra5kz","slide":9,"text":"Divalidasi dan disiapkan untuk scanning","textPreview":"Divalidasi dan disiapkan untuk scanning","textChars":39,"textLines":1,"bbox":[650,439,500,46]}
+{"kind":"shape","id":"sh/b2t8jalk","slide":9,"bbox":[72,545,1136,1]}
+{"kind":"textbox","id":"sh/wn29cf25","slide":9,"text":"Export tanpa hak","textPreview":"Export tanpa hak","textChars":16,"textLines":1,"bbox":[90,497,470,46]}
+{"kind":"textbox","id":"sh/xobql03a","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,497,40,46]}
+{"kind":"textbox","id":"sh/mx0r6lkn","slide":9,"text":"Ditolak oleh permission khusus","textPreview":"Ditolak oleh permission khusus","textChars":30,"textLines":1,"bbox":[650,497,500,46]}
+{"kind":"shape","id":"sh/ny98fql8","slide":9,"bbox":[72,603,1136,1]}
+{"kind":"textbox","id":"sh/oz298v2t","slide":9,"text":"Perubahan data sensitif","textPreview":"Perubahan data sensitif","textChars":23,"textLines":1,"bbox":[90,555,470,46]}
+{"kind":"textbox","id":"sh/90bqh03e","slide":9,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[585,555,40,46]}
+{"kind":"textbox","id":"sh/et072lkr","slide":9,"text":"Dicatat dalam audit recruitment","textPreview":"Dicatat dalam audit recruitment","textChars":31,"textLines":1,"bbox":[650,555,500,46]}
+{"kind":"shape","id":"sh/zu98bqlc","slide":9,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/hofuhonu","slide":9,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/gn6t8jm9","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/hdkik4","slide":9,"text":""}
+{"kind":"slide","id":"sl/6c8jw8","slide":10,"title":"DAMPAK YANG DIHARAPKAN","textShapes":19}
+{"kind":"textbox","id":"sh/gvy5g7mh","slide":10,"text":"DAMPAK YANG DIHARAPKAN","textPreview":"DAMPAK YANG DIHARAPKAN","textChars":22,"textLines":1,"bbox":[72,40,600,26]}
+{"kind":"textbox","id":"sh/vup4n25c","slide":10,"text":"Sistem menciptakan standar kerja yang dapat berkembang","textPreview":"Sistem menciptakan standar kerja yang dapat berkembang","textChars":54,"textLines":1,"bbox":[72,78,1136,72]}
+{"kind":"textbox","id":"sh/utwnex4r","slide":10,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[72,215,55,44]}
+{"kind":"textbox","id":"sh/5k7mtcne","slide":10,"text":"Lebih cepat","textPreview":"Lebih cepat","textChars":11,"textLines":1,"bbox":[145,215,240,44]}
+{"kind":"textbox","id":"sh/4jy5k7mt","slide":10,"text":"Data dan status tersedia tanpa konsolidasi manual.","textPreview":"Data dan status tersedia tanpa konsolidasi manual.","textChars":50,"textLines":1,"bbox":[410,215,720,44]}
+{"kind":"textbox","id":"sh/3ip4r258","slide":10,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[72,297,55,44]}
+{"kind":"textbox","id":"sh/ihgnix4n","slide":10,"text":"Lebih konsisten","textPreview":"Lebih konsisten","textChars":15,"textLines":1,"bbox":[145,297,240,44]}
+{"kind":"textbox","id":"sh/dor6xwna","slide":10,"text":"Tahapan dan aturan digunakan sama oleh seluruh pengguna.","textPreview":"Tahapan dan aturan digunakan sama oleh seluruh pengguna.","textChars":56,"textLines":1,"bbox":[410,297,720,44]}
+{"kind":"textbox","id":"sh/sni5ormp","slide":10,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[72,379,55,44]}
+{"kind":"textbox","id":"sh/e1s761sr","slide":10,"text":"Lebih aman","textPreview":"Lebih aman","textChars":10,"textLines":1,"bbox":[145,379,240,44]}
+{"kind":"textbox","id":"sh/z218z69c","slide":10,"text":"Akses, token, dokumen, serta operasi sensitif dikontrol.","textPreview":"Akses, token, dokumen, serta operasi sensitif dikontrol.","textChars":56,"textLines":1,"bbox":[410,379,720,44]}
+{"kind":"textbox","id":"sh/03ap8bax","slide":10,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[72,461,55,44]}
+{"kind":"textbox","id":"sh/14jq1wr2","slide":10,"text":"Lebih terukur","textPreview":"Lebih terukur","textChars":13,"textLines":1,"bbox":[145,461,240,44]}
+{"kind":"textbox","id":"sh/m5s7a1sn","slide":10,"text":"Dashboard dan audit memberi dasar evaluasi proses.","textPreview":"Dashboard dan audit memberi dasar evaluasi proses.","textChars":50,"textLines":1,"bbox":[410,461,720,44]}
+{"kind":"textbox","id":"sh/nql83698","slide":10,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[72,543,55,44]}
+{"kind":"textbox","id":"sh/orupcbat","slide":10,"text":"Lebih skalabel","textPreview":"Lebih skalabel","textChars":14,"textLines":1,"bbox":[145,543,240,44]}
+{"kind":"textbox","id":"sh/9s3q5gre","slide":10,"text":"Queue, pagination, dan struktur multi-perusahaan mendukung pertumbuhan.","textPreview":"Queue, pagination, dan struktur multi-perusahaan mendukung pertumbuhan.","textChars":71,"textLines":1,"bbox":[410,543,720,44]}
+{"kind":"shape","id":"sh/i987yhsj","slide":10,"bbox":[72,680,1136,1]}
+{"kind":"textbox","id":"sh/3ahorm94","slide":10,"text":"SISTEM REKRUTMEN TERINTEGRASI","textPreview":"SISTEM REKRUTMEN TERINTEGRASI","textChars":29,"textLines":1,"bbox":[72,686,500,18]}
+{"kind":"textbox","id":"sh/7ed4zipw","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[1150,686,58,18]}
+{"kind":"notes","id":"nt/6c8jw8","slide":10,"text":""}
+{"kind":"slide","id":"sl/bjetaz","slide":11,"title":"KESIMPULAN","textShapes":5}
+{"kind":"textbox","id":"sh/sva5cvq9","slide":11,"text":"KESIMPULAN","textPreview":"KESIMPULAN","textChars":10,"textLines":1,"bbox":[72,72,360,28]}
+{"kind":"textbox","id":"sh/ru1ojq9o","slide":11,"text":"Satu sistem untuk\nmenjaga setiap kandidat\ntetap terlihat.","textPreview":"Satu sistem untuk | menjaga setiap kandidat | tetap terlihat.","textChars":57,"textLines":3,"bbox":[72,145,900,220]}
+{"kind":"textbox","id":"sh/6tsna583","slide":11,"text":"Tujuan akhirnya bukan hanya mendigitalisasi formulir, tetapi membantu tim rekrutmen bekerja lebih cepat, membuat keputusan lebih baik, dan mempertanggungjawabkan setiap proses.","textPreview":"Tujuan akhirnya bukan hanya mendigitalisasi formulir, tetapi membantu tim rekrutmen bekerja lebih cepat, membuat keputusan lebih baik, da...","textChars":176,"textLines":1,"bbox":[76,415,930,100]}
+{"kind":"shape","id":"sh/5sj6h0ri","slide":11,"bbox":[76,570,420,3]}
+{"kind":"textbox","id":"sh/4ra58vqx","slide":11,"text":"Langkah berikutnya: gunakan data dashboard untuk evaluasi rutin dan peningkatan proses seleksi.","textPreview":"Langkah berikutnya: gunakan data dashboard untuk evaluasi rutin dan peningkatan proses seleksi.","textChars":95,"textLines":1,"bbox":[76,595,900,55]}
+{"kind":"textbox","id":"sh/j61ofq9c","slide":11,"text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[1130,650,80,24]}
+{"kind":"notes","id":"nt/bjetaz","slide":11,"text":""}

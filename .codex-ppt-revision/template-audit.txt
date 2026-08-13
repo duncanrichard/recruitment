@@ -1,0 +1,1 @@
+Sumber memiliki 11 slide, rasio 16:9, gaya editorial putih dengan aksen indigo-violet, judul besar gelap, footer konsisten, dan struktur master/layout tunggal. Seluruh slide dipertahankan; revisi hanya mengganti teks pada frame yang sudah ada tanpa mengubah posisi, font, warna, atau struktur.

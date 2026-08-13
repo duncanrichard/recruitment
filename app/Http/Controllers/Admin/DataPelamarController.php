@@ -662,6 +662,84 @@ class DataPelamarController extends Controller
         ]);
     }
 
+    public function storePosisiOption(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'nama_posisi' => ['required', 'string', 'max:255', Rule::unique('posisi', 'nama_posisi')],
+        ], [
+            'nama_posisi.unique' => 'Posisi tersebut sudah tersedia. Silakan cari dan pilih dari daftar.',
+        ]);
+
+        $posisi = Posisi::create([
+            'nama_posisi' => trim($validated['nama_posisi']),
+            'deskripsi' => null,
+            'str_aktif' => 'active',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Posisi baru berhasil ditambahkan dan dipilih.',
+            'data' => $posisi,
+        ], 201);
+    }
+
+    public function storePerusahaanOption(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'nama_perusahaan' => ['required', 'string', 'max:255', Rule::unique('data_perusahaan', 'nama_perusahaan')->whereNull('deleted_at')],
+            'no_wa' => ['required', 'string', 'max:30'],
+            'token_api_wa' => ['required', 'string', 'max:500'],
+        ]);
+
+        $noWa = preg_replace('/\D+/', '', $validated['no_wa']);
+        if (Str::startsWith($noWa, '0')) {
+            $noWa = '62'.substr($noWa, 1);
+        }
+        if (! preg_match('/^62\d{8,13}$/', $noWa)) {
+            return response()->json(['success' => false, 'message' => 'Nomor WhatsApp perusahaan tidak valid.'], 422);
+        }
+
+        do {
+            $kode = 'PRS-'.now()->format('ymd').'-'.strtoupper(Str::random(5));
+        } while (DataPerusahaan::where('kode', $kode)->exists());
+
+        $perusahaan = DataPerusahaan::create([
+            'kode' => $kode,
+            'nama_perusahaan' => trim($validated['nama_perusahaan']),
+            'no_wa' => $noWa,
+            'token_api_wa' => trim($validated['token_api_wa']),
+            'created_by' => Auth::id(),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Perusahaan berhasil ditambahkan dan dipilih.', 'data' => $perusahaan->only(['id', 'kode', 'nama_perusahaan', 'no_wa'])], 201);
+    }
+
+    public function storeSimpleOption(Request $request, string $type): JsonResponse
+    {
+        $definitions = [
+            'sumber-informasi' => [SumberInformasi::class, 'sumber_informasi', 'informasi'],
+            'pendidikan' => [Pendidikan::class, 'pendidikan', 'pendidikan'],
+            'agama' => [Agama::class, 'agama', 'agama'],
+            'kewarganegaraan' => [Kewarganegaraan::class, 'kewarganegaraan', 'kewarganegaraan'],
+            'status-pernikahan' => [StatusPernikahan::class, 'status_pernikahan', 'status_pernikahan'],
+        ];
+
+        abort_unless(isset($definitions[$type]), 404);
+        [$model, $table, $field] = $definitions[$type];
+        $unique = Rule::unique($table, $field);
+        if (Schema::hasColumn($table, 'deleted_at')) {
+            $unique->whereNull('deleted_at');
+        }
+        $validated = $request->validate([$field => ['required', 'string', 'max:255', $unique]]);
+        $payload = [$field => trim($validated[$field])];
+        if (Schema::hasColumn($table, 'created_by')) {
+            $payload['created_by'] = Auth::id();
+        }
+        $option = $model::create($payload);
+
+        return response()->json(['success' => true, 'message' => 'Data baru berhasil ditambahkan dan dipilih.', 'data' => $option], 201);
+    }
+
     public function perusahaanList(): JsonResponse
     {
         $query = DataPerusahaan::query()
@@ -678,7 +756,6 @@ class DataPelamarController extends Controller
             'kode',
             'nama_perusahaan',
             'no_wa',
-            'token_api_wa',
         ]);
 
         return response()->json([

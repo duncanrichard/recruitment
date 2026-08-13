@@ -212,6 +212,49 @@ export default function DataPelamarPage({
         }
     };
 
+    const createPosisiOption = async (namaPosisi) => {
+        const response = await fetch("/admin/data-pelamar/posisi/options", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+                "X-CSRF-TOKEN": getCsrfToken(),
+            },
+            body: JSON.stringify({ nama_posisi: namaPosisi }),
+        });
+        const result = await parseJsonResponse(response);
+        if (!response.ok || !result.success) {
+            throw new Error(
+                Object.values(result.errors || {})?.flat()?.[0] ||
+                result.message ||
+                "Posisi gagal ditambahkan."
+            );
+        }
+
+        const newOption = result.data;
+        setDataPosisi((previous) => [...previous, newOption].sort((a, b) =>
+            String(a.nama_posisi || "").localeCompare(String(b.nama_posisi || ""), "id")
+        ));
+        return newOption;
+    };
+
+    const createMasterOption = async ({ endpoint, field, labelField, value, setOptions, extra = {} }) => {
+        const response = await fetch(endpoint, {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "XMLHttpRequest", "X-CSRF-TOKEN": getCsrfToken() },
+            body: JSON.stringify({ [field]: value, ...extra }),
+        });
+        const result = await parseJsonResponse(response);
+        if (!response.ok || !result.success) {
+            throw new Error(Object.values(result.errors || {})?.flat()?.[0] || result.message || "Data gagal ditambahkan.");
+        }
+        const option = result.data;
+        setOptions((items) => [...items, option].sort((a, b) => String(a[labelField] || "").localeCompare(String(b[labelField] || ""), "id")));
+        return option;
+    };
+
     const fetchPerusahaan = async () => {
         try {
             const result = await fetchJson(
@@ -1298,6 +1341,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih posisi"
                                             searchPlaceholder="Cari posisi..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={createPosisiOption}
+                                            createLabel="Tambah posisi baru"
                                             required
                                         />
 
@@ -1311,6 +1356,12 @@ export default function DataPelamarPage({
                                             placeholder="Pilih perusahaan"
                                             searchPlaceholder="Cari perusahaan..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(name, extra) => createMasterOption({ endpoint: "/admin/data-pelamar/perusahaan/options", field: "nama_perusahaan", labelField: "nama_perusahaan", value: name, setOptions: setDataPerusahaan, extra })}
+                                            createLabel="Tambah perusahaan baru"
+                                            createFields={[
+                                                { name: "no_wa", label: "WhatsApp perusahaan", placeholder: "Contoh: 081234567890" },
+                                                { name: "token_api_wa", label: "Token API WhatsApp", placeholder: "Masukkan token API", type: "password" },
+                                            ]}
                                             required
                                         />
 
@@ -1324,6 +1375,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih sumber informasi"
                                             searchPlaceholder="Cari sumber informasi..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(value) => createMasterOption({ endpoint: "/admin/data-pelamar/sumber-informasi/options", field: "informasi", labelField: "informasi", value, setOptions: setDataSumberInformasi })}
+                                            createLabel="Tambah sumber informasi"
                                             required
                                         />
                                     </FormSection>
@@ -1409,6 +1462,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih pendidikan"
                                             searchPlaceholder="Cari pendidikan..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(value) => createMasterOption({ endpoint: "/admin/data-pelamar/pendidikan/options", field: "pendidikan", labelField: "pendidikan", value, setOptions: setDataPendidikan })}
+                                            createLabel="Tambah pendidikan"
                                         />
 
                                         <Input
@@ -1437,6 +1492,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih agama"
                                             searchPlaceholder="Cari agama..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(value) => createMasterOption({ endpoint: "/admin/data-pelamar/agama/options", field: "agama", labelField: "agama", value, setOptions: setDataAgama })}
+                                            createLabel="Tambah agama"
                                         />
 
                                         <Select2Single
@@ -1449,6 +1506,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih kewarganegaraan"
                                             searchPlaceholder="Cari kewarganegaraan..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(value) => createMasterOption({ endpoint: "/admin/data-pelamar/kewarganegaraan/options", field: "kewarganegaraan", labelField: "kewarganegaraan", value, setOptions: setDataKewarganegaraan })}
+                                            createLabel="Tambah kewarganegaraan"
                                         />
 
                                         <Select2Single
@@ -1461,6 +1520,8 @@ export default function DataPelamarPage({
                                             placeholder="Pilih status pernikahan"
                                             searchPlaceholder="Cari status pernikahan..."
                                             onChange={handleSelectChange}
+                                            onCreateOption={(value) => createMasterOption({ endpoint: "/admin/data-pelamar/status-pernikahan/options", field: "status_pernikahan", labelField: "status_pernikahan", value, setOptions: setDataStatusPernikahan })}
+                                            createLabel="Tambah status pernikahan"
                                         />
 
                                         <Input
@@ -2202,12 +2263,18 @@ function Select2Single({
     searchPlaceholder = "Cari data...",
     onChange,
     required = false,
+    onCreateOption = null,
+    createLabel = "Tambah data baru",
+    createFields = [],
 }) {
     const wrapperRef = useRef(null);
     const searchInputRef = useRef(null);
 
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState("");
+    const [createValues, setCreateValues] = useState({});
 
     const selectedOption = useMemo(() => {
         return options.find(
@@ -2224,6 +2291,11 @@ function Select2Single({
                 .includes(keyword)
         );
     }, [options, optionLabel, search]);
+
+    const normalizedSearch = search.trim().toLowerCase();
+    const exactOptionExists = options.some(
+        (item) => String(item[optionLabel] || "").trim().toLowerCase() === normalizedSearch
+    );
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -2261,6 +2333,27 @@ function Select2Single({
         e.stopPropagation();
         onChange(name, "");
         setSearch("");
+    };
+
+    const handleCreate = async () => {
+        const label = search.trim();
+        if (!label || !onCreateOption || creating) return;
+        setCreating(true);
+        setCreateError("");
+        try {
+            const missingField = createFields.find((field) => !String(createValues[field.name] || "").trim());
+            if (missingField) {
+                setCreateError(`${missingField.label} wajib diisi.`);
+                return;
+            }
+            const created = await onCreateOption(label, createValues);
+            handleSelect(created[optionValue]);
+            setCreateValues({});
+        } catch (error) {
+            setCreateError(error.message || "Data gagal ditambahkan.");
+        } finally {
+            setCreating(false);
+        }
     };
 
     return (
@@ -2323,14 +2416,20 @@ function Select2Single({
                             ref={searchInputRef}
                             type="text"
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => { setSearch(e.target.value); setCreateError(""); }}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && onCreateOption && normalizedSearch && !exactOptionExists) {
+                                    e.preventDefault();
+                                    handleCreate();
+                                }
+                            }}
                             placeholder={searchPlaceholder}
                             className="w-full rounded-xl border border-teal-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-teal-50"
                         />
                     </div>
 
                     <div className="max-h-60 overflow-y-auto py-2">
-                        {filteredOptions.length > 0 ? (
+                        {filteredOptions.length > 0 && (
                             filteredOptions.map((item) => {
                                 const itemValue = item[optionValue];
                                 const isSelected =
@@ -2353,11 +2452,44 @@ function Select2Single({
                                     </button>
                                 );
                             })
-                        ) : (
-                            <div className="px-4 py-5 text-center text-sm font-bold text-slate-400">
-                                Data tidak ditemukan
+                        )}
+
+                        {onCreateOption && normalizedSearch && !exactOptionExists && (
+                            <div className="mx-2 mt-1 rounded-xl border border-violet-200 bg-violet-50 p-2">
+                                {createFields.map((field) => (
+                                    <label key={field.name} className="mb-2 block text-xs font-bold text-slate-600">
+                                        {field.label}
+                                        <input
+                                            type={field.type || "text"}
+                                            value={createValues[field.name] || ""}
+                                            onChange={(event) => setCreateValues((values) => ({ ...values, [field.name]: event.target.value }))}
+                                            placeholder={field.placeholder}
+                                            className="mt-1 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500"
+                                        />
+                                    </label>
+                                ))}
+                                <button
+                                type="button"
+                                disabled={creating}
+                                onClick={handleCreate}
+                                className="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-left text-sm font-black text-white transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60"
+                            >
+                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 text-lg">+</span>
+                                <span className="min-w-0 flex-1">
+                                    {creating ? "Menambahkan..." : `${createLabel} “${search.trim()}”`}
+                                    <span className="mt-0.5 block text-xs font-semibold text-indigo-100">Simpan dan langsung pilih</span>
+                                </span>
+                            </button>
                             </div>
                         )}
+
+                        {!filteredOptions.length && (!onCreateOption || !normalizedSearch) && (
+                            <div className="px-4 py-5 text-center text-sm font-bold text-slate-400">
+                                {normalizedSearch ? "Data tidak ditemukan" : "Ketik untuk mencari data"}
+                            </div>
+                        )}
+
+                        {createError && <p className="mx-3 my-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">{createError}</p>}
                     </div>
                 </div>
             )}

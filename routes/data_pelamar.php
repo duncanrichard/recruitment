@@ -24,9 +24,24 @@ Route::prefix('admin')
             ->middleware('permission:admin.data-pelamar.list')
             ->name('data-pelamar.posisi.list');
 
+        Route::post('/data-pelamar/posisi/options', [DataPelamarController::class, 'storePosisiOption'])
+            ->middleware('permission:admin.master-data.posisi.store')
+            ->name('data-pelamar.posisi.options.store');
+
         Route::get('/data-pelamar/perusahaan/list', [DataPelamarController::class, 'perusahaanList'])
             ->middleware('permission:admin.data-pelamar.list')
             ->name('data-pelamar.perusahaan.list');
+
+        Route::post('/data-pelamar/perusahaan/options', [DataPelamarController::class, 'storePerusahaanOption'])
+            ->middleware('permission:admin.master-data.perusahaan.store')
+            ->name('data-pelamar.perusahaan.options.store');
+
+        foreach (['sumber-informasi', 'pendidikan', 'agama', 'kewarganegaraan', 'status-pernikahan'] as $optionType) {
+            Route::post("/data-pelamar/{$optionType}/options", [DataPelamarController::class, 'storeSimpleOption'])
+                ->defaults('type', $optionType)
+                ->middleware("permission:admin.master-data.{$optionType}.store")
+                ->name("data-pelamar.{$optionType}.options.store");
+        }
 
         Route::get('/data-pelamar/pendidikan/list', [DataPelamarController::class, 'pendidikanList'])
             ->middleware('permission:admin.data-pelamar.list')
