@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 export default function JadwalInterviewPage({ actionSignals }) {
     const [dataJadwalInterview, setDataJadwalInterview] = useState([]);
     const [dataInterviewers, setDataInterviewers] = useState([]);
+    const [dataJabatan, setDataJabatan] = useState([]);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -138,6 +139,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
 
             if (result.success) {
                 setDataInterviewers(result.data || []);
+                setDataJabatan(result.meta?.jabatan || []);
             } else {
                 alert(result.message || "Gagal mengambil data interviewer.");
             }
@@ -145,6 +147,31 @@ export default function JadwalInterviewPage({ actionSignals }) {
             console.error("Gagal mengambil data interviewer:", error);
             alert("Terjadi kesalahan saat mengambil data interviewer.");
         }
+    };
+
+    const postJson = async (url, payload) => {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-TOKEN": getCsrfToken() },
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(Object.values(result.errors || {})?.flat()?.[0] || result.message || "Data gagal ditambahkan.");
+        }
+        return result.data;
+    };
+
+    const createJabatan = async (nama) => {
+        const item = await postJson("/admin/master-data/jabatan", { nama });
+        setDataJabatan((items) => [...items, item].sort((a, b) => a.nama.localeCompare(b.nama, "id")));
+        return item;
+    };
+
+    const createInterviewer = async ({ nama, no_wa, jabatan_id }) => {
+        const item = await postJson("/admin/rangkaian-interview/interviewer", { nama, no_wa, jabatan_id, divisi_id: null });
+        setDataInterviewers((items) => [...items, item].sort((a, b) => a.nama.localeCompare(b.nama, "id")));
+        return item;
     };
 
     useEffect(() => {
@@ -706,6 +733,9 @@ export default function JadwalInterviewPage({ actionSignals }) {
                                     onChange={handleInterviewerChange}
                                     placeholder="Pilih interviewer..."
                                     required
+                                    jabatanOptions={dataJabatan}
+                                    onCreateJabatan={createJabatan}
+                                    onCreateInterviewer={createInterviewer}
                                 />
 
                                 <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs font-bold leading-5 text-slate-500">
@@ -810,12 +840,19 @@ function Select2Multi({
     onChange,
     placeholder = "Pilih data...",
     required = false,
+    jabatanOptions = [],
+    onCreateJabatan,
+    onCreateInterviewer,
 }) {
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
 
     const [open, setOpen] = useState(false);
     const [keyword, setKeyword] = useState("");
+    const [newNoWa, setNewNoWa] = useState("");
+    const [newJabatanId, setNewJabatanId] = useState("");
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState("");
 
     const selectedOptions = useMemo(() => {
         return options.filter((item) => value.includes(item.id));
@@ -826,13 +863,37 @@ function Select2Multi({
 
         return options.filter((item) => {
             const isSelected = value.includes(item.id);
-            const matchKeyword = String(item.nama || "")
-                .toLowerCase()
-                .includes(lowerKeyword);
+            const searchableText = [
+                item.nama,
+                item.no_wa,
+                item.jabatan?.nama,
+                item.divisi?.nama,
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+            const matchKeyword = searchableText.includes(lowerKeyword);
 
             return !isSelected && matchKeyword;
         });
     }, [options, value, keyword]);
+
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const exactInterviewer = options.some((item) => String(item.nama || "").trim().toLowerCase() === normalizedKeyword);
+
+    const handleCreateInterviewer = async () => {
+        if (!keyword.trim() || !newNoWa.trim() || !newJabatanId || creating) {
+            setCreateError("Nama, nomor WhatsApp, dan jabatan wajib diisi.");
+            return;
+        }
+        setCreating(true); setCreateError("");
+        try {
+            const item = await onCreateInterviewer({ nama: keyword.trim(), no_wa: newNoWa.trim(), jabatan_id: newJabatanId });
+            onChange([...value, item.id]);
+            setKeyword(""); setNewNoWa(""); setNewJabatanId("");
+        } catch (error) { setCreateError(error.message || "Interviewer gagal ditambahkan."); }
+        finally { setCreating(false); }
+    };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -908,7 +969,14 @@ function Select2Multi({
                             key={item.id}
                             className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700"
                         >
-                            {item.nama}
+                            <span>
+                                <span className="block">{item.nama}</span>
+                                {(item.jabatan?.nama || item.divisi?.nama) && (
+                                    <span className="mt-0.5 block text-[10px] font-bold text-teal-600/80">
+                                        {[item.jabatan?.nama, item.divisi?.nama].filter(Boolean).join(" • ")}
+                                    </span>
+                                )}
+                            </span>
 
                             <button
                                 type="button"
@@ -959,7 +1027,7 @@ function Select2Multi({
 
             {open && (
                 <div className="absolute z-[70] mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-                    {availableOptions.length > 0 ? (
+                    {availableOptions.length > 0 && (
                         availableOptions.map((item) => (
                             <button
                                 key={item.id}
@@ -967,15 +1035,34 @@ function Select2Multi({
                                 onClick={() => handleSelect(item.id)}
                                 className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
                             >
-                                <span>{item.nama}</span>
+                                <span className="min-w-0">
+                                    <span className="block text-slate-800">{item.nama}</span>
+                                    <span className="mt-1 block text-xs font-semibold text-slate-400">
+                                        {[item.jabatan?.nama || "Jabatan belum diisi", item.divisi?.nama || "Divisi belum diisi"].join(" • ")}
+                                    </span>
+                                    {item.no_wa && <span className="mt-0.5 block text-xs font-semibold text-teal-600">WA: {item.no_wa}</span>}
+                                </span>
                                 <span className="text-xs text-slate-400">＋</span>
                             </button>
                         ))
-                    ) : (
+                    )}
+                    {!availableOptions.length && (!normalizedKeyword || exactInterviewer) && (
                         <div className="px-4 py-6 text-center text-sm font-bold text-slate-400">
                             {options.length === 0
                                 ? "Belum ada data interviewer"
                                 : "Data tidak ditemukan"}
+                        </div>
+                    )}
+                    {normalizedKeyword && !exactInterviewer && onCreateInterviewer && (
+                        <div className="mt-2 space-y-3 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+                            <div>
+                                <p className="text-sm font-black text-violet-900">Tambah “{keyword.trim()}” sebagai interviewer</p>
+                                <p className="mt-1 text-xs font-semibold text-violet-600">Lengkapi data berikut, lalu interviewer langsung dipilih.</p>
+                            </div>
+                            <input type="text" inputMode="tel" value={newNoWa} onChange={(event) => { setNewNoWa(event.target.value); setCreateError(""); }} placeholder="No. WhatsApp, contoh 081234567890" className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-sm font-bold outline-none focus:border-violet-500" />
+                            <InlineJabatanSelect value={newJabatanId} onChange={setNewJabatanId} options={jabatanOptions} onCreate={onCreateJabatan} />
+                            <button type="button" disabled={creating} onClick={handleCreateInterviewer} className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-black text-white disabled:opacity-60">{creating ? "Menyimpan interviewer..." : "+ Simpan dan pilih interviewer"}</button>
+                            {createError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">{createError}</p>}
                         </div>
                     )}
                 </div>
@@ -993,4 +1080,29 @@ function Select2Multi({
             )}
         </div>
     );
+}
+
+function InlineJabatanSelect({ value, onChange, options, onCreate }) {
+    const [search, setSearch] = useState("");
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
+    const normalized = search.trim().toLowerCase();
+    const exact = options.some((item) => String(item.nama || "").trim().toLowerCase() === normalized);
+    const filtered = options.filter((item) => String(item.nama || "").toLowerCase().includes(normalized));
+    const create = async () => {
+        if (!normalized || creating) return;
+        setCreating(true); setError("");
+        try { const item = await onCreate(search.trim()); onChange(item.id); setSearch(""); }
+        catch (exception) { setError(exception.message || "Jabatan gagal ditambahkan."); }
+        finally { setCreating(false); }
+    };
+    return <div className="rounded-xl border border-violet-200 bg-white p-2">
+        <input value={search} onChange={(event) => { setSearch(event.target.value); setError(""); }} onKeyDown={(event) => { if (event.key === "Enter" && normalized && !exact) { event.preventDefault(); create(); } }} placeholder="Cari atau tambah jabatan..." className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-violet-500" />
+        <div className="mt-1 max-h-32 overflow-y-auto">
+            {filtered.map((item) => <button key={item.id} type="button" onClick={() => { onChange(item.id); setSearch(""); }} className={`block w-full rounded-lg px-3 py-2 text-left text-sm font-bold ${String(value) === String(item.id) ? "bg-violet-600 text-white" : "text-slate-700 hover:bg-violet-50"}`}>{item.nama}</button>)}
+            {normalized && !exact && <button type="button" disabled={creating} onClick={create} className="mt-1 block w-full rounded-lg bg-violet-100 px-3 py-2 text-left text-sm font-black text-violet-700">{creating ? "Menambahkan..." : `+ Tambah jabatan “${search.trim()}”`}</button>}
+        </div>
+        {value && <p className="mt-1 px-2 text-xs font-bold text-emerald-600">Jabatan terpilih: {options.find((item) => String(item.id) === String(value))?.nama}</p>}
+        {error && <p className="mt-1 px-2 text-xs font-bold text-rose-600">{error}</p>}
+    </div>;
 }

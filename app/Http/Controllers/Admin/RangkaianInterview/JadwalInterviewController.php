@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\RangkaianInterview;
 
 use App\Http\Controllers\Controller;
 use App\Models\Interviewer;
+use App\Models\Jabatan;
 use App\Models\JadwalInterview;
 use App\Models\JadwalInterviewKandidat;
 use Carbon\Carbon;
@@ -77,7 +78,11 @@ class JadwalInterviewController extends Controller
     public function interviewers()
     {
         $data = Interviewer::query()
-            ->select('id', 'nama')
+            ->with([
+                'jabatan:id,nama',
+                'divisi:id,nama',
+            ])
+            ->select('id', 'nama', 'no_wa', 'jabatan_id', 'divisi_id')
             ->orderBy('nama', 'asc')
             ->get();
 
@@ -85,6 +90,9 @@ class JadwalInterviewController extends Controller
             'success' => true,
             'message' => 'Data interviewer berhasil diambil.',
             'data' => $data,
+            'meta' => [
+                'jabatan' => Jabatan::query()->select('id', 'nama')->orderBy('nama')->get(),
+            ],
         ]);
     }
 

@@ -246,6 +246,42 @@ export default function InterviewerPage({ actionSignals }) {
         }));
     };
 
+    const createJabatan = async (nama) => {
+        const response = await fetch("/admin/master-data/jabatan", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+            },
+            body: JSON.stringify({ nama }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(Object.values(result.errors || {})?.flat()?.[0] || result.message || "Jabatan gagal ditambahkan.");
+        }
+        setDataJabatan((items) => [...items, result.data].sort((a, b) => a.nama.localeCompare(b.nama, "id")));
+        return result.data;
+    };
+
+    const createDivisi = async (nama) => {
+        const response = await fetch("/admin/master-data/divisi", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                "X-CSRF-TOKEN": getCsrfToken(),
+            },
+            body: JSON.stringify({ nama }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(Object.values(result.errors || {})?.flat()?.[0] || result.message || "Divisi gagal ditambahkan.");
+        }
+        setDataDivisi((items) => [...items, result.data].sort((a, b) => a.nama.localeCompare(b.nama, "id")));
+        return result.data;
+    };
+
     const closeModal = () => {
         setModalOpen(false);
         resetForm();
@@ -603,8 +639,8 @@ export default function InterviewerPage({ actionSignals }) {
                             </div>
                         </div>
 
-                        <form onSubmit={handleSubmit}>
-                            <div className="space-y-5 px-6 py-6">
+                        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-6 pb-10 [scrollbar-gutter:stable]">
                                 <Input
                                     label="Nama Interviewer"
                                     name="nama"
@@ -625,22 +661,24 @@ export default function InterviewerPage({ actionSignals }) {
                                     inputMode="numeric"
                                 />
 
-                                <SelectInput
+                                <Select2Creatable
                                     label="Jabatan"
-                                    name="jabatan_id"
                                     value={form.jabatan_id}
-                                    onChange={handleChange}
+                                    onChange={(value) => setForm((current) => ({ ...current, jabatan_id: value }))}
                                     options={dataJabatan}
                                     placeholder="Pilih jabatan"
+                                    onCreate={createJabatan}
                                 />
 
-                                <SelectInput
+                                <Select2Creatable
                                     label="Divisi"
-                                    name="divisi_id"
                                     value={form.divisi_id}
-                                    onChange={handleChange}
+                                    onChange={(value) => setForm((current) => ({ ...current, divisi_id: value }))}
                                     options={dataDivisi}
                                     placeholder="Pilih divisi"
+                                    onCreate={createDivisi}
+                                    searchPlaceholder="Cari atau tambah divisi..."
+                                    createLabel="Tambah divisi"
                                 />
                             </div>
 
@@ -781,6 +819,59 @@ function SelectInput({
                     </option>
                 ))}
             </select>
+        </div>
+    );
+}
+
+function Select2Creatable({ label, value, onChange, options, placeholder, onCreate, searchPlaceholder = "Cari atau tambah jabatan...", createLabel = "Tambah jabatan" }) {
+    const wrapperRef = useRef(null);
+    const inputRef = useRef(null);
+    const [open, setOpen] = useState(false);
+    const [keyword, setKeyword] = useState("");
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
+    const selected = options.find((item) => String(item.id) === String(value));
+    const normalized = keyword.trim().toLowerCase();
+    const filtered = options.filter((item) => String(item.nama || "").toLowerCase().includes(normalized));
+    const exact = options.some((item) => String(item.nama || "").trim().toLowerCase() === normalized);
+
+    useEffect(() => {
+        const close = (event) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+                setOpen(false);
+                setKeyword("");
+            }
+        };
+        document.addEventListener("mousedown", close);
+        return () => document.removeEventListener("mousedown", close);
+    }, []);
+
+    const create = async () => {
+        if (!normalized || creating) return;
+        setCreating(true); setError("");
+        try {
+            const item = await onCreate(keyword.trim());
+            onChange(item.id); setOpen(false); setKeyword("");
+        } catch (exception) { setError(exception.message || "Data gagal ditambahkan."); }
+        finally { setCreating(false); }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <label className="mb-2 block text-sm font-black text-slate-700">{label}</label>
+            <button type="button" onClick={() => { setOpen((state) => !state); setTimeout(() => inputRef.current?.focus(), 0); }} className={`flex w-full items-center justify-between rounded-2xl border bg-white px-4 py-3 text-sm font-bold shadow-sm ${open ? "border-violet-500 ring-4 ring-violet-100" : "border-slate-200"}`}>
+                <span className={selected ? "text-slate-700" : "text-slate-400"}>{selected?.nama || placeholder}</span>
+                <span className="text-slate-400">⌄</span>
+            </button>
+            {open && <div className="relative z-[80] mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <input ref={inputRef} value={keyword} onChange={(event) => { setKeyword(event.target.value); setError(""); }} onKeyDown={(event) => { if (event.key === "Enter" && normalized && !exact) { event.preventDefault(); create(); } }} placeholder={searchPlaceholder} className="w-full rounded-xl border border-violet-300 px-3 py-2.5 text-sm font-bold outline-none focus:ring-4 focus:ring-violet-100" />
+                <div className="mt-2 max-h-48 overflow-y-auto">
+                    {filtered.map((item) => <button key={item.id} type="button" onClick={() => { onChange(item.id); setOpen(false); setKeyword(""); }} className="block w-full rounded-xl px-3 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-violet-50">{item.nama}</button>)}
+                    {normalized && !exact && <button type="button" disabled={creating} onClick={create} className="mt-1 block w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2.5 text-left text-sm font-black text-white disabled:opacity-60">{creating ? "Menambahkan..." : `+ ${createLabel} “${keyword.trim()}”`}</button>}
+                    {!filtered.length && !normalized && <p className="px-3 py-4 text-center text-sm font-bold text-slate-400">Ketik untuk mencari data</p>}
+                </div>
+                {error && <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">{error}</p>}
+            </div>}
         </div>
     );
 }
