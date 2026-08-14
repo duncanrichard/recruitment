@@ -520,7 +520,7 @@ export default function PermintaanKandidatPage({ actionSignals }) {
                             onChange={(event) =>
                                 setEntriesPerPage(Number(event.target.value))
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         >
                             <option value={5}>5</option>
                             <option value={10}>10</option>
@@ -626,7 +626,7 @@ export default function PermintaanKandidatPage({ actionSignals }) {
                                                 <button
                                                     type="button"
                                                     onClick={() => openDetail(item)}
-                                                    className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-2 text-xs font-black text-teal-700 shadow-sm transition hover:bg-teal-100"
+                                                    className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 shadow-sm transition hover:bg-indigo-100"
                                                 >
                                                     Detail
                                                 </button>
@@ -698,7 +698,7 @@ export default function PermintaanKandidatPage({ actionSignals }) {
                                 onClick={() => setCurrentPage(page)}
                                 className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                     currentPage === page
-                                        ? "bg-teal-600 text-white"
+                                        ? "bg-indigo-600 text-white"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -1017,7 +1017,7 @@ function DetailModal({ item, onClose }) {
                 <div className="border-b border-slate-200 px-6 py-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                            <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                 Detail Permintaan Kandidat
                             </div>
 
@@ -1101,7 +1101,7 @@ function FormModal({ title, children, onClose, onSubmit, loading, submitLabel })
                 <div className="shrink-0 border-b border-slate-200 px-6 py-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                            <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                 Form Permintaan Kandidat
                             </div>
 
@@ -1138,7 +1138,7 @@ function FormModal({ title, children, onClose, onSubmit, loading, submitLabel })
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="rounded-2xl bg-teal-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {loading ? "Menyimpan..." : submitLabel}
                             </button>
@@ -1154,7 +1154,7 @@ function SectionTitle({ title }) {
     return (
         <div>
             <h3 className="text-lg font-black text-slate-950">{title}</h3>
-            <div className="mt-2 h-1 w-12 rounded-full bg-teal-500" />
+            <div className="mt-2 h-1 w-12 rounded-full bg-indigo-500" />
         </div>
     );
 }
@@ -1192,7 +1192,7 @@ function InputField({ label, required = false, className = "", ...props }) {
             <input
                 {...props}
                 required={required}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );
@@ -1209,7 +1209,7 @@ function DateInput({ label, value, onChange }) {
                 type="date"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </label>
     );
@@ -1233,7 +1233,7 @@ function SelectField({
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             >
                 <option value="">{placeholder}</option>
                 {options.map((item) => (
@@ -1258,7 +1258,7 @@ function Textarea({ label, required = false, ...props }) {
                 {...props}
                 required={required}
                 rows={4}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );

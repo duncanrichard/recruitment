@@ -473,7 +473,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
                                 onChange={(event) =>
                                     setEntriesPerPage(Number(event.target.value))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             >
                                 <option value={5}>5</option>
                                 <option value={10}>10</option>
@@ -499,7 +499,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
                                     setSearch(event.target.value)
                                 }
                                 placeholder="Cari jadwal interview..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 md:w-80"
                             />
                         </div>
                     </div>
@@ -650,7 +650,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
                                 onClick={() => setCurrentPage(page)}
                                 className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                     currentPage === page
-                                        ? "bg-teal-600 text-white"
+                                        ? "bg-indigo-600 text-white"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -680,7 +680,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
                         <div className="shrink-0 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
-                                    <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                         Form Jadwal Interview
                                     </div>
 
@@ -757,7 +757,7 @@ export default function JadwalInterviewPage({ actionSignals }) {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {loading
                                             ? "Menyimpan..."
@@ -827,7 +827,7 @@ function Input({
                 required={required}
                 placeholder={placeholder}
                 min={min}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );
@@ -959,7 +959,7 @@ function Select2Multi({
                 }}
                 className={`min-h-[54px] w-full rounded-2xl border bg-white px-3 py-2 shadow-sm transition ${
                     open
-                        ? "border-teal-500 ring-4 ring-teal-100"
+                        ? "border-indigo-500 ring-4 ring-indigo-100"
                         : "border-slate-200"
                 }`}
             >
@@ -967,12 +967,12 @@ function Select2Multi({
                     {selectedOptions.map((item) => (
                         <span
                             key={item.id}
-                            className="inline-flex items-center gap-2 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700"
+                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700"
                         >
                             <span>
                                 <span className="block">{item.nama}</span>
                                 {(item.jabatan?.nama || item.divisi?.nama) && (
-                                    <span className="mt-0.5 block text-[10px] font-bold text-teal-600/80">
+                                    <span className="mt-0.5 block text-[10px] font-bold text-indigo-600/80">
                                         {[item.jabatan?.nama, item.divisi?.nama].filter(Boolean).join(" • ")}
                                     </span>
                                 )}
@@ -984,7 +984,7 @@ function Select2Multi({
                                     event.stopPropagation();
                                     handleRemove(item.id);
                                 }}
-                                className="rounded-full text-sm leading-none text-teal-700 hover:text-rose-600"
+                                className="rounded-full text-sm leading-none text-indigo-700 hover:text-rose-600"
                             >
                                 ×
                             </button>
@@ -1033,14 +1033,14 @@ function Select2Multi({
                                 key={item.id}
                                 type="button"
                                 onClick={() => handleSelect(item.id)}
-                                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
+                                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
                             >
                                 <span className="min-w-0">
                                     <span className="block text-slate-800">{item.nama}</span>
                                     <span className="mt-1 block text-xs font-semibold text-slate-400">
                                         {[item.jabatan?.nama || "Jabatan belum diisi", item.divisi?.nama || "Divisi belum diisi"].join(" • ")}
                                     </span>
-                                    {item.no_wa && <span className="mt-0.5 block text-xs font-semibold text-teal-600">WA: {item.no_wa}</span>}
+                                    {item.no_wa && <span className="mt-0.5 block text-xs font-semibold text-indigo-600">WA: {item.no_wa}</span>}
                                 </span>
                                 <span className="text-xs text-slate-400">＋</span>
                             </button>

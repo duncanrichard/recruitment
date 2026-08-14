@@ -40,7 +40,25 @@ export default function DataPelamarPage({
     const [loadingMessageCandidates, setLoadingMessageCandidates] = useState(false);
     const [messageCandidates, setMessageCandidates] = useState([]);
     const [selectedMessageIds, setSelectedMessageIds] = useState([]);
+    const [messageSearch, setMessageSearch] = useState("");
+    const [messagePage, setMessagePage] = useState(1);
+    const messagePerPage = 20;
     const [alamatSama, setAlamatSama] = useState(false);
+
+    const filteredMessageCandidates = useMemo(() => {
+        const keyword = messageSearch.trim().toLowerCase();
+        if (!keyword) return messageCandidates;
+        return messageCandidates.filter((candidate) => [
+            candidate.nama_lengkap,
+            candidate.email,
+            candidate.no_wa,
+            candidate.posisi?.nama_posisi,
+            candidate.perusahaan?.nama_perusahaan,
+        ].filter(Boolean).join(" ").toLowerCase().includes(keyword));
+    }, [messageCandidates, messageSearch, dataPosisi, dataPerusahaan]);
+
+    const messageTotalPages = Math.max(1, Math.ceil(filteredMessageCandidates.length / messagePerPage));
+    const paginatedMessageCandidates = filteredMessageCandidates.slice((messagePage - 1) * messagePerPage, messagePage * messagePerPage);
 
     const [tanggalSkriningMulai, setTanggalSkriningMulai] = useState("");
     const [tanggalSkriningSelesai, setTanggalSkriningSelesai] = useState("");
@@ -651,6 +669,8 @@ export default function DataPelamarPage({
             }
 
             setMessageCandidates(candidates);
+            setMessageSearch("");
+            setMessagePage(1);
             setSelectedMessageIds(
                 candidates.map((candidate) => String(candidate.id))
             );
@@ -668,6 +688,8 @@ export default function DataPelamarPage({
         setMessageModalOpen(false);
         setMessageCandidates([]);
         setSelectedMessageIds([]);
+        setMessageSearch("");
+        setMessagePage(1);
     };
 
     const handleToggleMessageCandidate = (candidateId) => {
@@ -681,7 +703,7 @@ export default function DataPelamarPage({
     };
 
     const handleToggleAllMessageCandidates = () => {
-        const allIds = messageCandidates.map((candidate) =>
+        const allIds = filteredMessageCandidates.map((candidate) =>
             String(candidate.id)
         );
         const allSelected =
@@ -877,7 +899,7 @@ export default function DataPelamarPage({
                     `${item.nama_lengkap || ""} ${item.nama_panggil || ""}`,
                 render: (item) => (
                     <div className="flex min-w-[220px] items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-sm font-black uppercase text-white shadow-lg shadow-teal-100">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-black uppercase text-white shadow-lg shadow-indigo-100">
                             {(item.nama_lengkap || "P")
                                 .charAt(0)
                                 .toUpperCase()}
@@ -924,7 +946,7 @@ export default function DataPelamarPage({
                             {item.email || "-"}
                         </div>
 
-                        <div className="mt-0.5 text-sm font-bold text-teal-700">
+                        <div className="mt-0.5 text-sm font-bold text-indigo-700">
                             WA: {item.no_wa || "-"}
                         </div>
                     </div>
@@ -985,7 +1007,7 @@ export default function DataPelamarPage({
                 accessor: (item) =>
                     getNamaSumberInformasi(item.sumber_informasi_id, item),
                 render: (item) => (
-                    <span className="inline-flex rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700">
+                    <span className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700">
                         {getNamaSumberInformasi(item.sumber_informasi_id, item)}
                     </span>
                 ),
@@ -1017,7 +1039,7 @@ export default function DataPelamarPage({
                                 rel="noreferrer"
                                 className={`w-fit rounded-xl px-3 py-2 text-xs font-black transition ${
                                     url
-                                        ? "bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
+                                        ? "bg-violet-50 text-violet-700 hover:bg-violet-100"
                                         : "pointer-events-none bg-slate-100 text-slate-400"
                                 }`}
                             >
@@ -1046,7 +1068,7 @@ export default function DataPelamarPage({
                         <button
                             type="button"
                             onClick={() => onOpenDetailPelamar?.(item.id)}
-                            className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 shadow-sm transition hover:bg-cyan-100"
+                            className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-2 text-xs font-black text-violet-700 shadow-sm transition hover:bg-violet-100"
                         >
                             Detail
                         </button>
@@ -1086,7 +1108,7 @@ export default function DataPelamarPage({
                         <button
                             type="button"
                             onClick={handleSetTanggalSkriningHariIni}
-                            className="w-fit rounded-2xl border border-cyan-100 bg-cyan-50 px-5 py-3 text-sm font-black text-cyan-700 transition hover:bg-cyan-100"
+                            className="w-fit rounded-2xl border border-violet-100 bg-violet-50 px-5 py-3 text-sm font-black text-violet-700 transition hover:bg-violet-100"
                         >
                             Filter Hari Ini
                         </button>
@@ -1124,7 +1146,7 @@ export default function DataPelamarPage({
 
                         <button
                             type="submit"
-                            className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700"
+                            className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
                         >
                             Filter
                         </button>
@@ -1141,7 +1163,7 @@ export default function DataPelamarPage({
                             type="button"
                             disabled={sendingMessage || loadingMessageCandidates}
                             onClick={handleKirimPesanSkrining}
-                            className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-2xl bg-gradient-to-r from-emerald-600 to-indigo-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:from-emerald-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {loadingMessageCandidates ? "Memuat Kandidat..." : "Kirim Pesan WA"}
                         </button>
@@ -1150,7 +1172,7 @@ export default function DataPelamarPage({
                     {(appliedTanggalSkrining.perusahaan_dilamar ||
                         appliedTanggalSkrining.tanggal_skrining_mulai ||
                         appliedTanggalSkrining.tanggal_skrining_selesai) && (
-                        <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-700">
+                        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">
                             Filter aktif: Perusahaan {getNamaPerusahaan(appliedTanggalSkrining.perusahaan_dilamar) || "-"} | Tanggal skrining {appliedTanggalSkrining.tanggal_skrining_mulai || "-"} sampai {appliedTanggalSkrining.tanggal_skrining_selesai || "-"}
                         </div>
                     )}
@@ -1199,31 +1221,49 @@ export default function DataPelamarPage({
                             </button>
                         </div>
 
-                        <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 px-6 py-4">
+                        <div className="shrink-0 border-b border-slate-100 bg-slate-50 px-6 py-4">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="relative min-w-0 flex-1 lg:max-w-md">
+                                    <input
+                                        type="search"
+                                        value={messageSearch}
+                                        onChange={(event) => { setMessageSearch(event.target.value); setMessagePage(1); }}
+                                        placeholder="Cari nama, WA, email, posisi, atau perusahaan..."
+                                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                                    />
+                                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                             <label className="flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
                                 <input
                                     type="checkbox"
                                     checked={
-                                        messageCandidates.length > 0 &&
-                                        messageCandidates.every((candidate) =>
+                                        filteredMessageCandidates.length > 0 &&
+                                        filteredMessageCandidates.every((candidate) =>
                                             selectedMessageIds.includes(String(candidate.id))
                                         )
                                     }
                                     onChange={handleToggleAllMessageCandidates}
-                                    className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                 />
-                                Pilih Semua
+                                Pilih Semua Hasil
                             </label>
 
-                            <div className="rounded-full bg-teal-100 px-4 py-2 text-sm font-black text-teal-700">
+                            <div className="rounded-full bg-indigo-100 px-4 py-2 text-sm font-black text-indigo-700">
                                 {selectedMessageIds.length} dari {messageCandidates.length} kandidat dipilih
                             </div>
+                                </div>
+                            </div>
+                            <p className="mt-3 text-xs font-semibold text-slate-500">
+                                Menampilkan {filteredMessageCandidates.length} kandidat sesuai pencarian. Daftar dibagi per {messagePerPage} kandidat agar tetap cepat dan rapi.
+                            </p>
                         </div>
 
                         <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
                             <div className="overflow-hidden rounded-2xl border border-slate-200">
-                                <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50">
+                                <div className="max-h-[46vh] overflow-auto">
+                                <table className="min-w-[920px] w-full divide-y divide-slate-200">
+                                    <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
                                         <tr>
                                             <th className="w-16 px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Pilih</th>
                                             <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-500">Kandidat</th>
@@ -1234,21 +1274,21 @@ export default function DataPelamarPage({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 bg-white">
-                                        {messageCandidates.map((candidate) => {
+                                        {paginatedMessageCandidates.map((candidate) => {
                                             const candidateId = String(candidate.id);
                                             const checked = selectedMessageIds.includes(candidateId);
 
                                             return (
                                                 <tr
                                                     key={candidateId}
-                                                    className={checked ? "bg-teal-50/60" : "hover:bg-slate-50"}
+                                                    className={checked ? "bg-indigo-50/60" : "hover:bg-slate-50"}
                                                 >
                                                     <td className="px-4 py-4 text-center">
                                                         <input
                                                             type="checkbox"
                                                             checked={checked}
                                                             onChange={() => handleToggleMessageCandidate(candidateId)}
-                                                            className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                            className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                         />
                                                     </td>
                                                     <td className="px-4 py-4">
@@ -1262,8 +1302,19 @@ export default function DataPelamarPage({
                                                 </tr>
                                             );
                                         })}
+                                        {paginatedMessageCandidates.length === 0 && (
+                                            <tr><td colSpan="6" className="px-6 py-12 text-center"><p className="font-black text-slate-700">Kandidat tidak ditemukan</p><p className="mt-1 text-sm font-semibold text-slate-400">Coba gunakan kata pencarian lain.</p></td></tr>
+                                        )}
                                     </tbody>
                                 </table>
+                                </div>
+                                <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs font-bold text-slate-500">Halaman {messagePage} dari {messageTotalPages}</p>
+                                    <div className="flex gap-2">
+                                        <button type="button" disabled={messagePage <= 1} onClick={() => setMessagePage((page) => Math.max(1, page - 1))} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-black text-slate-600 disabled:opacity-40">Sebelumnya</button>
+                                        <button type="button" disabled={messagePage >= messageTotalPages} onClick={() => setMessagePage((page) => Math.min(messageTotalPages, page + 1))} className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white disabled:opacity-40">Berikutnya</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1280,7 +1331,7 @@ export default function DataPelamarPage({
                                 type="button"
                                 onClick={handleConfirmKirimPesanSkrining}
                                 disabled={sendingMessage || selectedMessageIds.length === 0}
-                                className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {sendingMessage
                                     ? "Mengirim Pesan..."
@@ -1297,7 +1348,7 @@ export default function DataPelamarPage({
                         <div className="shrink-0 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
-                                    <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                         Form Skrining Pelamar
                                     </div>
 
@@ -1557,14 +1608,14 @@ export default function DataPelamarPage({
                                                 placeholder="Masukkan alamat sesuai KTP"
                                             />
 
-                                            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50/70 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-teal-50">
+                                            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-indigo-50">
                                                 <input
                                                     type="checkbox"
                                                     checked={alamatSama}
                                                     onChange={
                                                         handleAlamatSamaChange
                                                     }
-                                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                 />
 
                                                 <span>
@@ -1604,7 +1655,7 @@ export default function DataPelamarPage({
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {loading
                                             ? "Menyimpan..."
@@ -1637,7 +1688,7 @@ function SelectFilterInput({
             <select
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             >
                 <option value="">{placeholder}</option>
 
@@ -1662,7 +1713,7 @@ function DateFilterInput({ label, value, onChange }) {
                 type="date"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </label>
     );
@@ -1733,11 +1784,11 @@ function CompletionProgress({
 
     const colorClass =
         safePercentage >= 100
-            ? "from-emerald-500 to-teal-500"
+            ? "from-emerald-500 to-indigo-500"
             : safePercentage >= 80
-            ? "from-teal-500 to-cyan-500"
+            ? "from-indigo-500 to-violet-500"
             : safePercentage >= 60
-            ? "from-blue-500 to-cyan-500"
+            ? "from-blue-500 to-violet-500"
             : safePercentage >= 40
             ? "from-amber-500 to-orange-500"
             : "from-rose-500 to-red-500";
@@ -1746,7 +1797,7 @@ function CompletionProgress({
         safePercentage >= 100
             ? "bg-emerald-50 text-emerald-700"
             : safePercentage >= 80
-            ? "bg-teal-50 text-teal-700"
+            ? "bg-indigo-50 text-indigo-700"
             : safePercentage >= 60
             ? "bg-blue-50 text-blue-700"
             : safePercentage >= 40
@@ -1789,7 +1840,7 @@ function CompletionProgress({
                         key={step.key || index}
                         title={step.label}
                         className={`h-2 rounded-full ${
-                            step.completed ? "bg-teal-500" : "bg-slate-200"
+                            step.completed ? "bg-indigo-500" : "bg-slate-200"
                         }`}
                     />
                 ))}
@@ -2030,7 +2081,7 @@ function DataTable({
                             onChange={(event) =>
                                 setEntriesPerPage(Number(event.target.value))
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         >
                             <option value={5}>5</option>
                             <option value={10}>10</option>
@@ -2054,7 +2105,7 @@ function DataTable({
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 sm:w-96"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:w-96"
                         />
                     </div>
                 </div>
@@ -2205,7 +2256,7 @@ function DataTable({
                             onClick={() => changePage(page)}
                             className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                 currentPage === page
-                                    ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-teal-100"
+                                    ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-indigo-100"
                                     : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                             }`}
                         >
@@ -2368,10 +2419,10 @@ function Select2Single({
                 onClick={() => setOpen((prev) => !prev)}
                 className={`flex w-full items-center justify-between rounded-2xl border bg-white px-4 py-3 text-left text-sm font-bold shadow-sm outline-none transition ${
                     open
-                        ? "border-teal-500 ring-4 ring-teal-100"
+                        ? "border-indigo-500 ring-4 ring-indigo-100"
                         : required && !value
                         ? "border-rose-200 hover:border-rose-300"
-                        : "border-slate-200 hover:border-teal-300"
+                        : "border-slate-200 hover:border-indigo-300"
                 }`}
             >
                 <span
@@ -2424,7 +2475,7 @@ function Select2Single({
                                 }
                             }}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-xl border border-teal-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-teal-50"
+                            className="w-full rounded-xl border border-indigo-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-indigo-50"
                         />
                     </div>
 
@@ -2444,8 +2495,8 @@ function Select2Single({
                                         }
                                         className={`block w-full px-4 py-3 text-left text-sm font-bold transition ${
                                             isSelected
-                                                ? "bg-teal-600 text-white"
-                                                : "text-slate-700 hover:bg-teal-50 hover:text-teal-800"
+                                                ? "bg-indigo-600 text-white"
+                                                : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-800"
                                         }`}
                                     >
                                         {item[optionLabel]}
@@ -2521,11 +2572,11 @@ function Input({
                 onChange={onChange}
                 required={required}
                 placeholder={placeholder}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
 
             {info && (
-                <p className="mt-2 rounded-xl bg-teal-50 px-3 py-2 text-xs font-bold leading-5 text-teal-700">
+                <p className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold leading-5 text-indigo-700">
                     {info}
                 </p>
             )}
@@ -2557,7 +2608,7 @@ function Textarea({
                 className={`w-full rounded-2xl border px-4 py-3 text-sm font-bold shadow-sm outline-none transition placeholder:text-slate-300 ${
                     disabled
                         ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
-                        : "border-slate-200 bg-white text-slate-700 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                        : "border-slate-200 bg-white text-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                 }`}
             />
         </div>

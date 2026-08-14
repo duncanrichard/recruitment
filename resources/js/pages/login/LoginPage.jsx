@@ -1,64 +1,52 @@
 import React, { useState } from "react";
 
+const Icon = ({ children, className = "h-5 w-5" }) => (
+    <svg
+        aria-hidden="true"
+        className={className}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        {children}
+    </svg>
+);
+
 const LoginPage = () => {
     const [formData, setFormData] = useState({
         email: "",
         password: "",
         remember: false,
     });
-
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
-    const floatingBoxes = [
-        "left-[8%] top-[12%] h-14 w-14 animation-delay-0",
-        "left-[18%] bottom-[18%] h-10 w-10 animation-delay-1000",
-        "right-[12%] top-[16%] h-16 w-16 animation-delay-2000",
-        "right-[20%] bottom-[14%] h-12 w-12 animation-delay-3000",
-        "left-[50%] top-[8%] h-8 w-8 animation-delay-1500",
-        "right-[42%] bottom-[8%] h-9 w-9 animation-delay-2500",
-    ];
-
-    const getCsrfToken = () => {
-        return document
-            .querySelector('meta[name="csrf-token"]')
-            ?.getAttribute("content");
-    };
+    const getCsrfToken = () =>
+        document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
 
     const getFirstErrorMessage = (errors) => {
-        if (!errors) return null;
-
-        const firstError = Object.values(errors)?.[0];
-
-        if (Array.isArray(firstError)) {
-            return firstError[0];
-        }
-
-        return firstError;
+        const firstError = errors ? Object.values(errors)[0] : null;
+        return Array.isArray(firstError) ? firstError[0] : firstError;
     };
 
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-
-        setFormData((prev) => ({
-            ...prev,
+    const handleChange = ({ target }) => {
+        const { name, value, type, checked } = target;
+        setFormData((current) => ({
+            ...current,
             [name]: type === "checkbox" ? checked : value,
         }));
-
         setErrorMessage("");
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleSubmit = async (event) => {
+        event.preventDefault();
 
-        if (!formData.email) {
-            setErrorMessage("Email wajib diisi.");
-            return;
-        }
-
-        if (!formData.password) {
-            setErrorMessage("Password wajib diisi.");
+        if (!formData.email.trim() || !formData.password) {
+            setErrorMessage("Email dan password wajib diisi.");
             return;
         }
 
@@ -73,311 +61,167 @@ const LoginPage = () => {
                     Accept: "application/json",
                     "X-CSRF-TOKEN": getCsrfToken(),
                 },
-                body: JSON.stringify({
-                    email: formData.email,
-                    password: formData.password,
-                    remember: formData.remember,
-                }),
+                body: JSON.stringify(formData),
             });
-
             const result = await response.json();
 
             if (!response.ok) {
                 setErrorMessage(
                     getFirstErrorMessage(result.errors) ||
                         result.message ||
-                        "Login gagal. Periksa email dan password."
+                        "Login gagal. Periksa kembali akun Anda.",
                 );
                 return;
             }
 
-            if (result.redirect) {
-                window.location.href = result.redirect;
-                return;
-            }
-
-            window.location.href = "/dashboard";
+            window.location.href = result.redirect || "/dashboard";
         } catch (error) {
             console.error("Gagal login:", error);
-            setErrorMessage("Terjadi kesalahan saat login.");
+            setErrorMessage("Sistem tidak dapat dihubungi. Silakan coba kembali.");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <>
-            <style>
-                {`
-                    @keyframes fadeUp3D {
-                        from {
-                            opacity: 0;
-                            transform: translateY(30px) rotateX(12deg) scale(0.96);
-                        }
-                        to {
-                            opacity: 1;
-                            transform: translateY(0) rotateX(0deg) scale(1);
-                        }
-                    }
+        <main className="min-h-screen bg-[#ececf5] p-0 text-slate-950 lg:p-5">
+            <div className="mx-auto grid min-h-screen max-w-[1500px] overflow-hidden bg-white shadow-[0_30px_100px_rgba(30,27,75,0.18)] lg:min-h-[calc(100vh-2.5rem)] lg:grid-cols-[1.16fr_0.84fr] lg:rounded-[32px]">
+                <section className="relative hidden overflow-hidden bg-[#17133f] px-12 py-10 text-white lg:flex lg:flex-col xl:px-16">
+                    <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.08)_1px,transparent_1px)] [background-size:48px_48px]" />
+                    <div className="absolute -left-40 -top-48 h-[520px] w-[520px] rounded-full bg-indigo-500/35 blur-[100px]" />
+                    <div className="absolute -bottom-56 right-[-80px] h-[520px] w-[520px] rounded-full bg-violet-600/35 blur-[110px]" />
 
-                    @keyframes floatBox {
-                        0%, 100% {
-                            transform: translate3d(0, 0, 0) rotateX(22deg) rotateY(-24deg) rotateZ(0deg);
-                        }
-                        50% {
-                            transform: translate3d(0, -22px, 26px) rotateX(35deg) rotateY(-12deg) rotateZ(12deg);
-                        }
-                    }
-
-                    @keyframes cardFloat {
-                        0%, 100% {
-                            transform: perspective(1100px) rotateX(0deg) rotateY(0deg) translateY(0);
-                        }
-                        50% {
-                            transform: perspective(1100px) rotateX(1.5deg) rotateY(-1.5deg) translateY(-6px);
-                        }
-                    }
-
-                    @keyframes glowPulse {
-                        0%, 100% {
-                            box-shadow:
-                                0 28px 80px rgba(0, 0, 0, 0.45),
-                                0 0 30px rgba(20, 184, 166, 0.22),
-                                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-                        }
-                        50% {
-                            box-shadow:
-                                0 34px 100px rgba(0, 0, 0, 0.55),
-                                0 0 70px rgba(20, 184, 166, 0.42),
-                                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-                        }
-                    }
-
-                    @keyframes shineMove {
-                        0% {
-                            transform: translateX(-120%) rotate(18deg);
-                        }
-                        100% {
-                            transform: translateX(220%) rotate(18deg);
-                        }
-                    }
-
-                    .login-3d-enter {
-                        animation: fadeUp3D 0.85s ease forwards;
-                    }
-
-                    .login-3d-card {
-                        animation: cardFloat 5s ease-in-out infinite, glowPulse 3.5s ease-in-out infinite;
-                        transform-style: preserve-3d;
-                    }
-
-                    .floating-box {
-                        animation: floatBox 6s ease-in-out infinite;
-                        transform-style: preserve-3d;
-                    }
-
-                    .animation-delay-0 {
-                        animation-delay: 0s;
-                    }
-
-                    .animation-delay-1000 {
-                        animation-delay: 1s;
-                    }
-
-                    .animation-delay-1500 {
-                        animation-delay: 1.5s;
-                    }
-
-                    .animation-delay-2000 {
-                        animation-delay: 2s;
-                    }
-
-                    .animation-delay-2500 {
-                        animation-delay: 2.5s;
-                    }
-
-                    .animation-delay-3000 {
-                        animation-delay: 3s;
-                    }
-
-                    .login-shine::before {
-                        content: "";
-                        position: absolute;
-                        inset: -40%;
-                        width: 45%;
-                        background: linear-gradient(
-                            90deg,
-                            transparent,
-                            rgba(255, 255, 255, 0.16),
-                            transparent
-                        );
-                        animation: shineMove 5s ease-in-out infinite;
-                    }
-                `}
-            </style>
-
-            <div className="relative flex h-screen items-center justify-center overflow-hidden bg-[#050817] px-4 text-white">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(20,184,166,0.16),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(6,182,212,0.18),transparent_34%)]" />
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:44px_44px] opacity-30" />
-
-                <div className="absolute -left-32 top-10 h-72 w-72 rounded-full bg-teal-400/20 blur-3xl" />
-                <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
-
-                {floatingBoxes.map((box, index) => (
-                    <div
-                        key={index}
-                        className={`floating-box absolute ${box} rounded-2xl border border-teal-300/20 bg-teal-300/10 shadow-2xl shadow-teal-500/10 backdrop-blur-xl`}
-                    >
-                        <div className="absolute inset-1 rounded-xl border border-white/10 bg-white/5" />
-                        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-teal-300 shadow-lg shadow-teal-300/50" />
-                    </div>
-                ))}
-
-                <div className="login-3d-enter relative z-10 w-full max-w-[420px]">
-                    <div className="mb-5 text-center">
-                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-400 text-lg font-black text-[#050817] shadow-[0_18px_45px_rgba(20,184,166,0.35)]">
+                    <div className="relative flex items-center gap-3">
+                        <div className="relative flex h-12 w-12 items-center justify-center rounded-[15px] bg-gradient-to-br from-indigo-400 to-violet-500 font-black text-white shadow-[0_10px_30px_rgba(99,102,241,.35)]">
                             SR
+                            <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-[3px] border-[#17133f] bg-emerald-400" />
                         </div>
-
-                        <p className="tracking-[0.32em] text-[11px] font-black text-teal-300">
-                            ADMIN PANEL
-                        </p>
-
-                        <h1 className="mt-1 text-3xl font-black text-white">
-                            Sirekrut
-                        </h1>
-                    </div>
-
-                    <div className="login-3d-card login-shine relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-white/[0.08] p-2 backdrop-blur-2xl">
-                        <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-teal-300/20 blur-2xl" />
-                        <div className="absolute -bottom-8 -left-8 h-28 w-28 rounded-full bg-cyan-300/10 blur-2xl" />
-
-                        <div className="relative rounded-[1.45rem] border border-white/10 bg-[#080d20]/95 p-6 sm:p-7">
-                            <div className="mb-6">
-                                <div className="mb-3 inline-flex rounded-full border border-teal-300/20 bg-teal-300/10 px-4 py-2">
-                                    <span className="text-[11px] font-black uppercase tracking-[0.28em] text-teal-300">
-                                        Login Admin
-                                    </span>
-                                </div>
-
-                                <h2 className="text-2xl font-black text-white">
-                                    Selamat Datang
-                                </h2>
-
-                                <p className="mt-2 text-sm leading-6 text-slate-400">
-                                    Masukkan akun admin untuk membuka sistem Sirekrut.
-                                </p>
-                            </div>
-
-                            {errorMessage && (
-                                <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-200">
-                                    {errorMessage}
-                                </div>
-                            )}
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label
-                                        htmlFor="email"
-                                        className="mb-2 block text-sm font-bold text-slate-300"
-                                    >
-                                        Email
-                                    </label>
-
-                                    <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-teal-300">
-                                            ✉
-                                        </div>
-
-                                        <input
-                                            id="email"
-                                            type="email"
-                                            name="email"
-                                            placeholder="admin@email.com"
-                                            value={formData.email}
-                                            onChange={handleChange}
-                                            required
-                                            autoComplete="email"
-                                            className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-11 text-sm text-white outline-none transition duration-300 placeholder:text-slate-500 focus:border-teal-300/60 focus:bg-white/[0.09] focus:ring-4 focus:ring-teal-300/10"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label
-                                        htmlFor="password"
-                                        className="mb-2 block text-sm font-bold text-slate-300"
-                                    >
-                                        Password
-                                    </label>
-
-                                    <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-teal-300">
-                                            🔒
-                                        </div>
-
-                                        <input
-                                            id="password"
-                                            type={showPassword ? "text" : "password"}
-                                            name="password"
-                                            placeholder="Masukkan password"
-                                            value={formData.password}
-                                            onChange={handleChange}
-                                            required
-                                            autoComplete="current-password"
-                                            className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-11 pr-20 text-sm text-white outline-none transition duration-300 placeholder:text-slate-500 focus:border-teal-300/60 focus:bg-white/[0.09] focus:ring-4 focus:ring-teal-300/10"
-                                        />
-
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setShowPassword((prev) => !prev)
-                                            }
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-teal-300/10 px-3 py-2 text-[11px] font-black text-teal-300 transition duration-300 hover:bg-teal-300 hover:text-[#050817]"
-                                        >
-                                            {showPassword ? "Hide" : "Show"}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-3 text-sm">
-                                    <label className="flex cursor-pointer items-center gap-2 text-slate-400">
-                                        <input
-                                            type="checkbox"
-                                            name="remember"
-                                            checked={formData.remember}
-                                            onChange={handleChange}
-                                            className="h-4 w-4 rounded border-white/20 bg-white/10 text-teal-400 focus:ring-teal-400"
-                                        />
-                                        <span>Ingat saya</span>
-                                    </label>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="group relative h-12 w-full overflow-hidden rounded-2xl bg-teal-400 text-sm font-black uppercase tracking-[0.25em] text-[#050817] shadow-lg shadow-teal-400/25 transition duration-300 hover:-translate-y-0.5 hover:bg-teal-300 hover:shadow-2xl hover:shadow-teal-400/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
-                                >
-                                    <span className="relative z-10">
-                                        {loading ? "Memproses..." : "Masuk"}
-                                    </span>
-                                    <span className="absolute inset-y-0 -left-20 w-16 rotate-12 bg-white/40 transition duration-700 group-hover:left-[120%]" />
-                                </button>
-                            </form>
-
-                            <div className="mt-5 text-center text-sm text-slate-400">
-                                <p>
-                                    Belum punya akun?{" "}
-                                    <span className="font-bold text-teal-300">
-                                        Hubungi admin
-                                    </span>
-                                </p>
-                            </div>
+                        <div>
+                            <p className="text-[11px] font-extrabold uppercase tracking-[0.26em] text-indigo-200">
+                                Sistem Recruitment
+                            </p>
+                            <p className="mt-0.5 text-lg font-black">Sirekrut</p>
                         </div>
                     </div>
-                </div>
+
+                    <div className="relative my-auto grid items-center gap-8 py-8 xl:grid-cols-[0.9fr_1.1fr]">
+                        <div>
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-violet-300">Recruitment workspace</p>
+                            <h1 className="mt-5 text-[46px] font-black leading-[1.02] tracking-[-0.045em] xl:text-[58px]">
+                                Satu tempat untuk setiap
+                                <span className="mt-2 block bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">perjalanan kandidat.</span>
+                            </h1>
+                            <p className="mt-6 max-w-md text-[15px] leading-7 text-indigo-100/70">Dari data masuk hingga offering, semua proses terpantau dalam alur kerja tim HR yang jelas.</p>
+                        </div>
+
+                        <div className="relative mx-auto w-full max-w-[380px] xl:translate-x-4">
+                            <div className="absolute -inset-7 rounded-full bg-indigo-500/20 blur-3xl" />
+                            <div className="relative rotate-[2deg] rounded-[28px] border border-white/15 bg-white/[0.09] p-4 shadow-[0_30px_70px_rgba(0,0,0,.3)] backdrop-blur-xl">
+                                <div className="mb-4 flex items-center justify-between px-1">
+                                    <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Candidate journey</p><p className="mt-1 text-sm font-black">Pipeline hari ini</p></div>
+                                    <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[9px] font-black text-emerald-300">LIVE</span>
+                                </div>
+                                <div className="rounded-[22px] bg-white p-4 text-slate-900 shadow-xl">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-sm font-black text-indigo-700">AR</div>
+                                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-black">Aulia Rahma</p><p className="mt-0.5 text-[10px] font-semibold text-slate-400">UI/UX Designer · Kandidat aktif</p></div>
+                                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-50" />
+                                    </div>
+                                    <div className="relative mt-5 flex justify-between">
+                                        <div className="absolute left-4 right-4 top-3 h-0.5 bg-slate-100" />
+                                        {["Data", "Test", "Interview", "Offer"].map((stage, index) => <div key={stage} className="relative z-10 flex flex-col items-center gap-2"><span className={`flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-black ${index < 3 ? "bg-indigo-600 text-white ring-4 ring-indigo-50" : "border-2 border-slate-200 bg-white text-slate-400"}`}>{index < 2 ? "✓" : index + 1}</span><span className={`text-[9px] font-bold ${index < 3 ? "text-indigo-700" : "text-slate-400"}`}>{stage}</span></div>)}
+                                    </div>
+                                </div>
+                                <div className="mt-3 grid grid-cols-3 gap-2">
+                                    {[["24", "Pelamar"], ["06", "Interview"], ["03", "Offering"]].map(([total, label]) => <div key={label} className="rounded-2xl border border-white/10 bg-black/10 px-3 py-3"><p className="text-lg font-black">{total}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-200/70">{label}</p></div>)}
+                                </div>
+                            </div>
+                            <div className="absolute -bottom-5 -left-7 -rotate-[5deg] rounded-2xl border border-white/15 bg-[#302879] px-4 py-3 shadow-xl"><p className="text-[9px] font-bold text-indigo-200">STATUS TERBARU</p><p className="mt-1 text-xs font-black">✓ Interview terjadwal</p></div>
+                        </div>
+                    </div>
+
+                    <div className="relative flex items-center justify-between border-t border-white/10 pt-5 text-[11px] font-semibold text-indigo-200/60"><span>Monitor · Collaborate · Decide</span><span>HR workspace secured</span></div>
+                </section>
+
+                <section className="relative flex items-center justify-center px-5 py-8 sm:px-10 lg:px-14 xl:px-20">
+                    <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500 lg:hidden" />
+                    <div className="w-full max-w-[460px]">
+                        <div className="mb-10 flex items-center gap-3 lg:hidden">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 font-black text-white shadow-lg shadow-indigo-200">
+                                HR
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-indigo-600">Sistem Recruitment</p>
+                                <p className="font-black text-slate-950">Sirekrut</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-8">
+                            <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-700"><span className="h-1.5 w-1.5 rounded-full bg-indigo-500" /> HR access portal</div>
+                            <h2 className="text-3xl font-black tracking-[-0.035em] text-slate-950 sm:text-4xl">Lanjutkan proses recruitment Anda.</h2>
+                            <p className="mt-3 text-sm leading-6 text-slate-500">Masuk untuk melihat kandidat dan pekerjaan HR yang membutuhkan perhatian hari ini.</p>
+                        </div>
+
+                        {errorMessage && (
+                            <div role="alert" aria-live="polite" className="mb-5 flex gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3.5 text-sm text-rose-700">
+                                <Icon className="mt-0.5 h-5 w-5 shrink-0">
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M12 8v4M12 16h.01" />
+                                </Icon>
+                                <span className="font-semibold leading-5">{errorMessage}</span>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                            <div>
+                                <label htmlFor="email" className="mb-2 block text-sm font-extrabold text-slate-700">Email perusahaan</label>
+                                <div className="relative">
+                                    <Icon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400">
+                                        <rect x="3" y="5" width="18" height="14" rx="2" />
+                                        <path d="m3 7 9 6 9-6" />
+                                    </Icon>
+                                    <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="nama@perusahaan.com" autoComplete="email" autoFocus aria-invalid={Boolean(errorMessage)} className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:font-medium placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="password" className="mb-2 block text-sm font-extrabold text-slate-700">Password</label>
+                                <div className="relative">
+                                    <Icon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400">
+                                        <rect x="4" y="10" width="16" height="10" rx="2" />
+                                        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                                    </Icon>
+                                    <input id="password" type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Masukkan password" autoComplete="current-password" aria-invalid={Boolean(errorMessage)} className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-16 text-sm font-semibold text-slate-900 outline-none transition placeholder:font-medium placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" />
+                                    <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-slate-400 transition hover:bg-indigo-50 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                        <Icon className="h-5 w-5">
+                                            {showPassword ? <><path d="M3 3l18 18" /><path d="M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.6 10.6 0 0 1 12 4c5 0 8.5 4.5 9 6-.2.7-.8 1.7-1.6 2.7M6.6 6.6C4.6 8 3.4 9.7 3 11c.5 1.5 4 6 9 6 1.1 0 2.1-.2 3-.6" /></> : <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></>}
+                                        </Icon>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-semibold text-slate-600">
+                                <input type="checkbox" name="remember" checked={formData.remember} onChange={handleChange} className="h-4.5 w-4.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                                Ingat saya di perangkat ini
+                            </label>
+
+                            <button type="submit" disabled={loading} className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(79,70,229,0.32)] focus:outline-none focus:ring-4 focus:ring-indigo-200 active:translate-y-0 disabled:cursor-wait disabled:opacity-70">
+                                {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white" />}
+                                {loading ? "Memverifikasi akun..." : "Masuk ke Dashboard"}
+                                {!loading && <Icon className="h-4 w-4"><path d="M5 12h14M13 6l6 6-6 6" /></Icon>}
+                            </button>
+                        </form>
+
+                        <div className="mt-8 flex items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3.5 text-xs leading-5 text-slate-500">
+                            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></Icon>
+                            <p>Akses terbatas untuk tim recruitment. Hubungi administrator apabila Anda mengalami kendala akun.</p>
+                        </div>
+
+                        <p className="mt-8 text-center text-xs text-slate-400">© {new Date().getFullYear()} Sirekrut · Sistem Recruitment Terintegrasi</p>
+                    </div>
+                </section>
             </div>
-        </>
+        </main>
     );
 };
 

@@ -240,7 +240,7 @@ export default function ReportInterviewerPage() {
                         title="Top Interviewer Berdasarkan Jadwal"
                         description="Jumlah jadwal interview per interviewer"
                     >
-                        <ProgressList items={demografi.jadwal_interviewer || []} colorClass="bg-cyan-500" />
+                        <ProgressList items={demografi.jadwal_interviewer || []} colorClass="bg-violet-500" />
                     </ChartCard>
                 </div>
 

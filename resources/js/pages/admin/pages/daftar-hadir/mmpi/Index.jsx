@@ -102,7 +102,7 @@ export default function DaftarHadirMmpiPage({ onNavigate }) {
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <div className="inline-flex whitespace-nowrap rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                        <div className="inline-flex whitespace-nowrap rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                             Daftar Hadir Test MMPI
                         </div>
 
@@ -142,7 +142,7 @@ export default function DaftarHadirMmpiPage({ onNavigate }) {
                                     value={search}
                                     onChange={(event) => setSearch(event.target.value)}
                                     placeholder="Cari tanggal..."
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
                         </div>
@@ -151,7 +151,7 @@ export default function DaftarHadirMmpiPage({ onNavigate }) {
                             <button
                                 type="button"
                                 onClick={applyFilter}
-                                className="whitespace-nowrap rounded-2xl bg-teal-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-teal-700"
+                                className="whitespace-nowrap rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
                             >
                                 Filter
                             </button>
@@ -207,7 +207,7 @@ export default function DaftarHadirMmpiPage({ onNavigate }) {
                                             <button
                                                 type="button"
                                                 onClick={() => openDetail(item.tanggal_test)}
-                                                className="rounded-2xl bg-teal-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-teal-700"
+                                                className="rounded-2xl bg-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700"
                                             >
                                                 Detail
                                             </button>
@@ -239,7 +239,7 @@ function FieldDate({ label, value, onChange }) {
                 type="date"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );

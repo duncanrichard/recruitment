@@ -663,7 +663,7 @@ function DokumenCard({ title, description, url, emptyText, type = "document" }) 
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-4 inline-flex rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white transition hover:bg-teal-700"
+                    className="mt-4 inline-flex rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-700"
                 >
                     Buka Dokumen
                 </a>
@@ -704,8 +704,8 @@ function SubTabs({ tabs = [] }) {
                                 onClick={() => setActiveSubTab(tab.key)}
                                 className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black transition ${
                                     isActive
-                                        ? "bg-teal-600 text-white shadow-md shadow-teal-100"
-                                        : "bg-slate-50 text-slate-600 hover:bg-teal-50 hover:text-teal-700"
+                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
+                                        : "bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
                                 }`}
                             >
                                 {tab.label}
@@ -727,7 +727,7 @@ function ProfileHeader({ data, posisi, perusahaan, onBack }) {
 
     return (
         <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-teal-900 px-6 py-7 text-white">
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-900 px-6 py-7 text-white">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
                         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-2xl font-black ring-1 ring-white/20">
@@ -735,7 +735,7 @@ function ProfileHeader({ data, posisi, perusahaan, onBack }) {
                         </div>
 
                         <div>
-                            <p className="text-xs font-black uppercase tracking-[0.22em] text-teal-200">
+                            <p className="text-xs font-black uppercase tracking-[0.22em] text-indigo-200">
                                 Profil Pelamar
                             </p>
 

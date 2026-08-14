@@ -447,7 +447,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                     value={item.hasil_test || ""}
                     disabled={isRowSaving}
                     onChange={(event) => handleHasilTestChange(item, event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
                 >
                     <option value="">Pilih Hasil</option>
                     <option value="lolos">Lolos</option>
@@ -455,7 +455,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 </select>
 
                 {isRowSaving && (
-                    <p className="mt-1 text-xs font-black text-teal-700">
+                    <p className="mt-1 text-xs font-black text-indigo-700">
                         Menyimpan...
                     </p>
                 )}
@@ -503,7 +503,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                 </div>
 
                 {isRowSaving && (
-                    <p className="text-xs font-black text-teal-700">Menyimpan...</p>
+                    <p className="text-xs font-black text-indigo-700">Menyimpan...</p>
                 )}
             </div>
         );
@@ -522,7 +522,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
 
                 <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                        <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                             Detail Daftar Hadir Zoom
                         </div>
 
@@ -582,7 +582,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Cari peserta..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 md:w-80"
                             />
                         </div>
                     </div>
@@ -699,7 +699,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                                             />
 
                                                             {selectedFile && (
-                                                                <p className="mt-1 break-all text-xs font-bold text-teal-700">
+                                                                <p className="mt-1 break-all text-xs font-bold text-indigo-700">
                                                                     File dipilih: {selectedFile.name}
                                                                 </p>
                                                             )}
@@ -725,7 +725,7 @@ export default function DetailDaftarHadirZoomPage({ tanggal, onBack }) {
                                                                 type="button"
                                                                 disabled={isRowSaving || isRowUploading}
                                                                 onClick={() => handleUploadFile(item)}
-                                                                className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                className="rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                                             >
                                                                 {isRowUploading ? "Upload..." : "Upload File"}
                                                             </button>
@@ -784,7 +784,7 @@ function InputMini({ label, value, disabled = false, placeholder = "", onChange 
                 disabled={disabled}
                 placeholder={placeholder}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
             />
         </label>
     );
@@ -808,7 +808,7 @@ function TabButton({ active, children, onClick }) {
             onClick={onClick}
             className={`rounded-2xl px-5 py-2.5 text-sm font-black transition ${
                 active
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
                     : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
         >

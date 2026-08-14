@@ -19,7 +19,11 @@ export default function AdminLayout() {
         if (typeof window === "undefined") return false;
         return window.localStorage.getItem("admin.sidebar.collapsed") === "true";
     });
-    const [activeMenu, setActiveMenu] = useState(defaultMenuKey);
+    const [activeMenu, setActiveMenu] = useState(() => {
+        if (typeof window === "undefined") return defaultMenuKey;
+        const saved = window.sessionStorage.getItem("admin.activeMenu");
+        return saved && !saved.endsWith("-detail") ? saved : defaultMenuKey;
+    });
 
     const [detailPelamarId, setDetailPelamarId] = useState(null);
     const [detailDaftarHadirZoomTanggal, setDetailDaftarHadirZoomTanggal] =
@@ -62,6 +66,12 @@ export default function AdminLayout() {
             String(sidebarCollapsed)
         );
     }, [sidebarCollapsed]);
+
+    useEffect(() => {
+        if (!activeMenu.endsWith("-detail")) {
+            window.sessionStorage.setItem("admin.activeMenu", activeMenu);
+        }
+    }, [activeMenu]);
 
     const resetDetails = () => {
         setDetailPelamarId(null);
@@ -326,7 +336,22 @@ export default function AdminLayout() {
 
         resetDetails();
         setActiveMenu(key);
-        openOnlyMenu(key.startsWith("daftar-hadir") ? "daftar-hadir" : null);
+        const parentByChild = {
+            "jadwal-test-zoom": "jadwal-test",
+            "jadwal-test-mmpi": "jadwal-test",
+            "daftar-hadir-zoom": "daftar-hadir",
+            "daftar-hadir-mmpi": "daftar-hadir",
+            interviewer: "rangkaian-interview",
+            "jadwal-interview": "rangkaian-interview",
+            "kandidat-interview": "rangkaian-interview",
+            "report-data-pelamar": "report",
+            "report-hasil-test-zoom": "report",
+            "report-hasil-test-mmpi": "report",
+            "report-interview-kandidat": "report",
+            "report-interviewer": "report",
+            "report-offering-letter": "report",
+        };
+        openOnlyMenu(parentByChild[key] || null);
         closeSidebar();
     };
 
@@ -375,6 +400,11 @@ export default function AdminLayout() {
                         onHeaderAction={handleHeaderAction}
                     />
 
+                    <RecruitmentWorkflowNav
+                        activeMenu={activeMenu}
+                        onNavigate={handleNavigate}
+                    />
+
                     <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
                         {isDetailPelamarPage ? (
                             <ActiveComponent
@@ -419,17 +449,70 @@ export default function AdminLayout() {
     );
 }
 
+function RecruitmentWorkflowNav({ activeMenu, onNavigate }) {
+    const steps = [
+        { key: "data-pelamar", label: "Pelamar", short: "1", description: "Input & monitoring" },
+        { key: "jadwal-test-zoom", label: "Test Zoom", short: "2", description: "Atur jadwal" },
+        { key: "daftar-hadir-zoom", label: "Hadir Zoom", short: "3", description: "Kehadiran & hasil" },
+        { key: "jadwal-test-mmpi", label: "Test MMPI", short: "4", description: "Atur jadwal" },
+        { key: "daftar-hadir-mmpi", label: "Hadir MMPI", short: "5", description: "Kehadiran & hasil" },
+        { key: "jadwal-interview", label: "Interview", short: "6", description: "Panel & kandidat" },
+        { key: "review-management", label: "Review", short: "7", description: "Keputusan akhir" },
+        { key: "jadwal-ol", label: "Offering", short: "8", description: "Penawaran kerja" },
+    ];
+    const related = {
+        "data-pelamar-detail": "data-pelamar",
+        "daftar-hadir-zoom-detail": "daftar-hadir-zoom",
+        "daftar-hadir-mmpi-detail": "daftar-hadir-mmpi",
+        interviewer: "jadwal-interview",
+        "kandidat-interview": "jadwal-interview",
+    };
+    const current = related[activeMenu] || activeMenu;
+
+    return (
+        <div className="shrink-0 border-b border-indigo-100 bg-white/95 px-4 py-3 shadow-sm backdrop-blur sm:px-8">
+            <div className="mx-auto flex max-w-[1600px] items-center gap-3 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                <span className="hidden shrink-0 text-xs font-black uppercase tracking-[0.14em] text-slate-400 xl:block">Alur HRD</span>
+                {steps.map((item, index) => {
+                    const active = current === item.key;
+                    return (
+                        <React.Fragment key={item.key}>
+                            {index > 0 && <span className="hidden text-slate-300 lg:block">›</span>}
+                            <button type="button" onClick={() => onNavigate(item.key)} className={`flex shrink-0 items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${active ? "border-indigo-200 bg-indigo-50 text-indigo-800 shadow-sm" : "border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800"}`}>
+                                <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black ${active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"}`}>{item.short}</span>
+                                <span>
+                                    <span className="block text-xs font-black sm:text-sm">{item.label}</span>
+                                    <span className="hidden text-[10px] font-semibold text-slate-400 md:block">{item.description}</span>
+                                </span>
+                            </button>
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function AdminAlertModal({ open, title, message, type, onClose }) {
+    useEffect(() => {
+        if (!open) return undefined;
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape" || event.key === "Enter") onClose();
+        };
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [open, onClose]);
+
     if (!open) return null;
 
     const style = getAlertStyle(type);
 
     return (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+            <div role="dialog" aria-modal="true" aria-labelledby="admin-alert-title" className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
                 <div className={`h-2 w-full ${style.topBar}`} />
 
-                <div className="px-6 pt-6">
+                <div className="min-h-0 overflow-y-auto px-6 pt-6">
                     <div className="flex items-start gap-4">
                         <div
                             className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl text-3xl font-black shadow-lg ${style.iconBox}`}
@@ -444,7 +527,7 @@ function AdminAlertModal({ open, title, message, type, onClose }) {
                                 {style.badgeText}
                             </div>
 
-                            <h2 className="text-2xl font-black text-slate-950">
+                            <h2 id="admin-alert-title" className="text-2xl font-black text-slate-950">
                                 {title}
                             </h2>
 

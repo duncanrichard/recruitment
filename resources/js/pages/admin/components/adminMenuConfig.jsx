@@ -73,7 +73,7 @@ export const initialActionSignals = {
     accountPermission: 0,
 };
 
-export const menuItems = [
+const configuredMenuItems = [
     {
         key: "dashboard",
         label: "Dashboard",
@@ -229,7 +229,7 @@ export const menuItems = [
         children: [
             {
                 key: "jadwal-test-zoom",
-                label: "Zoom",
+                label: "Test Zoom",
                 description: "Kelola jadwal test Zoom",
                 icon: "◎",
                 component: JadwalTestZoomPage,
@@ -240,7 +240,7 @@ export const menuItems = [
             },
             {
                 key: "jadwal-test-mmpi",
-                label: "MMPI",
+                label: "Test MMPI",
                 description: "Kelola jadwal test MMPI",
                 icon: "◉",
                 component: JadwalTestMmpiPage,
@@ -259,14 +259,14 @@ export const menuItems = [
         children: [
             {
                 key: "daftar-hadir-zoom",
-                label: "Zoom",
+                label: "Daftar Hadir Zoom",
                 description: "Daftar hadir test Zoom",
                 icon: "◎",
                 component: DaftarHadirZoomPage,
             },
             {
                 key: "daftar-hadir-mmpi",
-                label: "MMPI",
+                label: "Daftar Hadir MMPI",
                 description: "Daftar hadir test MMPI",
                 icon: "◉",
                 component: DaftarHadirMmpiPage,
@@ -420,6 +420,25 @@ export const menuItems = [
         ],
     },
 ];
+
+// Urutkan berdasarkan alur kerja HRD; menu konfigurasi ditempatkan di bagian bawah.
+const menuPriority = [
+    "dashboard",
+    "data-pelamar",
+    "permintaan-kandidat",
+    "jadwal-test",
+    "daftar-hadir",
+    "rangkaian-interview",
+    "review-management",
+    "jadwal-ol",
+    "report",
+    "master-data",
+    "account",
+];
+
+export const menuItems = [...configuredMenuItems].sort(
+    (a, b) => menuPriority.indexOf(a.key) - menuPriority.indexOf(b.key)
+);
 
 export const detailMenus = {
     "data-pelamar-detail": {

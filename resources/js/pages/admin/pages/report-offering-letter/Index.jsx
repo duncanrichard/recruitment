@@ -276,7 +276,7 @@ export default function ReportOfferingLetterPage() {
                         title="Demografi Metode Offering"
                         description="Distribusi metode pelaksanaan Offering Letter"
                     >
-                        <ProgressList items={metodeItems} colorClass="bg-cyan-500" />
+                        <ProgressList items={metodeItems} colorClass="bg-violet-500" />
                     </ChartCard>
                 </div>
 
@@ -559,7 +559,7 @@ function MetodeBadge({ value }) {
 
     const colorClass =
         normalized === "online"
-            ? "bg-cyan-100 text-cyan-700"
+            ? "bg-violet-100 text-violet-700"
             : normalized === "offline"
             ? "bg-violet-100 text-violet-700"
             : "bg-slate-100 text-slate-700";

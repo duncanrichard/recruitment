@@ -339,7 +339,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                             ← Kembali
                         </button>
 
-                        <div className="inline-flex whitespace-nowrap rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                        <div className="inline-flex whitespace-nowrap rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                             Detail Daftar Hadir MMPI
                         </div>
 
@@ -376,7 +376,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Cari peserta, email, nomor HP, status..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             />
                         </div>
 
@@ -384,7 +384,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                             <button
                                 type="button"
                                 onClick={fetchData}
-                                className="whitespace-nowrap rounded-2xl bg-teal-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-teal-700"
+                                className="whitespace-nowrap rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
                             >
                                 Filter
                             </button>
@@ -531,7 +531,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                         onChange={(event) =>
                                                             submitKehadiran(item, event.target.value)
                                                         }
-                                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
                                                     >
                                                         <option value="">Belum Ada</option>
                                                         <option value="hadir">Hadir</option>
@@ -543,7 +543,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                     </div>
 
                                                     {kehadiranSaving && (
-                                                        <p className="text-xs font-black text-teal-700">
+                                                        <p className="text-xs font-black text-indigo-700">
                                                             Menyimpan...
                                                         </p>
                                                     )}
@@ -562,7 +562,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                                     event.target.value
                                                                 )
                                                             }
-                                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
+                                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
                                                         >
                                                             <option value="">Pilih Hasil</option>
                                                             <option value="lolos">Lolos</option>
@@ -570,7 +570,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                         </select>
 
                                                         {hasilSaving && (
-                                                            <p className="mt-1 text-xs font-black text-teal-700">
+                                                            <p className="mt-1 text-xs font-black text-indigo-700">
                                                                 Menyimpan...
                                                             </p>
                                                         )}
@@ -613,7 +613,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                             />
 
                                                             {selectedFile && (
-                                                                <p className="mt-1 break-all text-xs font-bold text-teal-700">
+                                                                <p className="mt-1 break-all text-xs font-bold text-indigo-700">
                                                                     File dipilih: {selectedFile.name}
                                                                 </p>
                                                             )}
@@ -628,7 +628,7 @@ export default function DetailDaftarHadirMmpiPage({ tanggal, onBack }) {
                                                         type="button"
                                                         disabled={hasilSaving || uploadSaving}
                                                         onClick={() => handleUploadFile(item)}
-                                                        className="rounded-2xl bg-teal-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        className="rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                                     >
                                                         {uploadSaving ? "Upload..." : "Upload File"}
                                                     </button>
@@ -695,7 +695,7 @@ function TabButton({ active, children, onClick }) {
             onClick={onClick}
             className={`whitespace-nowrap rounded-2xl px-5 py-2.5 text-sm font-black transition ${
                 active
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
                     : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
         >

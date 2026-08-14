@@ -377,7 +377,7 @@ export default function ReviewManagementPage() {
         }
 
         if (source === "test_mmpi") {
-            return "bg-cyan-50/70 hover:bg-cyan-100/70";
+            return "bg-violet-50/70 hover:bg-violet-100/70";
         }
 
         if (hasil === "Lolos Interview") {
@@ -400,7 +400,7 @@ export default function ReviewManagementPage() {
         }
 
         if (source === "test_mmpi") {
-            return "bg-cyan-100 text-cyan-700";
+            return "bg-violet-100 text-violet-700";
         }
 
         if (hasil === "Lolos Interview") {
@@ -416,7 +416,7 @@ export default function ReviewManagementPage() {
 
     const statusBadgeClass = (status) => {
         if (status === "Diterima") {
-            return "bg-teal-100 text-teal-700";
+            return "bg-indigo-100 text-indigo-700";
         }
 
         if (status === "Gagal") {
@@ -580,7 +580,7 @@ export default function ReviewManagementPage() {
                             <button
                                 type="submit"
                                 disabled={tableLoading}
-                                className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 Filter
                             </button>
@@ -600,7 +600,7 @@ export default function ReviewManagementPage() {
                                 Hasil Test Zoom
                             </span>
 
-                            <span className="rounded-full bg-cyan-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-cyan-700">
+                            <span className="rounded-full bg-violet-100 px-4 py-2 text-xs font-black uppercase tracking-wide text-violet-700">
                                 Hasil Test MMPI
                             </span>
 
@@ -626,7 +626,7 @@ export default function ReviewManagementPage() {
                                     onChange={(event) =>
                                         setEntriesPerPage(Number(event.target.value))
                                     }
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 >
                                     <option value={5}>5</option>
                                     <option value={10}>10</option>
@@ -646,7 +646,7 @@ export default function ReviewManagementPage() {
                                     value={search}
                                     onChange={(event) => setSearch(event.target.value)}
                                     placeholder="Cari nama, hasil test, interview, review..."
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 md:w-96"
                                 />
                             </div>
                         </div>
@@ -664,7 +664,7 @@ export default function ReviewManagementPage() {
                                 onClick={() => setActiveSource(tab.key)}
                                 className={`rounded-2xl px-4 py-2 text-xs font-black uppercase tracking-wide transition ${
                                     activeSource === tab.key
-                                        ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+                                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -859,7 +859,7 @@ export default function ReviewManagementPage() {
                                 onClick={() => setCurrentPage(page)}
                                 className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                     currentPage === page
-                                        ? "bg-teal-600 text-white"
+                                        ? "bg-indigo-600 text-white"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -885,7 +885,7 @@ export default function ReviewManagementPage() {
                         <div className="shrink-0 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
-                                    <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                         Review Management - {selectedSource}
                                     </div>
 
@@ -963,7 +963,7 @@ export default function ReviewManagementPage() {
                                                 </div>
 
                                                 <div className="text-right">
-                                                    <div className="text-2xl font-black text-teal-600">
+                                                    <div className="text-2xl font-black text-indigo-600">
                                                         {pelamar?.persentase_kelengkapan ?? 0}%
                                                     </div>
                                                     <div className="text-xs font-bold text-slate-400">
@@ -974,7 +974,7 @@ export default function ReviewManagementPage() {
 
                                             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
                                                 <div
-                                                    className="h-full rounded-full bg-teal-600 transition-all"
+                                                    className="h-full rounded-full bg-indigo-600 transition-all"
                                                     style={{
                                                         width: `${pelamar?.persentase_kelengkapan ?? 0}%`,
                                                     }}
@@ -1000,7 +1000,7 @@ export default function ReviewManagementPage() {
                                                             <span
                                                                 className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
                                                                     step.completed
-                                                                        ? "bg-teal-100 text-teal-700"
+                                                                        ? "bg-indigo-100 text-indigo-700"
                                                                         : "bg-slate-100 text-slate-400"
                                                                 }`}
                                                             >
@@ -1049,8 +1049,8 @@ export default function ReviewManagementPage() {
                                                     </div>
                                                 </div>
 
-                                                <div className="rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
-                                                    <div className="mb-3 text-xs font-black uppercase tracking-wide text-cyan-700">
+                                                <div className="rounded-3xl border border-violet-100 bg-violet-50/70 p-4">
+                                                    <div className="mb-3 text-xs font-black uppercase tracking-wide text-violet-700">
                                                         Hasil Test MMPI
                                                     </div>
 
@@ -1083,7 +1083,7 @@ export default function ReviewManagementPage() {
                                                 name="status"
                                                 value={form.status}
                                                 onChange={handleChange}
-                                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                             >
                                                 <option value="">Pilih Status</option>
                                                 {STATUS_OPTIONS.map((option) => (
@@ -1110,7 +1110,7 @@ export default function ReviewManagementPage() {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {loading ? "Menyimpan..." : "Simpan Review"}
                                     </button>
@@ -1133,7 +1133,7 @@ function DateInput({ label, value, onChange }) {
                 type="date"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </label>
     );
@@ -1155,7 +1155,7 @@ function SectionTitle({ title }) {
     return (
         <div>
             <h3 className="text-lg font-black text-slate-950">{title}</h3>
-            <div className="mt-2 h-1 w-12 rounded-full bg-teal-500" />
+            <div className="mt-2 h-1 w-12 rounded-full bg-indigo-500" />
         </div>
     );
 }
@@ -1181,7 +1181,7 @@ function FileLink({ url }) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex rounded-xl bg-white px-3 py-2 text-xs font-black text-teal-700 underline decoration-teal-300 underline-offset-4 transition hover:text-teal-900"
+            className="inline-flex rounded-xl bg-white px-3 py-2 text-xs font-black text-indigo-700 underline decoration-indigo-300 underline-offset-4 transition hover:text-indigo-900"
         >
             Lihat File
         </a>
@@ -1203,7 +1203,7 @@ function Textarea({ label, name, value, onChange, required = false, placeholder 
                 required={required}
                 placeholder={placeholder}
                 rows={8}
-                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );

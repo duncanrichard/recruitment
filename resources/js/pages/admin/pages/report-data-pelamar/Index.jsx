@@ -94,10 +94,10 @@ export default function ReportDataPelamarPage() {
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
             <div className="mx-auto max-w-7xl space-y-6">
-                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-teal-900 p-6 text-white shadow-xl">
+                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-900 p-6 text-white shadow-xl">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-teal-100 ring-1 ring-white/10">
+                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-indigo-100 ring-1 ring-white/10">
                                 Recruitment Analytics
                             </div>
 
@@ -168,7 +168,7 @@ export default function ReportDataPelamarPage() {
                                     type="date"
                                     value={tanggalAwal}
                                     onChange={(event) => setTanggalAwal(event.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -180,7 +180,7 @@ export default function ReportDataPelamarPage() {
                                     type="date"
                                     value={tanggalAkhir}
                                     onChange={(event) => setTanggalAkhir(event.target.value)}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -193,7 +193,7 @@ export default function ReportDataPelamarPage() {
                                     value={perusahaan}
                                     onChange={(event) => setPerusahaan(event.target.value)}
                                     placeholder="Cari nama perusahaan"
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -460,7 +460,7 @@ function ProgressList({ items }) {
 
                         <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                             <div
-                                className="h-full rounded-full bg-teal-500"
+                                className="h-full rounded-full bg-indigo-500"
                                 style={{ width: `${Math.max(percent, value > 0 ? 4 : 0)}%` }}
                             />
                         </div>
@@ -498,7 +498,7 @@ function TrendChart({ items }) {
                     >
                         <p className="text-xs font-black text-slate-700">{value}</p>
                         <div
-                            className="w-10 rounded-t-2xl bg-teal-500 shadow-sm transition"
+                            className="w-10 rounded-t-2xl bg-indigo-500 shadow-sm transition"
                             style={{ height: `${Math.max(height, value > 0 ? 16 : 0)}px` }}
                         />
                         <p className="w-16 truncate text-center text-[11px] font-bold text-slate-500">

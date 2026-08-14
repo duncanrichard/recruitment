@@ -777,7 +777,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             value={catatanForm.catatan}
                             onChange={(e) => setCatatanForm({ catatan: e.target.value })}
                             rows={5}
-                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             placeholder="Tambahkan catatan interview..."
                         />
                     </div>
@@ -800,7 +800,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                 ← Kembali
                             </button>
 
-                            <div className="inline-flex whitespace-nowrap rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                            <div className="inline-flex whitespace-nowrap rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                 Detail Jadwal Interview
                             </div>
 
@@ -867,7 +867,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                             <button
                                                 type="button"
                                                 onClick={() => openStatusModal(kandidat)}
-                                                className="whitespace-nowrap rounded-full transition hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-teal-100"
+                                                className="whitespace-nowrap rounded-full transition hover:scale-[1.02] focus:outline-none focus:ring-4 focus:ring-indigo-100"
                                                 title="Klik untuk edit status kehadiran"
                                             >
                                                 <Badge value={kandidat.status_kehadiran} />
@@ -879,7 +879,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                                 type="button"
                                                 disabled={!canEditHasilInterview(kandidat)}
                                                 onClick={() => openHasilModal(kandidat)}
-                                                className={`whitespace-nowrap rounded-full transition focus:outline-none focus:ring-4 focus:ring-teal-100 ${
+                                                className={`whitespace-nowrap rounded-full transition focus:outline-none focus:ring-4 focus:ring-indigo-100 ${
                                                     canEditHasilInterview(kandidat)
                                                         ? "hover:scale-[1.02]"
                                                         : "cursor-not-allowed opacity-60"
@@ -957,7 +957,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             <button
                                 type="submit"
                                 disabled={tableLoading}
-                                className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 Filter
                             </button>
@@ -980,7 +980,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Cari kandidat interview..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-80"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 md:w-80"
                             />
                         </div>
                     </div>
@@ -994,7 +994,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                             <select
                                 value={entriesPerPage}
                                 onChange={(e) => setEntriesPerPage(Number(e.target.value))}
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             >
                                 <option value={5}>5</option>
                                 <option value={10}>10</option>
@@ -1057,7 +1057,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                                 <button
                                                     type="button"
                                                     onClick={() => fetchDetail(item.jadwal_interview_id)}
-                                                    className="whitespace-nowrap rounded-2xl border border-teal-100 bg-teal-50 px-4 py-2 text-xs font-black text-teal-700 shadow-sm transition hover:bg-teal-100"
+                                                    className="whitespace-nowrap rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 shadow-sm transition hover:bg-indigo-100"
                                                 >
                                                     Detail
                                                 </button>
@@ -1136,7 +1136,7 @@ export default function KandidatInterviewPage({ actionSignals }) {
                                 onClick={() => setCurrentPage(page)}
                                 className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                     currentPage === page
-                                        ? "bg-teal-600 text-white"
+                                        ? "bg-indigo-600 text-white"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -1172,7 +1172,7 @@ function DateInput({ label, value, onChange }) {
                 type="date"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </label>
     );
@@ -1223,7 +1223,7 @@ function FormModal({ title, subtitle, children, onClose, onSubmit, loading, subm
                 <div className="shrink-0 border-b border-slate-200 bg-white">
                     <div className="flex items-center justify-between gap-4 px-6 py-5">
                         <div>
-                            <div className="inline-flex whitespace-nowrap rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                            <div className="inline-flex whitespace-nowrap rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                 Form Kandidat Interview
                             </div>
 
@@ -1258,7 +1258,7 @@ function FormModal({ title, subtitle, children, onClose, onSubmit, loading, subm
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="whitespace-nowrap rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {loading ? "Menyimpan..." : submitLabel}
                             </button>
@@ -1281,7 +1281,7 @@ function InputField({ label, required, ...props }) {
             <input
                 {...props}
                 required={required}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
         </div>
     );
@@ -1295,7 +1295,7 @@ function SelectField({ label, value, onChange, options, placeholder }) {
             <select
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             >
                 <option value="">{placeholder}</option>
                 {options.map((item) => (
@@ -1370,7 +1370,7 @@ function SelectJadwal({ label, name, value, onChange, options, required = false,
                 onChange={onChange}
                 required={required}
                 disabled={disabled}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-100"
             >
                 <option value="">Pilih jadwal interview</option>
 
@@ -1461,7 +1461,7 @@ function Select2Multi({ label, value, options, onChange, placeholder = "Pilih da
                     }
                 }}
                 className={`min-h-[54px] w-full rounded-2xl border bg-white px-3 py-2 shadow-sm transition ${
-                    open ? "border-teal-500 ring-4 ring-teal-100" : "border-slate-200"
+                    open ? "border-indigo-500 ring-4 ring-indigo-100" : "border-slate-200"
                 }`}
             >
                 <div className="flex flex-wrap items-center gap-2">
@@ -1471,13 +1471,13 @@ function Select2Multi({ label, value, options, onChange, placeholder = "Pilih da
                         return (
                             <span
                                 key={item.id}
-                                className="inline-flex max-w-full items-center gap-2 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-black text-teal-700"
+                                className="inline-flex max-w-full items-center gap-2 rounded-xl bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700"
                                 title={`${getLabel(item)}${posisiLabel !== "-" ? ` - ${posisiLabel}` : ""}`}
                             >
                                 <span className="max-w-[240px] truncate">
                                     {getLabel(item)}
                                     {posisiLabel !== "-" && (
-                                        <span className="font-bold text-teal-600"> · {posisiLabel}</span>
+                                        <span className="font-bold text-indigo-600"> · {posisiLabel}</span>
                                     )}
                                 </span>
 
@@ -1487,7 +1487,7 @@ function Select2Multi({ label, value, options, onChange, placeholder = "Pilih da
                                         event.stopPropagation();
                                         onChange(value.filter((id) => id !== item.id));
                                     }}
-                                    className="rounded-full text-sm leading-none text-teal-700 hover:text-rose-600"
+                                    className="rounded-full text-sm leading-none text-indigo-700 hover:text-rose-600"
                                 >
                                     ×
                                 </button>
@@ -1538,7 +1538,7 @@ function Select2Multi({ label, value, options, onChange, placeholder = "Pilih da
                                     key={item.id}
                                     type="button"
                                     onClick={() => handleSelect(item.id)}
-                                    className="flex w-full items-start justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-teal-50 hover:text-teal-700"
+                                    className="flex w-full items-start justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-indigo-50 hover:text-indigo-700"
                                 >
                                     <span className="min-w-0">
                                         <span className="block truncate font-black text-slate-800">

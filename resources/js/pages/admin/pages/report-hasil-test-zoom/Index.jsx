@@ -100,10 +100,10 @@ export default function ReportHasilTestZoomPage() {
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
             <div className="mx-auto max-w-7xl space-y-6">
-                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-900 p-6 text-white shadow-xl">
+                <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-violet-900 p-6 text-white shadow-xl">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-cyan-100 ring-1 ring-white/10">
+                            <div className="mb-3 inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-widest text-violet-100 ring-1 ring-white/10">
                                 Zoom Test Analytics
                             </div>
 
@@ -178,7 +178,7 @@ export default function ReportHasilTestZoomPage() {
                                     type="date"
                                     value={tanggalAwal}
                                     onChange={(event) => setTanggalAwal(event.target.value)}
-                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                 />
                             </div>
 
@@ -191,7 +191,7 @@ export default function ReportHasilTestZoomPage() {
                                     type="date"
                                     value={tanggalAkhir}
                                     onChange={(event) => setTanggalAkhir(event.target.value)}
-                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                 />
                             </div>
 
@@ -203,7 +203,7 @@ export default function ReportHasilTestZoomPage() {
                                 <select
                                     value={statusKehadiran}
                                     onChange={(event) => setStatusKehadiran(event.target.value)}
-                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                 >
                                     <option value="semua">Semua</option>
                                     <option value="hadir">Hadir</option>
@@ -220,7 +220,7 @@ export default function ReportHasilTestZoomPage() {
                                 <select
                                     value={hasilTest}
                                     onChange={(event) => setHasilTest(event.target.value)}
-                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                 >
                                     <option value="semua">Semua</option>
                                     <option value="lolos">Lolos</option>
@@ -496,7 +496,7 @@ function ProgressList({ items }) {
 
                         <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                             <div
-                                className="h-full rounded-full bg-cyan-500"
+                                className="h-full rounded-full bg-violet-500"
                                 style={{ width: `${Math.max(percent, value > 0 ? 4 : 0)}%` }}
                             />
                         </div>
@@ -535,7 +535,7 @@ function TrendChart({ items }) {
                         <p className="text-xs font-black text-slate-700">{value}</p>
 
                         <div
-                            className="w-10 rounded-t-2xl bg-cyan-500 shadow-sm transition"
+                            className="w-10 rounded-t-2xl bg-violet-500 shadow-sm transition"
                             style={{ height: `${Math.max(height, value > 0 ? 16 : 0)}px` }}
                         />
 

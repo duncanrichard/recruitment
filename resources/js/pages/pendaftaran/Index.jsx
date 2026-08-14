@@ -38,6 +38,7 @@ function PendaftaranPage() {
     const [loadingToken, setLoadingToken] = useState(false);
     const [loadingSubmit, setLoadingSubmit] = useState(false);
     const [pelamarAktif, setPelamarAktif] = useState(null);
+    const [notification, setNotification] = useState(null);
 
     const [cekTahapanForm, setCekTahapanForm] = useState({
         token: "",
@@ -649,6 +650,21 @@ function PendaftaranPage() {
         });
 
         return nextErrors;
+    };
+
+    const makeRequestError = (message, laravelErrors = {}) => {
+        const error = new Error(message);
+        error.validationErrors = normalizeLaravelErrors(laravelErrors);
+        return error;
+    };
+
+    const showErrorNotification = (error, fallback) => {
+        setNotification({
+            type: "error",
+            title: "Data Belum Lengkap",
+            message: error?.message || fallback,
+            details: Object.values(error?.validationErrors || {}).filter(Boolean),
+        });
     };
 
     const parseResponseJson = async (response) => {
@@ -1953,7 +1969,7 @@ function PendaftaranPage() {
                 setErrors(normalizeLaravelErrors(result.errors));
             }
 
-            throw new Error(result.message || "Gagal menyimpan data diri.");
+            throw makeRequestError(result.message || "Gagal menyimpan data diri.", result.errors);
         }
 
         if (result.data) {
@@ -2034,9 +2050,7 @@ function PendaftaranPage() {
                 setErrors(normalizeLaravelErrors(result.errors));
             }
 
-            throw new Error(
-                result.message || "Gagal menyimpan riwayat keluarga."
-            );
+            throw makeRequestError(result.message || "Gagal menyimpan riwayat keluarga.", result.errors);
         }
 
         if (result.data) {
@@ -2158,9 +2172,7 @@ function PendaftaranPage() {
                 setErrors(normalizeLaravelErrors(result.errors));
             }
 
-            throw new Error(
-                result.message || "Gagal menyimpan riwayat kesehatan."
-            );
+            throw makeRequestError(result.message || "Gagal menyimpan riwayat kesehatan.", result.errors);
         }
 
         if (result.data) {
@@ -2314,9 +2326,7 @@ function PendaftaranPage() {
                 setErrors(normalizeLaravelErrors(result.errors));
             }
 
-            throw new Error(
-                result.message || "Gagal menyimpan riwayat pekerjaan."
-            );
+            throw makeRequestError(result.message || "Gagal menyimpan riwayat pekerjaan.", result.errors);
         }
 
         if (result.data) {
@@ -2389,9 +2399,7 @@ function PendaftaranPage() {
                 setErrors(normalizeLaravelErrors(result.errors));
             }
 
-            throw new Error(
-                result.message || "Gagal menyimpan kesiapan bekerja."
-            );
+            throw makeRequestError(result.message || "Gagal menyimpan kesiapan bekerja.", result.errors);
         }
 
         if (result.data) {
@@ -3083,7 +3091,7 @@ function PendaftaranPage() {
             });
         } catch (error) {
             console.error("Gagal menyimpan data step:", error);
-            alert(error.message || "Gagal menyimpan data step ini.");
+            showErrorNotification(error, "Gagal menyimpan data step ini.");
         } finally {
             setLoadingSubmit(false);
         }
@@ -3113,10 +3121,10 @@ function PendaftaranPage() {
         try {
             const savedPelamar = await saveCurrentStep();
             syncProgressFromPelamarOrForm(savedPelamar);
-            alert("Data berhasil diperbarui.");
+            setNotification({ type: "success", title: "Data Tersimpan", message: "Data pendaftaran berhasil diperbarui.", details: [] });
         } catch (error) {
             console.error("Gagal memperbarui data:", error);
-            alert(error.message || "Terjadi kesalahan saat memperbarui data.");
+            showErrorNotification(error, "Terjadi kesalahan saat memperbarui data.");
         } finally {
             setLoadingSubmit(false);
         }
@@ -3150,7 +3158,7 @@ function PendaftaranPage() {
             syncProgressFromPelamarOrForm(savedPelamar);
         } catch (error) {
             console.error("Gagal menyimpan data step:", error);
-            alert(error.message || "Gagal menyimpan data step ini.");
+            showErrorNotification(error, "Gagal menyimpan data step ini.");
             setLoadingSubmit(false);
             return;
         }
@@ -3437,9 +3445,7 @@ function PendaftaranPage() {
 
                                 <div className="mt-8 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-lg backdrop-blur">
                                     <div className="flex items-start gap-3">
-                                        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300 text-lg font-black text-slate-950">
-                                            !
-                                        </div>
+                                        <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300 text-lg font-black text-slate-950">!</div>
 
                                         <div>
                                             <h3 className="font-bold text-white">
@@ -3538,6 +3544,47 @@ function PendaftaranPage() {
                     </div>
                 </div>
             </div>
+
+            {notification && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="candidate-notification-title">
+                    <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] bg-white shadow-2xl">
+                        <div className={`h-2 shrink-0 ${notification.type === "success" ? "bg-emerald-500" : "bg-gradient-to-r from-rose-500 to-red-600"}`} />
+                        <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:p-8">
+                            <div className="flex items-start gap-4">
+                                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl font-black ${notification.type === "success" ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+                                    {notification.type === "success" ? "✓" : "!"}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className={`text-xs font-black uppercase tracking-[0.16em] ${notification.type === "success" ? "text-emerald-600" : "text-rose-600"}`}>
+                                        {notification.type === "success" ? "Berhasil" : "Perlu diperbaiki"}
+                                    </p>
+                                    <h2 id="candidate-notification-title" className="mt-1 text-2xl font-black text-slate-950">{notification.title}</h2>
+                                    <p className="mt-2 text-sm font-medium leading-6 text-slate-600">{notification.message}</p>
+                                </div>
+                            </div>
+
+                            {notification.details?.length > 0 && (
+                                <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50 p-4">
+                                    <p className="text-sm font-black text-rose-800">Silakan periksa isian berikut:</p>
+                                    <ul className="mt-3 space-y-2">
+                                        {notification.details.map((detail, index) => (
+                                            <li key={`${detail}-${index}`} className="flex gap-3 text-sm font-semibold leading-5 text-rose-700">
+                                                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+                                                <span>{detail}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                        <div className="shrink-0 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:px-8">
+                            <button type="button" autoFocus onClick={() => setNotification(null)} className={`w-full rounded-2xl px-6 py-3 text-sm font-black text-white shadow-lg transition ${notification.type === "success" ? "bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700" : "bg-slate-900 shadow-slate-200 hover:bg-slate-800"}`}>
+                                {notification.type === "success" ? "Lanjutkan" : "Periksa Form"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }

@@ -756,7 +756,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                             href={item.link_zoom}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
+                            className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700 transition hover:bg-violet-100"
                         >
                             Buka Link
                         </a>
@@ -814,7 +814,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         <button
                             type="button"
                             onClick={() => openGroupEditModal(item)}
-                            className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
+                            className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100"
                         >
                             Edit Group
                         </button>
@@ -822,7 +822,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                         <button
                             type="button"
                             onClick={() => openDetailModal(item)}
-                            className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-2 text-xs font-black text-teal-700 transition hover:bg-teal-100"
+                            className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700 transition hover:bg-indigo-100"
                         >
                             Detail
                         </button>
@@ -877,7 +877,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                        <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                             Data Jadwal Test
                         </div>
 
@@ -921,7 +921,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                                         }
                                     }}
                                     max={filterTanggalTestSelesai || undefined}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -935,7 +935,7 @@ export default function JadwalTestZoomPage({ actionSignals }) {
                                     value={filterTanggalTestSelesai}
                                     onChange={(e) => setFilterTanggalTestSelesai(e.target.value)}
                                     min={filterTanggalTestMulai || undefined}
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-700 shadow-md shadow-slate-100 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
                             </div>
 
@@ -1062,7 +1062,7 @@ function JadwalFormModal({
                 <div className="shrink-0 border-b border-slate-200 px-6 py-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                            <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                 {editingData ? "Edit Jadwal" : "Tambah Jadwal"}
                             </div>
 
@@ -1106,14 +1106,14 @@ function JadwalFormModal({
                             />
 
                             {!editingData && form.tanggal_skrining && (
-                                <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3">
-                                    <p className="text-sm font-black text-teal-800">
+                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                                    <p className="text-sm font-black text-indigo-800">
                                         {filteredPelamarByTanggal.length} pelamar
                                         belum dijadwalkan pada tanggal{" "}
                                         {formatDate(form.tanggal_skrining)}.
                                     </p>
 
-                                    <p className="mt-1 text-xs font-bold text-teal-700">
+                                    <p className="mt-1 text-xs font-bold text-indigo-700">
                                         Pelamar yang sudah memiliki jadwal Zoom
                                         tidak ditampilkan lagi.
                                     </p>
@@ -1177,7 +1177,7 @@ function JadwalFormModal({
                                         onChange={handleChange}
                                         placeholder="Contoh: Sesi 1"
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                     />
                                 </div>
 
@@ -1193,7 +1193,7 @@ function JadwalFormModal({
                                         onChange={handleChange}
                                         min={getMinDateTimeLocalValue()}
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                     />
                                 </div>
 
@@ -1209,7 +1209,7 @@ function JadwalFormModal({
                                         onChange={handleChange}
                                         min={form.jadwal_mulai || getMinDateTimeLocalValue()}
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                     />
                                 </div>
                             </div>
@@ -1228,7 +1228,7 @@ function JadwalFormModal({
                                     value={form.link_zoom}
                                     onChange={handleChange}
                                     placeholder="https://zoom.us/j/123456789"
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                 />
 
                                 <p className="mt-2 text-xs font-semibold text-slate-500">
@@ -1252,7 +1252,7 @@ function JadwalFormModal({
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {loading ? "Menyimpan..." : "Simpan Jadwal"}
                             </button>
@@ -1278,7 +1278,7 @@ function GroupEditModal({
                 <div className="shrink-0 border-b border-slate-200 px-6 py-5">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <div className="inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-cyan-700">
+                            <div className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-violet-700">
                                 Edit Group Jadwal
                             </div>
 
@@ -1304,8 +1304,8 @@ function GroupEditModal({
 
                 <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
                     <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                        <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
-                            <p className="text-xs font-black uppercase tracking-wide text-cyan-700">
+                        <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                            <p className="text-xs font-black uppercase tracking-wide text-violet-700">
                                 Group Dipilih
                             </p>
 
@@ -1332,7 +1332,7 @@ function GroupEditModal({
                                         onChange={onChange}
                                         placeholder="Contoh: Sesi 1"
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                     />
                                 </div>
 
@@ -1348,7 +1348,7 @@ function GroupEditModal({
                                         onChange={onChange}
                                         min={getMinDateTimeLocalValue()}
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                     />
                                 </div>
 
@@ -1364,7 +1364,7 @@ function GroupEditModal({
                                         onChange={onChange}
                                         min={form.jadwal_mulai || getMinDateTimeLocalValue()}
                                         required
-                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                     />
                                 </div>
 
@@ -1387,7 +1387,7 @@ function GroupEditModal({
                                     value={form.link_zoom}
                                     onChange={onChange}
                                     placeholder="https://zoom.us/j/123456789"
-                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                                 />
 
                                 <p className="mt-2 text-xs font-semibold text-slate-500">
@@ -1400,7 +1400,7 @@ function GroupEditModal({
                                     href={form.link_zoom}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex w-fit rounded-2xl bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-100"
+                                    className="inline-flex w-fit rounded-2xl bg-violet-50 px-4 py-2 text-sm font-black text-violet-700 transition hover:bg-violet-100"
                                 >
                                     Coba Buka Link
                                 </a>
@@ -1421,7 +1421,7 @@ function GroupEditModal({
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-cyan-100 transition hover:from-cyan-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-violet-100 transition hover:from-violet-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 {loading ? "Menyimpan..." : "Simpan Perubahan"}
                             </button>
@@ -1464,7 +1464,7 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                     href={detailData.link_zoom}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="mt-3 inline-flex rounded-2xl bg-cyan-50 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-100"
+                                    className="mt-3 inline-flex rounded-2xl bg-violet-50 px-4 py-2 text-sm font-black text-violet-700 transition hover:bg-violet-100"
                                 >
                                     Buka Link Zoom
                                 </a>
@@ -1591,7 +1591,7 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                     <div className="text-sm font-bold text-slate-700">
                                                                         {pelamar?.email || "-"}
                                                                     </div>
-                                                                    <div className="mt-1 text-xs font-black text-teal-700">
+                                                                    <div className="mt-1 text-xs font-black text-indigo-700">
                                                                         WA:{" "}
                                                                         {pelamar?.no_wa ||
                                                                             "-"}
@@ -1636,7 +1636,7 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                         href={item.link_zoom}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="inline-flex rounded-full bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
+                                                                        className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-xs font-black text-violet-700 transition hover:bg-violet-100"
                                                                     >
                                                                         Buka Link
                                                                     </a>
@@ -1663,7 +1663,7 @@ function DetailJadwalModal({ loading, detailData, onClose, onEdit, onDelete }) {
                                                                         onClick={() =>
                                                                             onEdit(item)
                                                                         }
-                                                                        className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-xs font-black text-cyan-700 transition hover:bg-cyan-100"
+                                                                        className="rounded-2xl border border-violet-100 bg-violet-50 px-4 py-2 text-xs font-black text-violet-700 transition hover:bg-violet-100"
                                                                     >
                                                                         Edit
                                                                     </button>
@@ -1813,7 +1813,7 @@ function DataTable({
                             onChange={(event) =>
                                 setEntriesPerPage(Number(event.target.value))
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                         >
                             <option value={5}>5</option>
                             <option value={10}>10</option>
@@ -1836,7 +1836,7 @@ function DataTable({
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 sm:w-96"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:w-96"
                         />
                     </div>
                 </div>
@@ -2026,8 +2026,8 @@ function Select2Single({
                     disabled
                         ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                         : open
-                        ? "border-teal-500 bg-white ring-4 ring-teal-100"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-teal-300"
+                        ? "border-indigo-500 bg-white ring-4 ring-indigo-100"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300"
                 }`}
             >
                 <span className={selectedOption ? "text-slate-800" : "text-slate-400"}>
@@ -2046,7 +2046,7 @@ function Select2Single({
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-xl border border-teal-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-teal-50"
+                            className="w-full rounded-xl border border-indigo-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-indigo-50"
                         />
                     </div>
 
@@ -2070,8 +2070,8 @@ function Select2Single({
                                         }}
                                         className={`block w-full px-4 py-3 text-left text-sm font-bold transition ${
                                             String(itemValue) === String(value)
-                                                ? "bg-teal-600 text-white"
-                                                : "text-slate-700 hover:bg-teal-50 hover:text-teal-800"
+                                                ? "bg-indigo-600 text-white"
+                                                : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-800"
                                         }`}
                                     >
                                         {labelText}
@@ -2179,8 +2179,8 @@ function Select2Multi({
                     disabled
                         ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
                         : open
-                        ? "border-teal-500 bg-white ring-4 ring-teal-100"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-teal-300"
+                        ? "border-indigo-500 bg-white ring-4 ring-indigo-100"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-300"
                 }`}
             >
                 {selectedOptions.length > 0 ? (
@@ -2195,7 +2195,7 @@ function Select2Multi({
                             return (
                                 <span
                                     key={itemValue}
-                                    className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700"
+                                    className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-black text-indigo-700"
                                 >
                                     {String(labelText).split(" • ")[0]}
 
@@ -2207,7 +2207,7 @@ function Select2Multi({
                                                 e.stopPropagation();
                                                 removeValue(itemValue);
                                             }}
-                                            className="text-teal-500 hover:text-teal-900"
+                                            className="text-indigo-500 hover:text-indigo-900"
                                         >
                                             ×
                                         </span>
@@ -2236,14 +2236,14 @@ function Select2Multi({
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder={searchPlaceholder}
-                            className="w-full rounded-xl border border-teal-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-teal-50"
+                            className="w-full rounded-xl border border-indigo-500 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 outline-none ring-4 ring-indigo-50"
                         />
 
                         <div className="mt-3 flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={selectAll}
-                                className="rounded-xl bg-teal-600 px-3 py-2 text-xs font-black text-white"
+                                className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-black text-white"
                             >
                                 Pilih Semua
                             </button>
@@ -2275,14 +2275,14 @@ function Select2Multi({
                                         onClick={() => toggleValue(itemValue)}
                                         className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm font-bold transition ${
                                             checked
-                                                ? "bg-teal-50 text-teal-800"
+                                                ? "bg-indigo-50 text-indigo-800"
                                                 : "text-slate-700 hover:bg-slate-50"
                                         }`}
                                     >
                                         <span
                                             className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
                                                 checked
-                                                    ? "border-teal-600 bg-teal-600 text-white"
+                                                    ? "border-indigo-600 bg-indigo-600 text-white"
                                                     : "border-slate-300 bg-white"
                                             }`}
                                         >

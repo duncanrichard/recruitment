@@ -301,7 +301,7 @@ export default function PermissionPage({ actionSignals }) {
                             <select
                                 value={selectedRoleId}
                                 onChange={handleSelectRole}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             >
                                 <option value="">Pilih Role</option>
 
@@ -324,7 +324,7 @@ export default function PermissionPage({ actionSignals }) {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Cari Master Data, Jabatan, View..."
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             />
                         </div>
                     </div>
@@ -343,7 +343,7 @@ export default function PermissionPage({ actionSignals }) {
                             type="button"
                             onClick={savePermissions}
                             disabled={loading || !selectedRoleId || selectedRole?.is_superadmin}
-                            className="rounded-2xl bg-teal-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {loading ? "Menyimpan..." : "Simpan Permission"}
                         </button>
@@ -351,7 +351,7 @@ export default function PermissionPage({ actionSignals }) {
                 </div>
 
                 {selectedRole?.is_superadmin && (
-                    <div className="mt-5 rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-700">
+                    <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">
                         Role Superadmin otomatis mendapatkan semua permission. Checkbox dikunci agar tetap full access.
                     </div>
                 )}
@@ -488,7 +488,7 @@ export default function PermissionPage({ actionSignals }) {
                                                                                 onChange={() =>
                                                                                     togglePermission(permission.id)
                                                                                 }
-                                                                                className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                                className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                                                                             />
                                                                         </label>
                                                                     </td>

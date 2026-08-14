@@ -408,7 +408,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
             <div className="rounded-[2rem] border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                        <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                             Master Data
                         </div>
 
@@ -446,7 +446,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 onChange={(event) =>
                                     setEntriesPerPage(Number(event.target.value))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             >
                                 <option value={5}>5</option>
                                 <option value={10}>10</option>
@@ -470,7 +470,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
                                 placeholder="Cari kode, nama, nomor, atau status Fonnte..."
-                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 md:w-96"
+                                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 md:w-96"
                             />
                         </div>
                     </div>
@@ -636,7 +636,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 onClick={() => setCurrentPage(page)}
                                 className={`rounded-xl px-4 py-2 text-sm font-black shadow-sm transition ${
                                     currentPage === page
-                                        ? "bg-teal-600 text-white"
+                                        ? "bg-indigo-600 text-white"
                                         : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
@@ -666,7 +666,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                         <div className="shrink-0 border-b border-slate-200 bg-white">
                             <div className="flex items-center justify-between gap-4 px-6 py-5">
                                 <div>
-                                    <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                         Form Data Perusahaan
                                     </div>
 
@@ -705,12 +705,12 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                 )}
 
                                 {!editId && (
-                                    <div className="rounded-2xl border border-teal-100 bg-teal-50 p-4 md:col-span-2">
-                                        <p className="text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 md:col-span-2">
+                                        <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
                                             Kode Perusahaan
                                         </p>
 
-                                        <p className="mt-1 text-sm font-bold text-teal-800">
+                                        <p className="mt-1 text-sm font-bold text-indigo-800">
                                             Kode akan dibuat otomatis secara random setelah data disimpan.
                                         </p>
                                     </div>
@@ -767,7 +767,7 @@ export default function DataPerusahaanPage({ actionSignals }) {
                                     <button
                                         type="submit"
                                         disabled={loading}
-                                        className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:from-teal-700 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {loading
                                             ? "Menyimpan..."
@@ -837,7 +837,7 @@ function Input({
                 required={required}
                 disabled={disabled}
                 placeholder={placeholder}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
             />
         </div>
     );

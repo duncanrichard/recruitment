@@ -379,7 +379,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                 onChange={(event) =>
                                     setFilterTanggalMmpiMulai(event.target.value)
                                 }
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             />
                         </div>
 
@@ -395,7 +395,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                 onChange={(event) =>
                                     setFilterTanggalMmpiSelesai(event.target.value)
                                 }
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                             />
                         </div>
 
@@ -535,7 +535,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                         <div className="shrink-0 border-b border-slate-200 px-6 py-5">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
-                                    <div className="inline-flex rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-teal-700">
+                                    <div className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
                                         Form Jadwal MMPI
                                     </div>
 
@@ -573,7 +573,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                             type="date"
                                             value={tanggal}
                                             onChange={(event) => setTanggal(event.target.value)}
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                             required
                                         />
                                     </div>
@@ -587,7 +587,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                             value={search}
                                             onChange={(event) => setSearch(event.target.value)}
                                             placeholder="Cari nama, email, atau nomor HP..."
-                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                                         />
                                     </div>
                                 </div>
@@ -650,7 +650,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                                                     type="checkbox"
                                                                     checked={checked}
                                                                     onChange={() => toggleSelect(item)}
-                                                                    className="h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                                                 />
                                                             </td>
 
@@ -731,7 +731,7 @@ export default function JadwalTestMmpiPage({ actionSignals }) {
                                             !tanggal ||
                                             selectedItems.length === 0
                                         }
-                                        className="rounded-2xl bg-teal-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-100 transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {saving
                                             ? "Menyimpan..."
