@@ -1,4 +1,5 @@
 import DashboardPage from "../pages/DashboardPage";
+import AiRecruitmentPage from "../pages/ai-recruitment/Index";
 import DataPelamarPage from "../pages/data-pelamar/Index";
 import DetailDataPelamarPage from "../pages/data-pelamar/Detail";
 
@@ -80,6 +81,13 @@ const configuredMenuItems = [
         description: "Ringkasan rekrutmen",
         icon: "⌂",
         component: DashboardPage,
+    },
+    {
+        key: "ai-recruitment",
+        label: "AI Recruitment",
+        description: "Insight kandidat dengan AI",
+        icon: "AI",
+        component: AiRecruitmentPage,
     },
     {
         key: "master-data",
@@ -424,6 +432,7 @@ const configuredMenuItems = [
 // Urutkan berdasarkan alur kerja HRD; menu konfigurasi ditempatkan di bagian bawah.
 const menuPriority = [
     "dashboard",
+    "ai-recruitment",
     "data-pelamar",
     "permintaan-kandidat",
     "jadwal-test",

@@ -56,4 +56,12 @@ return [
         'timeout' => (int) env('FONNTE_TIMEOUT', 20),
     ],
 
+    'ninerouter' => [
+        'api_key' => env('NINEROUTER_API_KEY'),
+        'base_url' => env('NINEROUTER_BASE_URL', 'http://127.0.0.1:20128/v1'),
+        'model' => env('NINEROUTER_MODEL', 'cx/gpt-5.6-terra'),
+        'connect_timeout' => (int) env('NINEROUTER_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('NINEROUTER_TIMEOUT', 60),
+    ],
+
 ];

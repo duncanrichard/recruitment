@@ -405,6 +405,15 @@ class PermissionSeeder extends Seeder
                     'export' => 'Export',
                 ],
             ],
+            [
+                'group' => 'AI Recruitment',
+                'label' => 'AI Recruitment',
+                'key' => 'admin.ai-recruitment',
+                'actions' => [
+                    'list' => 'View',
+                    'analyze' => 'Analyze',
+                ],
+            ],
         ];
 
         foreach ($modules as $module) {

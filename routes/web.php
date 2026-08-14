@@ -162,6 +162,7 @@ Route::middleware('auth')->group(function () {
     require __DIR__.'/permintaan_kandidat.php';
     require __DIR__.'/jadwal_offering_letter.php';
     require __DIR__.'/recruitment_audit.php';
+    require __DIR__.'/ai_recruitment.php';
 
     require __DIR__.'/report_data_pelamar.php';
     require __DIR__.'/report_hasil_test_zoom.php';
