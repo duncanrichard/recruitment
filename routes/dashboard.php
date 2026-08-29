@@ -11,4 +11,8 @@ Route::prefix('admin/dashboard')
     ->group(function () {
         Route::get('/summary', [DashboardController::class, 'summary'])
             ->name('summary');
+
+        Route::post('/ai-insights', [DashboardController::class, 'aiInsights'])
+            ->middleware(['permission:admin.ai-recruitment.analyze', 'throttle:6,1'])
+            ->name('ai-insights');
     });

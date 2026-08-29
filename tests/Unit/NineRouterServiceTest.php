@@ -43,4 +43,25 @@ class NineRouterServiceTest extends TestCase
 
         app(NineRouterService::class)->analyze([], 'candidate_summary');
     }
+
+    public function test_dashboard_insight_uses_aggregate_prompt_without_candidate_identity(): void
+    {
+        config()->set('services.ninerouter', ['api_key' => 'secret', 'base_url' => 'http://127.0.0.1:20128/v1', 'model' => 'test-model']);
+        Http::fake(['*' => Http::response([
+            'model' => 'test-model',
+            'choices' => [['message' => ['content' => '{"summary":"Funnel perlu perhatian.","strengths":["Pelamar bertambah"],"gaps":["Drop-off tinggi"],"follow_up":["Tinjau tahap Zoom"],"disclaimer":"Gunakan sebagai rekomendasi."}']]],
+        ])]);
+
+        $result = app(NineRouterService::class)->analyze(['total_pelamar' => 25], 'dashboard_insight');
+
+        $this->assertSame('Funnel perlu perhatian.', $result['summary']);
+        Http::assertSent(function ($request) {
+            $messages = $request->data()['messages'] ?? [];
+            $prompt = collect($messages)->pluck('content')->implode("\n");
+
+            return str_contains($prompt, 'Data agregat recruitment')
+                && str_contains($prompt, 'bottleneck funnel')
+                && ! str_contains($prompt, 'Data profesional kandidat');
+        });
+    }
 }

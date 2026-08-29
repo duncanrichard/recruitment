@@ -429,10 +429,11 @@ const configuredMenuItems = [
     },
 ];
 
-// Urutkan berdasarkan alur kerja HRD; menu konfigurasi ditempatkan di bagian bawah.
+// Master Data ditempatkan sebelum Data Pelamar agar referensi dapat disiapkan lebih dahulu.
 const menuPriority = [
     "dashboard",
     "ai-recruitment",
+    "master-data",
     "data-pelamar",
     "permintaan-kandidat",
     "jadwal-test",
@@ -441,7 +442,6 @@ const menuPriority = [
     "review-management",
     "jadwal-ol",
     "report",
-    "master-data",
     "account",
 ];
 

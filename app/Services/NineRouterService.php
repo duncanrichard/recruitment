@@ -9,7 +9,7 @@ use RuntimeException;
 
 class NineRouterService
 {
-    public function analyze(array $candidate, string $task): array
+    public function analyze(array $data, string $task): array
     {
         $model = trim((string) config('services.ninerouter.model'));
 
@@ -20,8 +20,15 @@ class NineRouterService
         $instructions = match ($task) {
             'interview_questions' => 'Susun pertanyaan interview yang relevan dan alasan setiap pertanyaan.',
             'data_review' => 'Temukan data profesional yang belum lengkap, tidak konsisten, atau perlu dikonfirmasi HR.',
+            'dashboard_insight' => 'Analisis data agregat recruitment ini. Temukan tren, bottleneck funnel, risiko operasional, dan rekomendasi tindakan HR yang paling prioritas. Jangan membuat benchmark atau fakta yang tidak tersedia. Jika volume data kecil, nyatakan keterbatasannya.',
             default => 'Ringkas kecocokan kandidat dengan posisi secara objektif, termasuk kekuatan, gap, dan tindak lanjut.',
         };
+
+        $isDashboardInsight = $task === 'dashboard_insight';
+        $systemPrompt = $isDashboardInsight
+            ? 'Anda adalah analis operasional recruitment Indonesia. Gunakan hanya data agregat yang diberikan, jangan mengarang benchmark, dan jangan membuat keputusan kandidat. Balas JSON valid dengan properti: summary (string), strengths (array string berisi sinyal positif), gaps (array string berisi risiko atau bottleneck), follow_up (array string berisi rekomendasi tindakan yang spesifik), disclaimer (string).'
+            : 'Anda adalah asisten HR Indonesia. Gunakan hanya data yang diberikan. Jangan mengarang fakta, jangan membuat keputusan lolos/gagal, dan jangan menggunakan atribut sensitif. Balas JSON valid dengan properti: summary (string), strengths (array string), gaps (array string), follow_up (array string), disclaimer (string).';
+        $dataLabel = $isDashboardInsight ? 'Data agregat recruitment' : 'Data profesional kandidat';
 
         try {
             $response = $this->request()->post($this->endpoint('/chat/completions'), [
@@ -30,8 +37,8 @@ class NineRouterService
                 'max_completion_tokens' => 1400,
                 'response_format' => ['type' => 'json_object'],
                 'messages' => [
-                    ['role' => 'system', 'content' => 'Anda adalah asisten HR Indonesia. Gunakan hanya data yang diberikan. Jangan mengarang fakta, jangan membuat keputusan lolos/gagal, dan jangan menggunakan atribut sensitif. Balas JSON valid dengan properti: summary (string), strengths (array string), gaps (array string), follow_up (array string), disclaimer (string).'],
-                    ['role' => 'user', 'content' => $instructions."\n\nData profesional kandidat:\n".json_encode($candidate, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)],
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $instructions."\n\n{$dataLabel}:\n".json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)],
                 ],
             ]);
         } catch (ConnectionException $exception) {

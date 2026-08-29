@@ -35,42 +35,42 @@ export default function AdminSidebar({
                         const hasChildren = Array.isArray(menu.children);
                         const active = isMenuActive(menu, activeMenu);
                         const open = Boolean(openMenus[menu.key]);
+                        const sectionLabel = getSectionLabel(menu.key);
 
                         return (
-                            <div key={menu.key}>
-                                <SidebarMenuButton
-                                    menu={menu}
-                                    active={active}
-                                    open={open}
-                                    hasChildren={hasChildren}
-                                    collapsed={collapsed}
-                                    onClick={() => {
-                                        if (collapsed && hasChildren) onExpand?.();
-                                        onMenuClick(menu);
-                                    }}
-                                />
-
-                                {hasChildren && open && (
-                                    <div className={`ml-5 mt-2 space-y-1 border-l border-white/10 pl-4 ${collapsed ? "lg:hidden" : ""}`}>
-                                        {menu.children.map((child) => (
-                                            <SidebarSubMenuButton
-                                                key={child.key}
-                                                child={child}
-                                                active={isChildActive(
-                                                    child,
-                                                    activeMenu
-                                                )}
-                                                onClick={() =>
-                                                    onSubMenuClick(
-                                                        menu.key,
-                                                        child.key
-                                                    )
-                                                }
-                                            />
-                                        ))}
+                            <React.Fragment key={menu.key}>
+                                {sectionLabel && (
+                                    <div className={`pt-3 first:pt-0 ${collapsed ? "lg:px-2" : "px-3"}`}>
+                                        <div className={`flex items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
+                                            <span className="h-px flex-1 bg-white/10" />
+                                            <span className={`text-[9px] font-black uppercase tracking-[0.18em] text-slate-500 ${collapsed ? "lg:hidden" : ""}`}>{sectionLabel}</span>
+                                            <span className="h-px flex-1 bg-white/10" />
+                                        </div>
                                     </div>
                                 )}
-                            </div>
+
+                                <div>
+                                    <SidebarMenuButton
+                                        menu={menu}
+                                        active={active}
+                                        open={open}
+                                        hasChildren={hasChildren}
+                                        collapsed={collapsed}
+                                        onClick={() => {
+                                            if (collapsed && hasChildren) onExpand?.();
+                                            onMenuClick(menu);
+                                        }}
+                                    />
+
+                                    {hasChildren && open && (
+                                        <div className={`ml-5 mt-2 space-y-1 border-l border-indigo-300/20 pl-4 ${collapsed ? "lg:hidden" : ""}`}>
+                                            {menu.children.map((child) => (
+                                                <SidebarSubMenuButton key={child.key} child={child} active={isChildActive(child, activeMenu)} onClick={() => onSubMenuClick(menu.key, child.key)} />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </React.Fragment>
                         );
                     })}
                 </nav>
@@ -111,6 +111,13 @@ function SidebarBrand({ collapsed, onToggle }) {
             </button>
         </div>
     );
+}
+
+function getSectionLabel(menuKey) {
+    if (menuKey === "dashboard") return "Workspace";
+    if (menuKey === "master-data") return "Persiapan Data";
+    if (menuKey === "data-pelamar") return "Alur Rekrutmen";
+    return null;
 }
 
 function SidebarMenuButton({ menu, active, open, hasChildren, collapsed, onClick }) {

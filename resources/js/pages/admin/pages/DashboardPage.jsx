@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import Select2 from "react-select";
 
 const STAGE_COLORS = {
     administrasi: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -30,17 +31,26 @@ const STAGE_BAR_COLORS = {
     interview_dipertimbangkan: "from-amber-400 to-amber-600",
 };
 
+const EMPTY_FILTERS = { date_from: "", date_to: "", company_id: "", position_id: "", source_id: "" };
+
 export default function DashboardPage() {
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [filters, setFilters] = useState(EMPTY_FILTERS);
+    const [aiResult, setAiResult] = useState(null);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState("");
 
-    const fetchSummary = async () => {
+    const fetchSummary = async (nextFilters = filters) => {
         setLoading(true);
         setErrorMessage("");
+        setAiResult(null);
+        setAiError("");
 
         try {
-            const response = await fetch("/admin/dashboard/summary", {
+            const query = new URLSearchParams(Object.entries(nextFilters).filter(([, value]) => value));
+            const response = await fetch(`/admin/dashboard/summary${query.size ? `?${query.toString()}` : ""}`, {
                 headers: {
                     Accept: "application/json",
                     "X-Requested-With": "XMLHttpRequest",
@@ -63,14 +73,47 @@ export default function DashboardPage() {
         }
     };
 
+    const runAiAnalysis = async () => {
+        setAiLoading(true);
+        setAiError("");
+
+        try {
+            const response = await fetch("/admin/dashboard/ai-insights", {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
+                },
+                body: JSON.stringify(summary?.active_filters || EMPTY_FILTERS),
+            });
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                setAiError(result.message || "Analisis AI belum dapat dibuat.");
+                return;
+            }
+
+            setAiResult(result.data || null);
+        } catch (error) {
+            console.error("Gagal membuat insight AI dashboard:", error);
+            setAiError("9Router tidak dapat dihubungi. Silakan coba kembali.");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
     useEffect(() => {
-        fetchSummary();
+        fetchSummary(EMPTY_FILTERS);
     }, []);
 
     const stages = useMemo(() => summary?.stages || [], [summary]);
     const monthlyApplicants = useMemo(() => summary?.monthly_applicants || [], [summary]);
     const insights = summary?.insights || {};
     const companyDistribution = summary?.company_distribution || [];
+    const funnel = summary?.funnel || { steps: [], bottleneck: null };
+    const filterOptions = summary?.filter_options || { companies: [], positions: [], sources: [] };
 
     const highestStage = useMemo(() => {
         if (!stages.length) return null;
@@ -88,7 +131,7 @@ export default function DashboardPage() {
                 <HeroSection
                     summary={summary}
                     loading={loading}
-                    onRefresh={fetchSummary}
+                    onRefresh={() => fetchSummary(filters)}
                     highestStage={highestStage}
                 />
 
@@ -97,6 +140,15 @@ export default function DashboardPage() {
                         <p className="text-sm font-bold text-rose-700">{errorMessage}</p>
                     </div>
                 )}
+
+                <DashboardFilters
+                    filters={filters}
+                    options={filterOptions}
+                    loading={loading}
+                    onChange={(name, value) => setFilters((current) => ({ ...current, [name]: value }))}
+                    onApply={() => fetchSummary(filters)}
+                    onReset={() => { setFilters(EMPTY_FILTERS); fetchSummary(EMPTY_FILTERS); }}
+                />
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <SummaryCard
@@ -135,6 +187,10 @@ export default function DashboardPage() {
                     <>
                         <InsightStrip insights={insights} />
 
+                        <FunnelAnalysis funnel={funnel} />
+
+                        <AiDashboardInsight result={aiResult} loading={aiLoading} error={aiError} disabled={!summary || loading} onAnalyze={runAiAnalysis} />
+
                         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
                             <AttentionPanel items={insights.attention_items || []} health={insights.health} />
                             <CompanyDistribution data={companyDistribution} />
@@ -150,6 +206,130 @@ export default function DashboardPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+function AiDashboardInsight({ result, loading, error, disabled, onAnalyze }) {
+    const groups = result ? [
+        { title: "Sinyal Positif", items: result.strengths || [], tone: "border-indigo-100 bg-indigo-50/70", dot: "bg-indigo-500" },
+        { title: "Risiko & Bottleneck", items: result.gaps || [], tone: "border-rose-100 bg-rose-50/60", dot: "bg-rose-500" },
+        { title: "Rekomendasi Prioritas", items: result.follow_up || [], tone: "border-violet-100 bg-violet-50/70", dot: "bg-violet-500" },
+    ] : [];
+
+    return (
+        <section className="relative overflow-hidden rounded-[2rem] border border-indigo-100 bg-white shadow-lg shadow-indigo-100/40">
+            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-violet-200/30 blur-3xl" />
+            <div className="relative border-b border-indigo-100 bg-gradient-to-r from-indigo-950 via-indigo-900 to-violet-900 p-6 text-white sm:p-7">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-lg font-black ring-1 ring-white/20">AI</div>
+                        <div>
+                            <div className="flex flex-wrap items-center gap-2"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-200">AI Executive Brief</p><span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-indigo-100 ring-1 ring-white/15">9Router</span></div>
+                            <h2 className="mt-2 text-2xl font-black">Analisis pipeline untuk keputusan HR</h2>
+                            <p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-indigo-100/80">AI membaca funnel, tren, drop-off, dan antrean operasional dari data agregat sesuai filter dashboard.</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onAnalyze} disabled={disabled || loading} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-xs font-black text-indigo-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"><span className={loading ? "animate-spin" : ""}>{loading ? "◌" : "✦"}</span>{loading ? "Menganalisis..." : result ? "Analisis Ulang" : "Buat Analisis AI"}</button>
+                </div>
+            </div>
+            <div className="relative p-6 sm:p-7">
+                {error && <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold leading-6 text-rose-700">{error}</div>}
+                {loading ? (
+                    <div className="grid gap-4 md:grid-cols-3">{[0, 1, 2].map((item) => <div key={item} className="h-40 animate-pulse rounded-3xl bg-slate-100" />)}</div>
+                ) : result ? (
+                    <>
+                        <div className="mb-5 rounded-3xl border border-slate-200 bg-slate-50/80 p-5"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">Ringkasan AI</p><p className="mt-2 text-sm font-semibold leading-7 text-slate-700">{result.summary || "AI belum memberikan ringkasan."}</p></div>
+                        <div className="grid gap-4 md:grid-cols-3">{groups.map((group) => <div key={group.title} className={`rounded-3xl border p-5 ${group.tone}`}><h3 className="text-sm font-black text-slate-900">{group.title}</h3>{group.items.length ? <ul className="mt-4 space-y-3">{group.items.map((item, index) => <li key={`${group.title}-${index}`} className="flex gap-3 text-xs font-semibold leading-5 text-slate-700"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${group.dot}`} />{item}</li>)}</ul> : <p className="mt-4 text-xs font-semibold text-slate-500">Tidak ada temuan khusus.</p>}</div>)}</div>
+                        <div className="mt-5 flex flex-col gap-2 border-t border-slate-100 pt-4 text-[11px] font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between"><span>{result.disclaimer || "Insight AI merupakan pendukung keputusan; keputusan akhir tetap pada HR."}</span><span className="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 font-black text-slate-600">Model: {result.model || "9Router"}</span></div>
+                    </>
+                ) : (
+                    <div className="rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/40 px-6 py-8 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm ring-1 ring-indigo-100">✦</div><p className="mt-4 text-sm font-black text-slate-800">Analisis belum dibuat</p><p className="mx-auto mt-1 max-w-xl text-xs font-semibold leading-5 text-slate-500">Terapkan filter bila diperlukan, lalu jalankan analisis. Nama, email, nomor WhatsApp, dan identitas kandidat tidak dikirim ke AI.</p></div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+function DashboardFilters({ filters, options, loading, onChange, onApply, onReset }) {
+    const activeCount = Object.values(filters).filter(Boolean).length;
+
+    return (
+        <section className="overflow-visible rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">Filter Insight</p>
+                    <h2 className="mt-1 text-lg font-black text-slate-950">Fokuskan data HR</h2>
+                </div>
+                <span className={`w-fit rounded-full px-3 py-1.5 text-[11px] font-black ${activeCount ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100" : "bg-slate-100 text-slate-500"}`}>{activeCount ? `${activeCount} filter aktif` : "Semua data"}</span>
+            </div>
+            <div className="p-5 sm:p-6">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+                    <div className="xl:col-span-2"><FilterInput label="Dari tanggal" type="date" value={filters.date_from} onChange={(value) => onChange("date_from", value)} /></div>
+                    <div className="xl:col-span-2"><FilterInput label="Sampai tanggal" type="date" value={filters.date_to} min={filters.date_from} onChange={(value) => onChange("date_to", value)} /></div>
+                    <div className="xl:col-span-3"><FilterSelect label="Perusahaan" value={filters.company_id} options={options.companies} placeholder="Semua perusahaan" onChange={(value) => onChange("company_id", value)} /></div>
+                    <div className="xl:col-span-3"><FilterSelect label="Posisi" value={filters.position_id} options={options.positions} placeholder="Semua posisi" onChange={(value) => onChange("position_id", value)} /></div>
+                    <div className="xl:col-span-2"><FilterSelect label="Sumber" value={filters.source_id} options={options.sources} placeholder="Semua sumber" onChange={(value) => onChange("source_id", value)} /></div>
+                </div>
+                <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs font-semibold text-slate-500">Pencarian pada pilihan tersedia. Kosongkan filter untuk menampilkan seluruh data yang dapat diakses.</p>
+                    <div className="flex gap-2 sm:shrink-0">
+                        <button type="button" onClick={onReset} disabled={loading || !activeCount} className="h-11 flex-1 rounded-xl border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none">Reset</button>
+                        <button type="button" onClick={onApply} disabled={loading} className="h-11 flex-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 text-xs font-black text-white shadow-lg shadow-indigo-100 transition hover:-translate-y-0.5 hover:shadow-indigo-200 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none">{loading ? "Memuat..." : "Terapkan Filter"}</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function FilterInput({ label, value, onChange, ...props }) {
+    return <label className="block"><span className="mb-2 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{label}</span><input {...props} value={value} onChange={(event) => onChange(event.target.value)} className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 text-xs font-bold text-slate-700 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50" /></label>;
+}
+
+function FilterSelect({ label, value, options = [], placeholder, onChange }) {
+    const selectOptions = options.map((option) => ({ value: String(option.id), label: option.label }));
+    const selected = selectOptions.find((option) => option.value === String(value)) || null;
+
+    return <div><span className="mb-2 block text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{label}</span><Select2 isClearable isSearchable value={selected} options={selectOptions} placeholder={placeholder} noOptionsMessage={() => "Data tidak ditemukan"} onChange={(option) => onChange(option?.value || "")} menuPortalTarget={document.body} menuPosition="fixed" styles={filterSelectStyles} /></div>;
+}
+
+const filterSelectStyles = {
+    control: (base, state) => ({ ...base, minHeight: 48, borderRadius: 12, borderColor: state.isFocused ? "#818cf8" : "#e2e8f0", backgroundColor: state.isFocused ? "#ffffff" : "rgba(248,250,252,.7)", boxShadow: state.isFocused ? "0 0 0 4px #eef2ff" : "none", cursor: "pointer", fontSize: 12, fontWeight: 700, ":hover": { borderColor: state.isFocused ? "#818cf8" : "#cbd5e1" } }),
+    valueContainer: (base) => ({ ...base, padding: "0 14px" }),
+    placeholder: (base) => ({ ...base, color: "#94a3b8" }),
+    singleValue: (base) => ({ ...base, color: "#334155" }),
+    indicatorSeparator: () => ({ display: "none" }),
+    dropdownIndicator: (base) => ({ ...base, color: "#64748b", paddingRight: 12 }),
+    clearIndicator: (base) => ({ ...base, color: "#94a3b8" }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menu: (base) => ({ ...base, borderRadius: 14, overflow: "hidden", border: "1px solid #e2e8f0", boxShadow: "0 18px 45px rgba(30,41,59,.16)" }),
+    option: (base, state) => ({ ...base, padding: "11px 14px", cursor: "pointer", fontSize: 12, fontWeight: 700, color: state.isSelected ? "#ffffff" : "#334155", backgroundColor: state.isSelected ? "#4f46e5" : state.isFocused ? "#eef2ff" : "#ffffff", ":active": { backgroundColor: state.isSelected ? "#4f46e5" : "#e0e7ff" } }),
+};
+
+function FunnelAnalysis({ funnel }) {
+    const steps = funnel?.steps || [];
+    const bottleneck = funnel?.bottleneck;
+
+    return (
+        <SectionCard>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div><p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600">Conversion Funnel</p><h2 className="mt-2 text-2xl font-black text-slate-950">Konversi Antar Tahap</h2><p className="mt-1 text-sm font-semibold text-slate-500">Kandidat yang mencapai tahap berikutnya dan jumlah drop-off.</p></div>
+                {bottleneck && Number(bottleneck.drop_off_rate || 0) > 0 && <div className="max-w-xs rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3"><p className="text-[10px] font-black uppercase tracking-wide text-violet-600">Titik perhatian terbesar</p><p className="mt-1 text-sm font-black text-violet-900">Menuju {bottleneck.label}</p><p className="mt-1 text-xs font-semibold text-violet-700">Drop-off {bottleneck.drop_off_rate}% ({formatNumber(bottleneck.drop_off)} kandidat)</p></div>}
+            </div>
+            <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                {steps.map((step, index) => (
+                    <div key={step.key} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="flex items-center justify-between"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-[10px] font-black text-indigo-700">{String(index + 1).padStart(2, "0")}</span>{index > 0 && <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-500 ring-1 ring-slate-200">{step.step_rate}%</span>}</div>
+                        <p className="mt-4 min-h-10 text-xs font-black leading-5 text-slate-700">{step.label}</p>
+                        <p className="mt-1 text-3xl font-black text-slate-950">{formatNumber(step.total)}</p>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-violet-500" style={{ width: `${Math.min(Number(step.overall_rate || 0), 100)}%` }} /></div>
+                        <p className="mt-2 text-[10px] font-bold text-slate-400">{step.overall_rate}% dari pelamar</p>
+                        {index > 0 && Number(step.drop_off || 0) > 0 && <p className="mt-2 text-[10px] font-black text-rose-500">−{formatNumber(step.drop_off)} belum lanjut</p>}
+                    </div>
+                ))}
+            </div>
+            <p className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-[11px] font-semibold leading-5 text-slate-500">Konversi dihitung dari kandidat yang tercatat mencapai setiap tahap dalam periode dan filter terpilih. Gunakan satu periode yang sama untuk perbandingan yang adil.</p>
+        </SectionCard>
     );
 }
 

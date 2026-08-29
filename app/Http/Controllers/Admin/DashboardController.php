@@ -4,21 +4,36 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\CompanyAccessService;
+use App\Services\NineRouterService;
+use App\Services\RecruitmentAuditService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use RuntimeException;
 
 class DashboardController extends Controller
 {
+    private array $dashboardFilters = [];
+
     public function index()
     {
         return view('pages.admin.index');
     }
 
-    public function summary(): JsonResponse
+    public function summary(Request $request): JsonResponse
     {
+        $this->dashboardFilters = $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'company_id' => ['nullable', 'uuid'],
+            'position_id' => ['nullable', 'uuid'],
+            'source_id' => ['nullable', 'uuid'],
+        ]);
+
         $pelamarIds = $this->getPelamarIds();
         $totalPelamar = $pelamarIds->count();
 
@@ -163,7 +178,68 @@ class DashboardController extends Controller
                 'recent_pelamar' => $this->getRecentPelamar(),
                 'insights' => $this->getOperationalInsights($pelamarIds, $stageCounts, $totalPelamar),
                 'company_distribution' => $this->getCompanyDistribution(),
+                'funnel' => $this->buildFunnel(
+                    $totalPelamar,
+                    $jadwalZoomIds->count(),
+                    $jadwalMmpiIds->count(),
+                    $interview->count(),
+                    $stageCounts
+                ),
+                'filter_options' => $this->getFilterOptions(),
+                'active_filters' => $this->dashboardFilters,
             ],
+        ]);
+    }
+
+    public function aiInsights(
+        Request $request,
+        NineRouterService $nineRouter,
+        RecruitmentAuditService $audit
+    ): JsonResponse {
+        $summaryResponse = $this->summary($request);
+        $summary = $summaryResponse->getData(true)['data'] ?? [];
+
+        // Hanya metrik agregat yang dikirim ke AI; recent_pelamar dan data pribadi tidak disertakan.
+        $aggregateData = collect($summary)->only([
+            'total_pelamar',
+            'total_jadwal_test_zoom',
+            'total_jadwal_test_mmpi',
+            'total_jadwal_interview',
+            'stages',
+            'stage_counts',
+            'monthly_applicants',
+            'insights',
+            'company_distribution',
+            'funnel',
+            'active_filters',
+        ])->all();
+
+        try {
+            $result = $nineRouter->analyze($aggregateData, 'dashboard_insight');
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 503);
+        }
+
+        $audit->record(
+            self::class,
+            (string) Str::uuid(),
+            'dashboard_ai_analyzed',
+            [
+                'task' => 'dashboard_insight',
+                'model' => $result['model'],
+                'filters' => $summary['active_filters'] ?? [],
+                'aggregate_only' => true,
+            ],
+            ($summary['active_filters']['company_id'] ?? null) ?: null
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Insight AI dashboard berhasil dibuat.',
+            'data' => $result,
         ]);
     }
 
@@ -179,6 +255,8 @@ class DashboardController extends Controller
 
         $query = DB::table('data_riwayat_diri');
         app(CompanyAccessService::class)->apply($query, Auth::user(), 'perusahaan_dilamar');
+
+        $this->applyDashboardFilters($query);
 
         return $query
             ->whereNotNull('id')
@@ -372,6 +450,7 @@ class DashboardController extends Controller
 
         $query = DB::table('data_riwayat_diri')->select($select);
         app(CompanyAccessService::class)->apply($query, Auth::user(), 'perusahaan_dilamar');
+        $query->whereIn('id', $this->getPelamarIds());
 
         if (Schema::hasColumn('data_riwayat_diri', 'deleted_at')) {
             $query->whereNull('deleted_at');
@@ -488,12 +567,117 @@ class DashboardController extends Controller
             ->limit(8);
 
         app(CompanyAccessService::class)->apply($query, Auth::user(), 'drd.perusahaan_dilamar');
+        $query->whereIn('drd.id', $this->getPelamarIds());
 
         return $query->get()->map(fn ($row) => [
             'id' => $row->company_id,
             'name' => $row->company_name,
             'total' => (int) $row->total,
         ])->all();
+    }
+
+    private function applyDashboardFilters($query): void
+    {
+        if (! Schema::hasTable('data_riwayat_diri')) {
+            return;
+        }
+
+        $filters = $this->dashboardFilters;
+
+        if (! empty($filters['date_from']) && Schema::hasColumn('data_riwayat_diri', 'created_at')) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+
+        if (! empty($filters['date_to']) && Schema::hasColumn('data_riwayat_diri', 'created_at')) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        if (! empty($filters['company_id']) && Schema::hasColumn('data_riwayat_diri', 'perusahaan_dilamar')) {
+            $query->where('perusahaan_dilamar', $filters['company_id']);
+        }
+
+        if (! empty($filters['position_id']) && Schema::hasColumn('data_riwayat_diri', 'posisi_yang_dilamar')) {
+            $query->where('posisi_yang_dilamar', $filters['position_id']);
+        }
+
+        if (! empty($filters['source_id']) && Schema::hasColumn('data_riwayat_diri', 'sumber_informasi_id')) {
+            $query->where('sumber_informasi_id', $filters['source_id']);
+        }
+    }
+
+    private function buildFunnel(int $total, int $zoom, int $mmpi, int $interview, array $stages): array
+    {
+        $finalDecision = (int) ($stages['interview_lolos'] ?? 0)
+            + (int) ($stages['interview_tidak_lolos'] ?? 0)
+            + (int) ($stages['interview_dipertimbangkan'] ?? 0);
+        $accepted = (int) ($stages['interview_lolos'] ?? 0);
+
+        $steps = [
+            ['key' => 'applicants', 'label' => 'Pelamar Masuk', 'total' => $total],
+            ['key' => 'zoom', 'label' => 'Masuk Test Zoom', 'total' => $zoom],
+            ['key' => 'mmpi', 'label' => 'Masuk Test MMPI', 'total' => $mmpi],
+            ['key' => 'interview', 'label' => 'Masuk Interview', 'total' => $interview],
+            ['key' => 'decision', 'label' => 'Keputusan Interview', 'total' => $finalDecision],
+            ['key' => 'accepted', 'label' => 'Lolos Interview', 'total' => $accepted],
+        ];
+
+        $previous = null;
+        foreach ($steps as &$step) {
+            $step['overall_rate'] = $total > 0 ? round(($step['total'] / $total) * 100, 1) : 0;
+            $step['step_rate'] = $previous !== null && $previous > 0
+                ? round(($step['total'] / $previous) * 100, 1)
+                : ($step['key'] === 'applicants' && $total > 0 ? 100 : 0);
+            $step['drop_off'] = $previous !== null ? max($previous - $step['total'], 0) : 0;
+            $step['drop_off_rate'] = $previous !== null && $previous > 0
+                ? round((max($previous - $step['total'], 0) / $previous) * 100, 1)
+                : 0;
+            $previous = $step['total'];
+        }
+        unset($step);
+
+        $bottleneck = collect($steps)->skip(1)->sortByDesc('drop_off_rate')->first();
+
+        return [
+            'steps' => $steps,
+            'bottleneck' => $bottleneck,
+        ];
+    }
+
+    private function getFilterOptions(): array
+    {
+        if (! Schema::hasTable('data_riwayat_diri')) {
+            return ['companies' => [], 'positions' => [], 'sources' => []];
+        }
+
+        $query = DB::table('data_riwayat_diri');
+        app(CompanyAccessService::class)->apply($query, Auth::user(), 'perusahaan_dilamar');
+        $accessibleIds = $query->pluck('id');
+
+        $companies = Schema::hasTable('data_perusahaan')
+            ? DB::table('data_perusahaan as dp')
+                ->join('data_riwayat_diri as drd', 'drd.perusahaan_dilamar', '=', 'dp.id')
+                ->whereIn('drd.id', $accessibleIds)
+                ->select('dp.id', 'dp.nama_perusahaan as label')
+                ->distinct()->orderBy('label')->get()->all()
+            : [];
+
+        $positions = Schema::hasTable('posisi')
+            ? DB::table('posisi as p')
+                ->join('data_riwayat_diri as drd', 'drd.posisi_yang_dilamar', '=', 'p.id')
+                ->whereIn('drd.id', $accessibleIds)
+                ->select('p.id', 'p.nama_posisi as label')
+                ->distinct()->orderBy('label')->get()->all()
+            : [];
+
+        $sources = Schema::hasTable('sumber_informasi') && Schema::hasColumn('data_riwayat_diri', 'sumber_informasi_id')
+            ? DB::table('sumber_informasi as si')
+                ->join('data_riwayat_diri as drd', 'drd.sumber_informasi_id', '=', 'si.id')
+                ->whereIn('drd.id', $accessibleIds)
+                ->select('si.id', 'si.informasi as label')
+                ->distinct()->orderBy('label')->get()->all()
+            : [];
+
+        return ['companies' => $companies, 'positions' => $positions, 'sources' => $sources];
     }
 
     private function normalizeHasilTest($value): ?string
